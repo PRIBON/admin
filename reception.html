@@ -66,6 +66,8 @@
   table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
   th,td{border:1px solid #e6e8ec;padding:6px 8px;text-align:left}
   th{background:#f4f9f5}
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+  .modal-box{background:#fff;border-radius:12px;padding:20px;max-width:780px;width:100%;max-height:92vh;overflow:auto}
 </style>
 </head>
 <body>
@@ -85,31 +87,25 @@
   <div class="tabs">
     <button class="tab active" data-tab="multi">📦 Chargement multi-magasin</button>
     <button class="tab" data-tab="simple">📄 Chargement simple</button>
+    <button class="tab" data-tab="g5">📥 À réceptionner sur G5</button>
+    <button class="tab" data-tab="archives">🗄️ Réceptions archivées</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
   </div>
   <div id="tab-multi"></div>
   <div id="tab-simple" class="hidden"></div>
+  <div id="tab-g5" class="hidden"></div>
+  <div id="tab-archives" class="hidden"></div>
   <div id="tab-suivi" class="hidden"></div>
 </div>
 
 <script>
 /* =========================== CONFIGURATION =========================== */
-const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
+const OAUTH_CLIENT_ID = "__CLIENT_ID.apps.googleusercontent.com__";
+const APPS_SCRIPT_URL = "__A_REMPLIR__";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
 // Laisse firebaseConfig vide ({}) pour un magasin pas encore prêt.
 const STORES = [
-  { code:"ROBESPIERRE", label:"Pribon Robespierre", firebaseConfig:{
-    
-    apiKey: "AIzaSyAe-oMdObRk0_JSMHK7F4Mgqo7yMrHEK5g",
-
-  authDomain: "robespierre-65cdf.firebaseapp.com",
-
-  databaseURL: "https://robespierre-65cdf-default-rtdb.europe-west1.firebasedatabase.app",
-
-  projectId: "robespierre-65cdf",
-
-  appId: "1:870656040014:web:8a33269cc4bc348145771f" } },
+  { code:"ROBESPIERRE", label:"Pribon Robespierre", firebaseConfig:{ /* apiKey, authDomain, databaseURL, projectId, appId */ } },
   { code:"TOLBIAC",     label:"Pribon Tolbiac",     firebaseConfig:{ } },
   { code:"BICHAT",      label:"Pribon Bichat",      firebaseConfig:{ } },
   { code:"BELLEVILLE",  label:"Pribon Belleville",  firebaseConfig:{ } }
@@ -160,16 +156,17 @@ function start(email){
   // Onglets
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   renderMulti(); renderSimple();
-  // Suivi live : écouteurs
+  // Écouteurs live : réceptions + documents de chaque magasin
   readyStores().forEach(s=>{ const db=dbByStore[s.code]; if(!db) return;
-    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); });
-    db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); });
+    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); });
+    db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderArchives(); });
   });
+  renderG5(); renderArchives();
   setInterval(renderSuivi,1000);
 }
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["multi","simple","suivi"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  ["multi","simple","g5","archives","suivi"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
 }
 
 /* ============================ PARSEURS ============================ */
@@ -251,12 +248,45 @@ function fmtFr(iso){ if(!iso) return ""; const [y,m,d]=iso.split("-"); return d+
 // Écrit un document parsé dans le Firebase du magasin
 async function loadToStore(code, parsed, {supplier,type,deliveryDate}){
   const db=dbByStore[code]; if(!db) throw new Error("Magasin "+code+" non configuré");
-  const store=STORES.find(s=>s.code===code)||{};
   const ref=db.ref("documents").push();
   await ref.set({ docNumber:parsed.docNumber||"(sans n°)", supplier:(supplier||parsed.supplier||"").trim()||"(fournisseur ?)",
     type:type||"BL", format:parsed.format, deliveryDate:fmtFr(deliveryDate)||"",
+    g5Key:parsed.g5Key||'ean',
     createdAt:firebase.database.ServerValue.TIMESTAMP, lines:parsed.lines });
 }
+// Détermine la clé utilisée pour le .txt G5 : EAN si présent, sinon on propose le code article.
+function detectG5Key(parsed){
+  const hasEan=(parsed.lines||[]).some(l=>l.ean&&String(l.ean).trim().length>=6);
+  if(hasEan) return 'ean';
+  const hasArticle=(parsed.lines||[]).some(l=>l.article);
+  if(hasArticle){
+    const ok=confirm("⚠️ Pas d'EAN sur ce document.\n\nUtiliser le CODE ARTICLE pour le .txt à charger sur G5 ?\n\n(OK = oui, utiliser le code article · Annuler = laisser tel quel)");
+    return ok?'article':'ean';
+  }
+  return 'ean';
+}
+// Clé de ligne identique à l'app vendeur (pour retrouver la quantité réelle).
+function lineKeyOf(l,idx){ const a=(l.article||"").toString().trim(); return a?("a_"+a.replace(/[.#$/\[\]]/g,"_")):("i_"+idx); }
+// Construit le .txt G5 : col1 = EAN (ou code article), col2 = quantité réelle reçue. Séparateur tabulation.
+function buildG5Txt(rec, doc){
+  const key=(doc&&doc.g5Key)||'ean';
+  const active=((doc&&doc.lines)?doc.lines:[]).filter(l=>!l.nonLivre);
+  const out=[];
+  active.forEach((l,i)=>{
+    const st=(rec.lines||{})[lineKeyOf(l,i)];
+    const reel=st?(st.reel!=null?st.reel:l.attendu):l.attendu;
+    const code=key==='article'?(l.article||l.ean||''):(l.ean||l.article||'');
+    if(!code) return;
+    out.push(code+"\t"+reel);
+  });
+  return out.join("\r\n");
+}
+function downloadTxt(filename, content){
+  const blob=new Blob([content],{type:"text/plain;charset=utf-8"});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function dateShort(ts){ if(!ts) return ""; return new Date(ts).toLocaleDateString("fr-FR"); }
 
 /* ==================== ONGLET CHARGEMENT MULTI-MAGASIN ==================== */
 const multiFiles={}; // code -> { file, parsed, deliveryDate, supplier }
@@ -287,7 +317,8 @@ function renderMulti(){
   updateMultiSummary();
 }
 function parseNote(p){
-  return `<div class="parse-note">N° <b>${esc(p.docNumber||'—')}</b> · ${esc(p.format)} · ${p.lines.length} lignes${p.skipped?(' · '+p.skipped+' ignorée(s)'):''}</div>`;
+  const g5 = p.g5Key==='article' ? ' · clé G5 : <b>code article</b>' : (p.g5Key==='ean' ? ' · clé G5 : EAN' : '');
+  return `<div class="parse-note">N° <b>${esc(p.docNumber||'—')}</b> · ${esc(p.format)} · ${p.lines.length} lignes${p.skipped?(' · '+p.skipped+' ignorée(s)'):''}${g5}</div>`;
 }
 async function onMultiFile(code,file){
   if(!file) return;
@@ -295,6 +326,7 @@ async function onMultiFile(code,file){
   const note=document.getElementById('mnote_'+code); if(note) note.innerHTML='<div class="parse-note">Lecture…</div>';
   try{
     const parsed=await parseAnyFile(file);
+    parsed.g5Key=detectG5Key(parsed);
     multiFiles[code].parsed=parsed;
     if(parsed.supplier && !multiFiles[code].supplier) multiFiles[code].supplier=parsed.supplier;
     renderMulti();
@@ -345,6 +377,7 @@ async function onSimpleFile(file){
   const note=document.getElementById('snote'); note.innerHTML='<div class="parse-note">Lecture…</div>';
   try{
     simpleParsed=await parseAnyFile(file);
+    simpleParsed.g5Key=detectG5Key(simpleParsed);
     note.innerHTML=parseNote(simpleParsed);
     if(simpleParsed.supplier) document.getElementById('ssup').value=simpleParsed.supplier;
     document.getElementById('sbtn').disabled=false;
@@ -364,6 +397,108 @@ async function loadSimple(){
     document.getElementById('sdrop').classList.remove('has'); document.getElementById('sdrop').textContent='📄 Choisir le fichier BL (CSV / TXT / PDF)';
   }catch(e){ document.getElementById('smsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
   btn.disabled=false; btn.textContent='Charger dans le magasin';
+}
+
+/* ==================== ONGLET À RÉCEPTIONNER SUR G5 ==================== */
+function recsOf(code, filterFn){
+  const st=state[code]; if(!st) return [];
+  return Object.entries(st.receptions||{}).map(([id,r])=>({id,...r})).filter(filterFn);
+}
+function renderG5(){
+  const el=document.getElementById("tab-g5"); if(!el) return;
+  let total=0;
+  const html=STORES.map(s=>{
+    const st=state[s.code]; if(!st) return '';
+    const recs=recsOf(s.code, r=>r.status==="validated" && !r.g5Validated).sort((a,b)=>(b.validatedAt||0)-(a.validatedAt||0));
+    total+=recs.length;
+    if(!recs.length) return `<div class="store-card"><h3>${esc(s.label)}</h3><div class="muted">Rien à réceptionner sur G5.</div></div>`;
+    const rows=recs.map(r=>{ const nm=names[r.operatorCode]||"";
+      return `<div class="rec valid">
+        <div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>
+        <div style="font-size:12px;color:#666;margin-top:2px">Validée ${esc(heure(r.validatedAt))} · ${esc(dateShort(r.validatedAt))}${nm?(' · '+esc(nm)):''}${r.ecartCount?(' · ⚠ '+r.ecartCount+' écart(s)'):''}</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">👁 Afficher la réception</button>
+          <button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="markG5('${s.code}','${r.id}')">✓ Validé sur G5</button>
+        </div></div>`;
+    }).join("");
+    return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${recs.length}</span></h3>${rows}</div>`;
+  }).join("");
+  el.innerHTML=`<p class="muted" style="margin-top:0">Réceptions validées par les vendeurs, à saisir dans G5 (trié par date, par magasin). « Afficher » = détail + photos + <b>.txt G5</b>. « Validé sur G5 » = fait → va dans les archives.</p><div class="live-grid">${html}</div>`;
+}
+async function markG5(code,id){
+  if(!confirm("Confirmer : cette réception a bien été saisie sur G5 ?\n\nElle passera dans « Réceptions archivées ».")) return;
+  const db=dbByStore[code]; if(!db) return;
+  try{ await db.ref("receptions/"+id).update({ g5Validated:true, g5ValidatedAt:firebase.database.ServerValue.TIMESTAMP }); }
+  catch(e){ alert("Erreur : "+e.message); }
+}
+function openDetail(code,id){
+  const st=state[code]; if(!st) return; const r=st.receptions[id]; if(!r) return;
+  const doc=st.docs[r.docId]||null;
+  const active=((doc&&doc.lines)?doc.lines:[]).filter(l=>!l.nonLivre);
+  const codeHdr=(doc&&doc.g5Key==='article')?'Code article':'EAN';
+  let rows="";
+  if(active.length){
+    rows=active.map((l,i)=>{ const s2=(r.lines||{})[lineKeyOf(l,i)]||{};
+      const stat=s2.status==="conforme"?'✓ conforme':s2.status==="nonrecu"?'✗ pas reçu':s2.status==="ecart"?'⚠ écart':'—';
+      const reel=s2.status?(s2.reel!=null?s2.reel:l.attendu):"";
+      const codeVal=(doc&&doc.g5Key==='article')?(l.article||''):(l.ean||l.article||'');
+      const bg=s2.status==="ecart"?' style="background:#fff3e0"':(s2.status==="nonrecu"?' style="background:#fdecea"':'');
+      return `<tr${bg}><td>${esc(codeVal)}</td><td>${esc(l.designation||'')}</td><td>${l.attendu}</td><td>${esc(stat)}</td><td>${reel}</td><td>${esc(s2.ecartText||'')}</td></tr>`;
+    }).join("");
+  } else {
+    rows=Object.values(r.lines||{}).map(s2=>`<tr><td>${esc(s2.ean||s2.article||'')}</td><td>${esc(s2.designation||'')}</td><td>${s2.attendu}</td><td>${esc(s2.status||'')}</td><td>${s2.reel!=null?s2.reel:''}</td><td>${esc(s2.ecartText||'')}</td></tr>`).join("");
+  }
+  const photos=Object.values(r.lines||{}).filter(s2=>s2.photoUrl).map(s2=>`<a href="${esc(s2.photoUrl)}" target="_blank" rel="noreferrer" class="badge info" style="text-decoration:none;padding:4px 10px;display:inline-block;margin:2px">📷 ${esc(s2.designation||'photo')}</a>`).join(" ");
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">${esc(r.supplier||'')} · ${esc(r.docNumber||'')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div class="muted" style="margin:4px 0 10px">${esc((STORES.find(x=>x.code===code)||{}).label||code)} · validée ${esc(heure(r.validatedAt))} ${esc(dateShort(r.validatedAt))}</div>
+    <div style="overflow:auto;max-height:52vh"><table><thead><tr><th>${codeHdr}</th><th>Désignation</th><th>Attendu</th><th>Statut</th><th>Reçu</th><th>Écart</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${photos?('<div style="margin-top:10px"><b>Photos :</b> '+photos+'</div>'):'<div class="muted" style="margin-top:8px">Aucune photo.</div>'}
+    <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlG5('${code}','${id}')">⬇️ Télécharger le .txt G5</button>
+  </div>`;
+  back.onclick=(e)=>{ if(e.target===back) back.remove(); };
+  document.body.appendChild(back);
+}
+function dlG5(code,id){
+  const st=state[code]; const r=st.receptions[id]; const doc=st.docs[r.docId]||null;
+  const txt=buildG5Txt(r,doc);
+  if(!txt){ alert("Aucune ligne avec code (EAN / article) — impossible de générer le .txt."); return; }
+  downloadTxt("G5_"+code+"_"+(r.docNumber||"BL")+".txt", txt);
+}
+
+/* ==================== ONGLET RÉCEPTIONS ARCHIVÉES ==================== */
+let archSearch="";
+function renderArchives(){
+  const el=document.getElementById("tab-archives"); if(!el) return;
+  if(!el.dataset.built){
+    el.innerHTML=`<p class="muted" style="margin-top:0">Réceptions saisies sur G5, archivées (trié par date, par magasin). Recherche par n° BL ou fournisseur.</p>
+      <input id="archSearch" placeholder="🔎 Rechercher (n° BL, fournisseur…)" style="width:100%;max-width:440px;margin-bottom:12px" oninput="archSearch=this.value;renderArchivesList()"/>
+      <div id="archList"></div>`;
+    el.dataset.built="1";
+    const inp=document.getElementById("archSearch"); if(inp) inp.value=archSearch;
+  }
+  renderArchivesList();
+}
+function renderArchivesList(){
+  const box=document.getElementById("archList"); if(!box) return;
+  const q=norm(archSearch); let total=0;
+  const html=STORES.map(s=>{
+    const st=state[s.code]; if(!st) return '';
+    let recs=recsOf(s.code, r=>r.status==="validated" && r.g5Validated);
+    if(q) recs=recs.filter(r=> norm(r.docNumber).includes(q) || norm(r.supplier).includes(q));
+    recs.sort((a,b)=>((b.g5ValidatedAt||b.validatedAt||0)-(a.g5ValidatedAt||a.validatedAt||0)));
+    total+=recs.length;
+    if(!recs.length) return '';
+    const rows=recs.map(r=>{ const nm=names[r.operatorCode]||"";
+      return `<div class="rec valid"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <div><div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>
+        <div style="font-size:12px;color:#666">Sur G5 le ${esc(dateShort(r.g5ValidatedAt||r.validatedAt))} · reçue par ${esc(nm||'—')}${r.ecartCount?(' · ⚠ '+r.ecartCount):''}</div></div>
+        <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">👁 Afficher</button></div></div>`;
+    }).join("");
+    return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${recs.length}</span></h3>${rows}</div>`;
+  }).join("");
+  box.innerHTML= total ? `<div class="live-grid">${html}</div>` : ('<div class="muted">Aucune réception archivée'+(q?' pour cette recherche':'')+'.</div>');
 }
 
 /* ==================== ONGLET SUIVI LIVE ==================== */
