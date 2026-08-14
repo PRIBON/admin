@@ -112,7 +112,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.3.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -187,7 +187,7 @@ function onCredential(resp){
 }
 window.onload=function(){
   if(OAUTH_CLIENT_ID.indexOf("__")!==-1){ document.getElementById("gateErr").textContent="Renseigne OAUTH_CLIENT_ID et APPS_SCRIPT_URL en haut du fichier."; return; }
-  document.querySelector(".header .sub").textContent="Suivi & chargement des BL · tous les magasins · v"+APP_VERSION;
+  document.querySelector(".header .sub").textContent="Suivi & chargement BL + commande · tous les magasins · v"+APP_VERSION;
   checkVersion(); setInterval(checkVersion, 10*60*1000);
   const t=setInterval(()=>{ if(window.google&&google.accounts&&google.accounts.id){ clearInterval(t);
     google.accounts.id.initialize({client_id:OAUTH_CLIENT_ID,callback:onCredential});
@@ -447,35 +447,106 @@ function downloadTxt(filename, content){
 }
 function dateShort(ts){ if(!ts) return ""; return new Date(ts).toLocaleDateString("fr-FR"); }
 
-/* ==================== ONGLET CHARGEMENT MULTI-MAGASIN ==================== */
-const multiFiles={}; // code -> { file, parsed, deliveryDate, supplier }
-function renderMulti(){
-  const el=document.getElementById("tab-multi");
-  let html='<p class="muted" style="margin-top:0">Une carte par magasin. Pour chacun : choisis le fichier BL et la date de livraison prévue, puis « Charger tous les magasins » en bas.</p><div class="grid">';
-  for(const s of STORES){
-    const ready=!!(s.firebaseConfig&&s.firebaseConfig.databaseURL);
-    const st=multiFiles[s.code]||{};
-    html+=`<div class="store-card ${ready?'':'nocfg'}">
-      <h3>${esc(s.label)} ${ready?'':'<span class="badge warn">non configuré</span>'}</h3>
-      ${ready?`
-        <div class="drop ${st.file?'has':''}" onclick="document.getElementById('mf_${s.code}').click()">
-          ${st.file?('✓ '+esc(st.file.name)):'📄 Commande (xlsx) ou BL (CSV / TXT / PDF)'}
-        </div>
-        <input id="mf_${s.code}" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onMultiFile('${s.code}',this.files[0])"/>
-        <div class="field"><label>Fournisseur</label><input style="width:100%" value="${esc(st.supplier||'')}" oninput="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{supplier:this.value})" placeholder="Ex : Elibio, Biodis, Vitafrais…"/></div>
-        <div class="field"><label>Livraison prévue</label><input type="date" style="width:100%" value="${esc(st.deliveryDate||'')}" onchange="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{deliveryDate:this.value})"/></div>
-        <div id="mnote_${s.code}">${st.parsed?parseNote(st.parsed):''}</div>
-      `:'<div class="muted">Renseigne sa config Firebase dans STORES pour l\'activer.</div>'}
-    </div>`;
-  }
-  html+='</div>';
-  el.innerHTML=html;
-  el.insertAdjacentHTML('beforeend',
-    `<div class="bar"><div class="muted" id="multiSummary"></div>
-     <button class="btn btn-green btn-lg" id="loadAllBtn" onclick="loadAll()">Charger tous les magasins</button></div>`);
-  updateMultiSummary();
+/* ==================== CHARGEMENT BL + COMMANDE ==================== */
+// La commande est la REFERENCE : elle fournit le code G5, la quantité commandée et le CDT.
+// Le BL sert à identifier les articles réellement livrés et le n° de BL.
+// Les deux fichiers sont rapprochés avant d'être envoyés dans Firebase.
+const multiFiles={}; // code -> { orderFile, orderParsed, blFile, blParsed, deliveryDate, supplier }
+
+function normKey(s){ return String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g,"").trim(); }
+function lineCandidates(l){
+  return [l.code,l.article,l.ref,l.ean,l.designation].map(normKey).filter(Boolean);
+}
+function mergeOrderAndBL(order, bl){
+  if(!order || order.format!=="CMD") throw new Error("Le bon de commande doit être un fichier XLSX/XLS de commande.");
+  if(!bl || bl.format==='CMD') throw new Error("Le BL doit être un CSV, TXT ou PDF (pas la commande).");
+  const blLines=bl.lines||[];
+  const used=new Set();
+  const merged=[];
+  let unmatched=0;
+
+  (order.lines||[]).forEach((ol, oi)=>{
+    const keys=lineCandidates(ol);
+    let bi=-1;
+    // 1. correspondance exacte sur code / référence fournisseur / EAN / article
+    for(let i=0;i<blLines.length;i++){
+      if(used.has(i)) continue;
+      const blc=lineCandidates(blLines[i]);
+      if(keys.slice(0,4).some(k=>k && blc.includes(k))){ bi=i; break; }
+    }
+    // 2. secours : désignation normalisée suffisamment proche
+    if(bi<0){
+      const kd=normKey(ol.designation);
+      if(kd && kd.length>=8){
+        for(let i=0;i<blLines.length;i++){
+          if(used.has(i)) continue;
+          const bd=normKey(blLines[i].designation);
+          if(bd && (bd===kd || bd.includes(kd) || kd.includes(bd))){ bi=i; break; }
+        }
+      }
+    }
+
+    const blLine=bi>=0 ? blLines[bi] : null;
+    if(bi>=0) used.add(bi); else unmatched++;
+
+    // La commande reste la source de vérité pour code G5, attendu et CDT.
+    // Le BL apporte article/EAN/désignation si disponibles.
+    merged.push({
+      article: blLine?.article || ol.ref || ol.article || ol.code || "",
+      code: ol.code || blLine?.code || "",
+      ean: blLine?.ean || ol.ean || (String(ol.code||"").match(/^\d{12,13}$/)?String(ol.code):"") || "",
+      ref: ol.ref || blLine?.article || "",
+      designation: blLine?.designation || ol.designation || "",
+      marque: blLine?.marque || ol.marque || "",
+      cdt: ol.cdt || null,
+      qteCmd: ol.qteCmd != null ? ol.qteCmd : null,
+      unit: ol.unit || (ol.cdt?"colis":"piece"),
+      attendu: Number(ol.attendu)||0,
+      poidsVariable: !!(ol.poidsVariable || blLine?.poidsVariable),
+      categorie: blLine?.categorie || ol.categorie || "Autres",
+      label: blLine?.label || ol.label || "",
+      nonLivre: false,
+      commandMatched: bi>=0,
+      blArticle: blLine?.article || "",
+      blEan: blLine?.ean || ""
+    });
+  });
+
+  // Articles présents sur le BL mais absents de la commande : on les conserve,
+  // mais avec attendu=0 pour qu'ils soient visibles et signalés au pointage.
+  blLines.forEach((blLine,i)=>{
+    if(used.has(i)) return;
+    merged.push({
+      article: blLine.article || blLine.ean || "",
+      code: blLine.article || blLine.ean || "",
+      ean: blLine.ean || "",
+      ref: blLine.article || "",
+      designation: blLine.designation || "",
+      marque: blLine.marque || "",
+      cdt: null, qteCmd:0, unit:"piece", attendu:0,
+      poidsVariable:!!blLine.poidsVariable, categorie:blLine.categorie||"Autres",
+      label:blLine.label||"", nonLivre:false, commandMatched:false,
+      blArticle:blLine.article||"", blEan:blLine.ean||"", horsCommande:true
+    });
+  });
+
+  return {
+    format:"BL+CMD",
+    g5Key:"code",
+    supplier:order.supplier || bl.supplier || "",
+    docNumber:bl.docNumber || order.docNumber || "",
+    commandNumber:order.docNumber || "",
+    deliveryDate:order.deliveryDate || "",
+    lines:merged,
+    reconciliation:{ commandLines:(order.lines||[]).length, blLines:blLines.length, unmatchedCommand:unmatched, unmatchedBL:merged.filter(x=>x.horsCommande).length }
+  };
 }
 function parseNote(p){
+  if(p.format==='BL+CMD'){
+    const cl=p.lines.filter(l=>l.cdt).length;
+    const hors=p.lines.filter(l=>l.horsCommande).length;
+    return `<div class="parse-note">🔗 <b>BL + commande rapprochés</b> · BL ${esc(p.docNumber||'—')} · commande ${esc(p.commandNumber||'—')} · ${p.lines.length} lignes${cl?' · '+cl+' conditionnements':''}${hors?' · ⚠️ '+hors+' BL hors commande':''}</div>`;
+  }
   if(p.format==='CMD'){
     const pv=p.lines.filter(l=>l.poidsVariable).length, cl=p.lines.filter(l=>l.cdt).length;
     return `<div class="parse-note">📋 <b>Commande ${esc(p.supplier||'?')}</b> ${esc(p.docNumber||'')} · ${p.lines.length} lignes${cl?(' · '+cl+' en colis'):''}${pv?(' · '+pv+' poids variable'):''}</div>`;
@@ -483,84 +554,99 @@ function parseNote(p){
   const g5 = p.g5Key==='article' ? ' · clé G5 : <b>code article</b>' : (p.g5Key==='ean' ? ' · clé G5 : EAN' : '');
   return `<div class="parse-note">N° <b>${esc(p.docNumber||'—')}</b> · ${esc(p.format)} · ${p.lines.length} lignes${p.skipped?(' · '+p.skipped+' ignorée(s)'):''}${g5}</div>`;
 }
-async function onMultiFile(code,file){
-  if(!file) return;
-  multiFiles[code]=Object.assign(multiFiles[code]||{},{file});
-  const note=document.getElementById('mnote_'+code); if(note) note.innerHTML='<div class="parse-note">Lecture…</div>';
-  try{
-    const parsed=await parseAnyFile(file);
-    if(parsed.format!=='CMD') parsed.g5Key=detectG5Key(parsed);
-    multiFiles[code].parsed=parsed;
-    if(parsed.supplier && !multiFiles[code].supplier) multiFiles[code].supplier=parsed.supplier;
-    renderMulti();
-  }catch(e){ if(note) note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
+function renderMulti(){
+  const el=document.getElementById("tab-multi");
+  let html='<p class="muted" style="margin-top:0"><b>Étape 1 :</b> charge le bon de commande XLSX. <b>Étape 2 :</b> charge le BL reçu. L\'application rapproche les deux et utilise la commande comme référence pour le conditionnement, la quantité attendue et le code G5.</p><div class="grid">';
+  for(const s of STORES){
+    const ready=!!(s.firebaseConfig&&s.firebaseConfig.databaseURL);
+    const st=multiFiles[s.code]||{};
+    html+=`<div class="store-card ${ready?'':'nocfg'}">
+      <h3>${esc(s.label)} ${ready?'':'<span class="badge warn">non configuré</span>'}</h3>
+      ${ready?`
+        <div class="field"><label>1️⃣ Bon de commande</label>
+          <div class="drop ${st.orderFile?'has':''}" onclick="document.getElementById('morder_${s.code}').click()">${st.orderFile?'✓ '+esc(st.orderFile.name):'📋 Charger le bon de commande (.xlsx)'}</div>
+          <input id="morder_${s.code}" type="file" accept=".xlsx,.xls" style="display:none" onchange="onMultiOrder('${s.code}',this.files[0])"/>
+        </div>
+        <div class="field"><label>2️⃣ Bon de livraison (BL)</label>
+          <div class="drop ${st.blFile?'has':''}" onclick="document.getElementById('mbl_${s.code}').click()">${st.blFile?'✓ '+esc(st.blFile.name):'📄 Charger le BL (.csv / .txt / .pdf)'}</div>
+          <input id="mbl_${s.code}" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onMultiBL('${s.code}',this.files[0])"/>
+        </div>
+        <div class="field"><label>Fournisseur</label><input style="width:100%" value="${esc(st.supplier||'')}" oninput="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{supplier:this.value})" placeholder="Déduit de la commande / BL…"/></div>
+        <div class="field"><label>Livraison prévue</label><input type="date" style="width:100%" value="${esc(st.deliveryDate||'')}" onchange="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{deliveryDate:this.value})"/></div>
+        <div id="mnote_${s.code}">${st.merged?parseNote(st.merged):(st.orderParsed?parseNote(st.orderParsed):st.blParsed?parseNote(st.blParsed):'')}</div>
+      `:'<div class="muted">Renseigne sa config Firebase dans STORES pour l\'activer.</div>'}
+    </div>`;
+  }
+  html+='</div>';
+  el.innerHTML=html;
+  el.insertAdjacentHTML('beforeend',`<div class="bar"><div class="muted" id="multiSummary"></div><button class="btn btn-green btn-lg" id="loadAllBtn" onclick="loadAll()">Charger tous les magasins</button></div>`);
+  updateMultiSummary();
+}
+async function onMultiOrder(code,file){
+  if(!file)return;
+  const st=multiFiles[code]=Object.assign(multiFiles[code]||{},{orderFile:file});
+  const note=document.getElementById('mnote_'+code); if(note) note.innerHTML='<div class="parse-note">Lecture de la commande…</div>';
+  try{ st.orderParsed=await parseAnyFile(file); if(st.orderParsed.format!=='CMD') throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.'); if(st.orderParsed.supplier&&!st.supplier) st.supplier=st.orderParsed.supplier; if(st.orderParsed.deliveryDate&&!st.deliveryDate){ const d=String(st.orderParsed.deliveryDate).split('/'); if(d.length===3) st.deliveryDate=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0'); } tryMergeMulti(code); renderMulti(); }
+  catch(e){ if(note)note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
+}
+async function onMultiBL(code,file){
+  if(!file)return;
+  const st=multiFiles[code]=Object.assign(multiFiles[code]||{},{blFile:file});
+  const note=document.getElementById('mnote_'+code); if(note)note.innerHTML='<div class="parse-note">Lecture du BL…</div>';
+  try{ st.blParsed=await parseAnyFile(file); if(st.blParsed.format==='CMD') throw new Error('Sélectionne le BL, pas le bon de commande.'); if(st.blParsed.format!=='CMD') st.blParsed.g5Key=detectG5Key(st.blParsed); if(st.blParsed.supplier&&!st.supplier) st.supplier=st.blParsed.supplier; tryMergeMulti(code); renderMulti(); }
+  catch(e){ if(note)note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
+}
+function tryMergeMulti(code){
+  const st=multiFiles[code];
+  if(st.orderParsed&&st.blParsed){ st.merged=mergeOrderAndBL(st.orderParsed,st.blParsed); }
 }
 function updateMultiSummary(){
-  const ready=Object.keys(multiFiles).filter(c=>multiFiles[c]&&multiFiles[c].parsed);
-  const el=document.getElementById('multiSummary'); if(el) el.textContent=ready.length+' magasin(s) prêt(s) à charger';
-  const btn=document.getElementById('loadAllBtn'); if(btn) btn.disabled=ready.length===0;
+  const ready=Object.keys(multiFiles).filter(c=>multiFiles[c]&&multiFiles[c].merged);
+  const waiting=Object.keys(multiFiles).filter(c=>multiFiles[c]&&(!multiFiles[c].orderParsed||!multiFiles[c].blParsed));
+  const el=document.getElementById('multiSummary'); if(el) el.textContent=ready.length+' magasin(s) prêt(s) · '+waiting.length+' en attente des 2 fichiers';
+  const btn=document.getElementById('loadAllBtn'); if(btn)btn.disabled=ready.length===0;
 }
 async function loadAll(){
-  const toLoad=Object.keys(multiFiles).filter(c=>multiFiles[c]&&multiFiles[c].parsed);
-  if(!toLoad.length) return;
-  if(!confirm('Charger '+toLoad.length+' magasin(s) ?')) return;
-  const btn=document.getElementById('loadAllBtn'); btn.disabled=true; btn.textContent='Chargement…';
-  let ok=0, errs=[];
-  for(const code of toLoad){
-    const m=multiFiles[code];
-    try{ await loadToStore(code, m.parsed, {supplier:m.supplier,type:"BL",deliveryDate:m.deliveryDate}); ok++; delete multiFiles[code]; }
-    catch(e){ errs.push(code+": "+e.message); }
-  }
-  renderMulti();
-  alert('✓ '+ok+' magasin(s) chargé(s)'+(errs.length?('\n\nErreurs :\n'+errs.join('\n')):''));
+  const toLoad=Object.keys(multiFiles).filter(c=>multiFiles[c]&&multiFiles[c].merged);
+  if(!toLoad.length)return;
+  if(!confirm('Charger '+toLoad.length+' magasin(s) après rapprochement BL + commande ?'))return;
+  const btn=document.getElementById('loadAllBtn');btn.disabled=true;btn.textContent='Chargement…';let ok=0,errs=[];
+  for(const code of toLoad){const m=multiFiles[code];try{await loadToStore(code,m.merged,{supplier:m.supplier||m.merged.supplier,type:"BL + commande",deliveryDate:m.deliveryDate});ok++;delete multiFiles[code];}catch(e){errs.push(code+': '+e.message);}}
+  renderMulti();alert('✓ '+ok+' magasin(s) chargé(s)'+(errs.length?'\n\nErreurs :\n'+errs.join('\n'):''));
 }
 
 /* ==================== ONGLET CHARGEMENT SIMPLE ==================== */
-let simpleParsed=null;
+let simpleOrder=null, simpleBL=null, simpleMerged=null;
 function renderSimple(){
   const el=document.getElementById("tab-simple");
   const opts=readyStores().map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
   el.innerHTML=`<div class="card">
-    <h2 style="margin-top:0">Charger un BL</h2>
-    <p class="muted">Choisis un fichier, puis indique pour quel magasin et la date de livraison prévue.</p>
-    <div class="drop" id="sdrop" onclick="document.getElementById('sfile').click()">📄 Commande (xlsx) ou BL (CSV / TXT / PDF)</div>
-    <input id="sfile" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onSimpleFile(this.files[0])"/>
+    <h2 style="margin-top:0">Charger BL + bon de commande</h2>
+    <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5, quantité commandée, conditionnement).<br><b>2.</b> BL = référence de la livraison / n° BL.<br><b>3.</b> L'application rapproche automatiquement les lignes.</p>
+    <div class="field"><label>1️⃣ Bon de commande</label><div class="drop" id="sorderDrop" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
+    <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div class="drop" id="sblDrop" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.csv / .txt / .pdf)</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
     <div id="snote" style="margin-top:10px"></div>
     <div class="field" style="margin-top:12px"><label>Magasin</label><select id="sstore" style="width:100%">${opts}</select></div>
-    <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Ex : Elibio, Biodis, Vitafrais…"/></div>
-    <div class="field"><label>Type</label><select id="stype" style="width:100%"><option>BL</option><option>Facture</option><option>Doc</option></select></div>
+    <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Déduit de la commande / BL…"/></div>
     <div class="field"><label>Livraison prévue</label><input id="sdate" type="date" style="width:100%"/></div>
-    <button class="btn btn-primary btn-lg" id="sbtn" onclick="loadSimple()" disabled style="margin-top:8px">Charger dans le magasin</button>
-    <div id="smsg"></div>
+    <button class="btn btn-primary btn-lg" id="sbtn" onclick="loadSimple()" disabled style="margin-top:8px">Rapprocher et charger dans le magasin</button><div id="smsg"></div>
   </div>`;
 }
-async function onSimpleFile(file){
-  if(!file) return;
-  document.getElementById('sdrop').classList.add('has'); document.getElementById('sdrop').textContent='✓ '+file.name;
-  const note=document.getElementById('snote'); note.innerHTML='<div class="parse-note">Lecture…</div>';
-  try{
-    simpleParsed=await parseAnyFile(file);
-    if(simpleParsed.format!=='CMD') simpleParsed.g5Key=detectG5Key(simpleParsed);
-    note.innerHTML=parseNote(simpleParsed);
-    if(simpleParsed.supplier) document.getElementById('ssup').value=simpleParsed.supplier;
-    if(simpleParsed.format==='CMD' && simpleParsed.deliveryDate){ const dp=String(simpleParsed.deliveryDate).split('/'); if(dp.length===3) document.getElementById('sdate').value=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0'); }
-    document.getElementById('sbtn').disabled=false;
-  }catch(e){ note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
+function showSimpleState(){
+  const note=document.getElementById('snote'); if(!note)return;
+  if(simpleMerged){ note.innerHTML=parseNote(simpleMerged); return; }
+  let h=''; if(simpleOrder)h+='<div class="parse-note">✓ Commande lue · '+simpleOrder.lines.length+' lignes</div>'; if(simpleBL)h+='<div class="parse-note">✓ BL lu · '+simpleBL.lines.length+' lignes</div>'; note.innerHTML=h;
 }
+async function onSimpleOrder(file){
+  if(!file)return; document.getElementById('sorderDrop').classList.add('has');document.getElementById('sorderDrop').textContent='✓ '+file.name;
+  try{simpleOrder=await parseAnyFile(file);if(simpleOrder.format!=='CMD')throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.');if(simpleOrder.supplier)document.getElementById('ssup').value=simpleOrder.supplier;if(simpleOrder.deliveryDate){const d=String(simpleOrder.deliveryDate).split('/');if(d.length===3)document.getElementById('sdate').value=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0');}simpleMerged=(simpleBL?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!simpleMerged;}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
+async function onSimpleBL(file){
+  if(!file)return;document.getElementById('sblDrop').classList.add('has');document.getElementById('sblDrop').textContent='✓ '+file.name;
+  try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!simpleMerged;}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
 async function loadSimple(){
-  if(!simpleParsed) return;
-  const code=document.getElementById('sstore').value;
-  const supplier=document.getElementById('ssup').value;
-  const type=document.getElementById('stype').value;
-  const deliveryDate=document.getElementById('sdate').value;
-  const btn=document.getElementById('sbtn'); btn.disabled=true; btn.textContent='Chargement…';
-  try{
-    await loadToStore(code, simpleParsed, {supplier,type,deliveryDate});
-    document.getElementById('smsg').innerHTML='<div class="ok">✓ Chargé dans '+esc(code)+'. Visible immédiatement dans le magasin.</div>';
-    simpleParsed=null; document.getElementById('snote').innerHTML='';
-    document.getElementById('sdrop').classList.remove('has'); document.getElementById('sdrop').textContent='📄 Commande (xlsx) ou BL (CSV / TXT / PDF)';
-  }catch(e){ document.getElementById('smsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
-  btn.disabled=false; btn.textContent='Charger dans le magasin';
+  if(!simpleMerged)return;const code=document.getElementById('sstore').value;const supplier=document.getElementById('ssup').value;const deliveryDate=document.getElementById('sdate').value;const btn=document.getElementById('sbtn');btn.disabled=true;btn.textContent='Chargement…';
+  try{await loadToStore(code,simpleMerged,{supplier,type:'BL + commande',deliveryDate});document.getElementById('smsg').innerHTML='<div class="ok">✓ BL + commande rapprochés et chargés dans '+esc(code)+'. Le magasin dispose maintenant du conditionnement et du code G5.</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
+  catch(e){document.getElementById('smsg').innerHTML='<div class="err">'+esc(e.message)+'</div>';btn.disabled=false;btn.textContent='Rapprocher et charger dans le magasin';}
 }
 
 /* ==================== ONGLET À RÉCEPTIONNER SUR G5 ==================== */
