@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
   if (window['pdfjsLib']) window['pdfjsLib'].GlobalWorkerOptions.workerSrc =
@@ -92,22 +93,26 @@
     <button class="tab active" data-tab="multi">📦 Chargement multi-magasin</button>
     <button class="tab" data-tab="simple">📄 Chargement simple</button>
     <button class="tab" data-tab="g5">📥 À réceptionner sur G5</button>
-    <button class="tab" data-tab="archives">🗄️ Réceptions archivées</button>
+    <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
+    <button class="tab" data-tab="archives">🗄️ Archives</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
     <button class="tab" data-tab="msg">📢 Messages</button>
+    <button class="tab" data-tab="fourn">🏭 Fournisseurs</button>
   </div>
   <div id="tab-multi"></div>
   <div id="tab-simple" class="hidden"></div>
   <div id="tab-g5" class="hidden"></div>
+  <div id="tab-avoirs" class="hidden"></div>
   <div id="tab-archives" class="hidden"></div>
   <div id="tab-suivi" class="hidden"></div>
   <div id="tab-msg" class="hidden"></div>
+  <div id="tab-fourn" class="hidden"></div>
 </div>
 
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.1";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -139,9 +144,17 @@ const names={};          // operatorCode -> "Prénom Nom"
 const state={};          // code -> { receptions, docs, broadcasts }
 let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
+let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
+let FOURNS=[];           // répertoire fournisseurs (nom + email litiges)
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function norm(s){ return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim(); }
 function toNum(s){ if(s==null) return 0; const n=parseFloat(String(s).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
+/* --- écarts / avoirs (v1.2) --- */
+const MOTIF_LABELS={ mauvaise_qte:"Mauvaise quantité", casse_fournisseur:"Casse fournisseur", auto_conso:"Auto-consommation", casse_salarie:"Casse (salarié)", delotage:"Délotage", perime_perte:"Périmé / perte" };
+function motifLabel(k){ return MOTIF_LABELS[k]||k||"écart"; }
+function recLineArr(r){ return Object.values((r&&r.lines)||{}); }
+function recEcartLines(r){ return recLineArr(r).filter(s=>s && (s.status==='ecart'||s.status==='nonrecu')); }
+function recAvoirLines(r){ return recLineArr(r).filter(s=>s && s.avoir===true); }
 
 /* ============================ VERSION / MAJ ============================ */
 function isNewer(a,b){
@@ -200,9 +213,10 @@ function start(email){
   // Onglets
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   renderMulti(); renderSimple(); renderMsg();
+  apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; }).catch(()=>{});
   // Écouteurs live : réceptions + documents + messages de chaque magasin
   readyStores().forEach(s=>{ const db=dbByStore[s.code]; if(!db) return;
-    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); });
+    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); renderAvoirs(); });
     db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderArchives(); });
     db.ref("broadcasts").on("value",snap=>{ state[s.code].broadcasts=snap.val()||{}; queueNames(); renderMsg(); });
   });
@@ -211,7 +225,15 @@ function start(email){
 }
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["multi","simple","g5","archives","suivi","msg"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  ["multi","simple","g5","avoirs","archives","suivi","msg","fourn"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  if(t==="avoirs") renderAvoirs();
+  if(t==="fourn") renderFournisseurs();
+}
+/* Appel Apps Script authentifié (idToken responsable). */
+async function apiRP(action, extra){
+  const r=await fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(Object.assign({action, idToken:ID_TOKEN}, extra||{}))});
+  return await r.json();
 }
 
 /* ============================ PARSEURS ============================ */
@@ -554,12 +576,14 @@ function renderG5(){
     const recs=recsOf(s.code, r=>r.status==="validated" && !r.g5Validated).sort((a,b)=>(b.validatedAt||0)-(a.validatedAt||0));
     total+=recs.length;
     if(!recs.length) return `<div class="store-card"><h3>${esc(s.label)}</h3><div class="muted">Rien à réceptionner sur G5.</div></div>`;
-    const rows=recs.map(r=>{ const nm=names[r.operatorCode]||"";
-      return `<div class="rec valid">
+    const rows=recs.map(r=>{ const nm=names[r.operatorCode]||""; const ec=recEcartLines(r).length, av=recAvoirLines(r).length;
+      return `<div class="rec valid" style="${ec?'border-color:#e53935;border-width:2px':''}">
         <div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>
-        <div style="font-size:12px;color:#666;margin-top:2px">Validée ${esc(heure(r.validatedAt))} · ${esc(dateShort(r.validatedAt))}${nm?(' · '+esc(nm)):''}${r.ecartCount?(' · ⚠ '+r.ecartCount+' écart(s)'):''}</div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">👁 Afficher la réception</button>
+        <div style="font-size:12px;color:#666;margin-top:2px">Validée ${esc(heure(r.validatedAt))} · ${esc(dateShort(r.validatedAt))}${nm?(' · '+esc(nm)):''}</div>
+        ${ec?`<div style="margin-top:8px"><span class="badge warn">⚠ ${ec} écart(s)</span> ${av?`<span class="badge" style="background:#fdecea;color:#c62828">💶 ${av} en avoir</span>`:''}</div>`:''}
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          ${ec?`<button class="btn" style="background:#e53935;color:#fff;padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">⚠ Voir les écarts</button>`:''}
+          <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">👁 Afficher</button>
           <button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="markG5('${s.code}','${r.id}')">✓ Validé sur G5</button>
         </div></div>`;
     }).join("");
@@ -577,25 +601,29 @@ function openDetail(code,id){
   const st=state[code]; if(!st) return; const r=st.receptions[id]; if(!r) return;
   const doc=st.docs[r.docId]||null;
   const active=((doc&&doc.lines)?doc.lines:[]).filter(l=>!l.nonLivre);
-  const codeHdr=(doc&&doc.g5Key==='article')?'Code article':'EAN';
+  const codeHdr=(doc&&doc.g5Key==='code')?'Code':((doc&&doc.g5Key==='article')?'Code article':'EAN');
   let rows="";
   if(active.length){
-    rows=active.map((l,i)=>{ const s2=(r.lines||{})[lineKeyOf(l,i)]||{};
-      const stat=s2.status==="conforme"?'✓ conforme':s2.status==="nonrecu"?'✗ pas reçu':s2.status==="ecart"?'⚠ écart':'—';
-      const reel=s2.status?(s2.reel!=null?s2.reel:l.attendu):"";
-      const codeVal=(doc&&doc.g5Key==='article')?(l.article||''):(l.ean||l.article||'');
-      const bg=s2.status==="ecart"?' style="background:#fff3e0"':(s2.status==="nonrecu"?' style="background:#fdecea"':'');
-      return `<tr${bg}><td>${esc(codeVal)}</td><td>${esc(l.designation||'')}</td><td>${l.attendu}</td><td>${esc(stat)}</td><td>${reel}</td><td>${esc(s2.ecartText||'')}</td></tr>`;
+    const entries=active.map((l,i)=>({l, s2:(r.lines||{})[lineKeyOf(l,i)]||{}}));
+    entries.sort((a,b)=>{ const ea=(a.s2.status==='ecart'||a.s2.status==='nonrecu')?0:1, eb=(b.s2.status==='ecart'||b.s2.status==='nonrecu')?0:1; return ea-eb; }); // écarts en tête
+    rows=entries.map(({l,s2})=>{
+      const stat=s2.status==='conforme'?'✓ conforme':s2.status==='nonrecu'?'✗ pas reçu':s2.status==='ecart'?('⚠ '+motifLabel(s2.motif)+(s2.avoir?' · avoir':'')):'—';
+      const apte=s2.status?(s2.aptevente!=null?s2.aptevente:(s2.reel!=null?s2.reel:l.attendu)):'';
+      const codeVal=(doc&&doc.g5Key==='code')?(l.code||l.ean||l.article||''):((doc&&doc.g5Key==='article')?(l.article||''):(l.ean||l.article||''));
+      const bg=s2.status==='ecart'?' style="background:#fff3e0"':(s2.status==='nonrecu'?' style="background:#fdecea"':'');
+      const ph=s2.photoUrl?`<a href="${esc(s2.photoUrl)}" target="_blank" rel="noreferrer">📷</a>`:'';
+      const extra=s2.poids?(' · '+s2.poids+' kg'):'';
+      return `<tr${bg}><td>${esc(codeVal)}</td><td>${esc(l.designation||'')}</td><td>${l.attendu}</td><td>${esc(stat)}</td><td>${apte}${esc(extra)}</td><td style="text-align:center">${ph}</td><td>${esc(s2.ecartText||'')}</td></tr>`;
     }).join("");
   } else {
-    rows=Object.values(r.lines||{}).map(s2=>`<tr><td>${esc(s2.ean||s2.article||'')}</td><td>${esc(s2.designation||'')}</td><td>${s2.attendu}</td><td>${esc(s2.status||'')}</td><td>${s2.reel!=null?s2.reel:''}</td><td>${esc(s2.ecartText||'')}</td></tr>`).join("");
+    rows=Object.values(r.lines||{}).map(s2=>`<tr><td>${esc(s2.ean||s2.article||'')}</td><td>${esc(s2.designation||'')}</td><td>${s2.attendu}</td><td>${esc(s2.status||'')}</td><td>${s2.aptevente!=null?s2.aptevente:(s2.reel!=null?s2.reel:'')}</td><td style="text-align:center">${s2.photoUrl?('<a href="'+esc(s2.photoUrl)+'" target="_blank">📷</a>'):''}</td><td>${esc(s2.ecartText||'')}</td></tr>`).join("");
   }
   const photos=Object.values(r.lines||{}).filter(s2=>s2.photoUrl).map(s2=>`<a href="${esc(s2.photoUrl)}" target="_blank" rel="noreferrer" class="badge info" style="text-decoration:none;padding:4px 10px;display:inline-block;margin:2px">📷 ${esc(s2.designation||'photo')}</a>`).join(" ");
   const back=document.createElement("div"); back.className="modal-back";
   back.innerHTML=`<div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">${esc(r.supplier||'')} · ${esc(r.docNumber||'')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <div class="muted" style="margin:4px 0 10px">${esc((STORES.find(x=>x.code===code)||{}).label||code)} · validée ${esc(heure(r.validatedAt))} ${esc(dateShort(r.validatedAt))}</div>
-    <div style="overflow:auto;max-height:52vh"><table><thead><tr><th>${codeHdr}</th><th>Désignation</th><th>Attendu</th><th>Statut</th><th>Reçu</th><th>Écart</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="overflow:auto;max-height:52vh"><table><thead><tr><th>${codeHdr}</th><th>Désignation</th><th>Attendu</th><th>Statut / motif</th><th>Apte vente</th><th>📷</th><th>Remarque</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${photos?('<div style="margin-top:10px"><b>Photos :</b> '+photos+'</div>'):'<div class="muted" style="margin-top:8px">Aucune photo.</div>'}
     <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlG5('${code}','${id}')">⬇️ Télécharger le .txt G5</button>
   </div>`;
@@ -635,15 +663,15 @@ function renderArchivesList(){
   const q=norm(archSearch); let total=0;
   const html=STORES.map(s=>{
     const st=state[s.code]; if(!st) return '';
-    let recs=recsOf(s.code, r=>r.status==="validated" && r.g5Validated);
+    let recs=recsOf(s.code, r=>r.status==="validated" && (r.g5Validated || (r.avoir&&r.avoir.status==='termine')));
     if(q) recs=recs.filter(r=> norm(r.docNumber).includes(q) || norm(r.supplier).includes(q));
     recs.sort((a,b)=>((b.g5ValidatedAt||b.validatedAt||0)-(a.g5ValidatedAt||a.validatedAt||0)));
     total+=recs.length;
     if(!recs.length) return '';
-    const rows=recs.map(r=>{ const nm=names[r.operatorCode]||"";
+    const rows=recs.map(r=>{ const nm=names[r.operatorCode]||""; const litige=(r.avoir&&r.avoir.status==='termine');
       return `<div class="rec valid"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <div><div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>
-        <div style="font-size:12px;color:#666">Sur G5 le ${esc(dateShort(r.g5ValidatedAt||r.validatedAt))} · reçue par ${esc(nm||'—')}${r.ecartCount?(' · ⚠ '+r.ecartCount):''}</div></div>
+        <div><div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')} ${litige?'<span class="badge ok">litige clos</span>':''}</div>
+        <div style="font-size:12px;color:#666">${r.g5Validated?('Sur G5 le '+esc(dateShort(r.g5ValidatedAt||r.validatedAt))):('Validée le '+esc(dateShort(r.validatedAt)))} · reçue par ${esc(nm||'—')}${r.ecartCount?(' · ⚠ '+r.ecartCount):''}</div></div>
         <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">👁 Afficher</button></div></div>`;
     }).join("");
     return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${recs.length}</span></h3>${rows}</div>`;
@@ -721,6 +749,129 @@ async function deleteBroadcast(id){
   const db=dbByStore[msgStore]; if(!db) return;
   if(!confirm("Supprimer ce message ?")) return;
   try{ await db.ref("broadcasts/"+id).remove(); }catch(e){ alert("Erreur : "+e.message); }
+}
+
+/* ==================== ONGLET SUIVI DES AVOIRS (P4) ==================== */
+function recAvoirStatus(r){ return (r.avoir&&r.avoir.status) || (recAvoirLines(r).length?'a_demander':''); }
+function fournEmail(supplier){ const s=norm(supplier); const f=FOURNS.find(x=>norm(x.nom)===s||s.includes(norm(x.nom))||norm(x.nom).includes(s)); return f?f.email:""; }
+
+function renderAvoirs(){
+  const el=document.getElementById("tab-avoirs"); if(!el) return;
+  if(!el.dataset.built){
+    el.innerHTML=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <b>Vue :</b>
+      <button class="btn" id="avVueMag" style="padding:8px 12px;font-size:13px" onclick="avoirView='magasin';renderAvoirsList()">Par magasin</button>
+      <button class="btn" id="avVueFou" style="padding:8px 12px;font-size:13px" onclick="avoirView='fournisseur';renderAvoirsList()">Par fournisseur</button>
+      <span style="margin-left:10px"><b>Statut :</b></span>
+      <select id="avStatut" onchange="avoirStatut=this.value;renderAvoirsList()"><option value="">À demander + en cours</option><option value="a_demander">À demander</option><option value="en_cours">Demande en cours</option></select>
+      <span><b>Date :</b></span><input type="date" id="avDate" onchange="avoirDate=this.value;renderAvoirsList()"/>
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="avoirDate='';document.getElementById('avDate').value='';renderAvoirsList()">✕</button>
+    </div><p class="muted" style="margin-top:0">Les litiges terminés basculent dans <b>Archives</b>.</p><div id="avoirList"></div>`;
+    el.dataset.built="1";
+  }
+  renderAvoirsList();
+}
+function avoirRecs(){
+  const out=[];
+  STORES.forEach(s=>{ const st=state[s.code]; if(!st) return;
+    Object.entries(st.receptions||{}).forEach(([id,r])=>{ const rr=Object.assign({id,storeCode:s.code,storeLabel:s.label},r);
+      if(recAvoirLines(rr).length===0) return;
+      const status=recAvoirStatus(rr);
+      if(status==='termine') return;
+      if(avoirStatut && status!==avoirStatut) return;
+      if(avoirDate){ const d=new Date(rr.validatedAt||rr.createdAt); const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); if(iso!==avoirDate) return; }
+      out.push(rr);
+    });
+  });
+  return out;
+}
+function avoirCard(r){
+  const status=recAvoirStatus(r); const lines=recAvoirLines(r);
+  const badge = status==='en_cours'?'<span class="badge warn">demande en cours</span>':'<span class="badge" style="background:#fdecea;color:#c62828">à demander</span>';
+  const items=lines.map(s2=>`<div style="font-size:12px">• ${esc(s2.designation||'')} — ${esc(motifLabel(s2.motif))} (${s2.manque||s2.saisi||''})${s2.photoUrl?' <a href="'+esc(s2.photoUrl)+'" target="_blank">📷</a>':''}</div>`).join("");
+  return `<div class="rec valid" style="border-color:#e53935">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+      <div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>${badge}</div>
+    <div style="font-size:12px;color:#666">${esc(r.storeLabel||'')} · ${esc(dateShort(r.validatedAt))}</div>
+    <div style="margin-top:6px">${items}</div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn" style="background:#1a4d2e;color:#fff;padding:8px 12px;font-size:13px" onclick="openDetail('${r.storeCode}','${r.id}')">👁 Détail</button>
+      <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="genAvoir('${r.storeCode}','${r.id}')">✉️ Générer la demande d'avoir</button>
+      <button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="closeAvoir('${r.storeCode}','${r.id}')">✓ Avoir reçu (archiver)</button>
+    </div></div>`;
+}
+function renderAvoirsList(){
+  const box=document.getElementById("avoirList"); if(!box) return;
+  const mag=document.getElementById("avVueMag"), fou=document.getElementById("avVueFou");
+  if(mag){ mag.style.background=avoirView==='magasin'?'#1a4d2e':'#eef2f7'; mag.style.color=avoirView==='magasin'?'#fff':'#333'; }
+  if(fou){ fou.style.background=avoirView==='fournisseur'?'#1a4d2e':'#eef2f7'; fou.style.color=avoirView==='fournisseur'?'#fff':'#333'; }
+  const recs=avoirRecs();
+  if(!recs.length){ box.innerHTML='<div class="muted">Aucune demande d\'avoir en cours.</div>'; return; }
+  const groups={};
+  recs.forEach(r=>{ const key=avoirView==='fournisseur'?(r.supplier||'?'):(r.storeLabel||r.storeCode); (groups[key]=groups[key]||[]).push(r); });
+  box.innerHTML=Object.keys(groups).sort().map(k=>`<div class="store-card"><h3>${esc(k)} <span class="badge info">${groups[k].length}</span></h3>${groups[k].map(avoirCard).join("")}</div>`).join("");
+}
+function closeAvoir(code,id){
+  if(!confirm("Confirmer : l'avoir a bien été reçu du fournisseur ? La demande passera dans les Archives.")) return;
+  const db=dbByStore[code]; if(!db) return;
+  db.ref("receptions/"+id).update({ avoir:{ status:"termine", closedAt:firebase.database.ServerValue.TIMESTAMP, by:ME_EMAIL } }).catch(e=>alert(e.message));
+}
+function genAvoir(code,id){
+  const st=state[code]; const r=st.receptions[id]; if(!r) return;
+  const doc=st.docs[r.docId]||null; const active=((doc&&doc.lines)?doc.lines:[]);
+  const avLines=[];
+  active.forEach((l,i)=>{ const s2=(r.lines||{})[lineKeyOf(l,i)]; if(s2&&s2.avoir){
+    const codeVal=(doc&&doc.g5Key==='code')?(l.code||l.ean||''):(l.ean||l.article||'');
+    avLines.push({ code:codeVal, ref:l.ref||'', des:l.designation||'', qte:(s2.manque||s2.saisi||''), motif:motifLabel(s2.motif) }); }});
+  if(!avLines.length){ alert("Aucune ligne en avoir sur cette réception."); return; }
+  const dateStr=dateShort(r.validatedAt);
+  let body="Bonjour,\n\nSuite à la réception du "+dateStr+" (BL "+(r.docNumber||'')+"), nous constatons les écarts suivants :\n\n";
+  avLines.forEach(a=>{ body+="- réf "+(a.ref||a.code)+" — "+a.des+" — quantité : "+a.qte+" ("+a.motif+")\n"; });
+  body+="\nMerci de bien vouloir effectuer l'avoir en conséquence.\n\nCordialement,\n"+(ME_EMAIL||'');
+  try{
+    const JS=(window.jspdf&&window.jspdf.jsPDF); if(JS){ const pdf=new JS();
+      pdf.setFontSize(14); pdf.text("Demande d'avoir — "+(r.supplier||''),14,18);
+      pdf.setFontSize(10); pdf.text("Réception du "+dateStr+" · BL "+(r.docNumber||'')+" · "+(r.storeLabel||''),14,26);
+      let y=40; pdf.setFont(undefined,'bold'); pdf.text("Réf/Code",14,y); pdf.text("Désignation",50,y); pdf.text("Qté",150,y); pdf.text("Motif",165,y); pdf.setFont(undefined,'normal'); y+=6;
+      avLines.forEach(a=>{ pdf.text(String(a.ref||a.code),14,y); pdf.text(String(a.des).slice(0,45),50,y); pdf.text(String(a.qte),150,y); pdf.text(String(a.motif).slice(0,18),165,y); y+=6; if(y>280){pdf.addPage();y=20;} });
+      y+=8; pdf.text("Merci d'effectuer l'avoir en conséquence.",14,y);
+      pdf.save("avoir_"+(r.supplier||'F')+"_"+(r.docNumber||'')+".pdf");
+    }
+  }catch(e){ /* PDF best-effort */ }
+  const email=fournEmail(r.supplier);
+  const subj="Demande d'avoir — réception du "+dateStr+" (BL "+(r.docNumber||'')+")";
+  window.location.href="mailto:"+encodeURIComponent(email)+"?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
+  const db=dbByStore[code]; if(db) db.ref("receptions/"+id).update({ avoir:{ status:"en_cours", requestedAt:firebase.database.ServerValue.TIMESTAMP, by:ME_EMAIL } });
+}
+
+/* ==================== ONGLET FOURNISSEURS (P5) ==================== */
+function renderFournisseurs(){
+  const el=document.getElementById("tab-fourn"); if(!el) return;
+  el.innerHTML=`<div class="card"><h2 style="margin-top:0">Fournisseurs</h2>
+    <p class="muted">Nom + adresse mail pour les demandes d'avoir / litiges (sert à préparer le mail d'avoir).</p>
+    <div id="fournList"><div class="muted">Chargement…</div></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <input id="fnNom" placeholder="Nom fournisseur (ex : BIODIS)" style="flex:1;min-width:150px"/>
+      <input id="fnMail" placeholder="email litiges" style="flex:1;min-width:150px"/>
+      <button class="btn btn-primary" style="padding:10px 16px" onclick="addFourn()">Ajouter</button>
+    </div><div id="fnMsg"></div></div>`;
+  apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; renderFournList(); }).catch(()=>renderFournList());
+}
+function renderFournList(){
+  const box=document.getElementById("fournList"); if(!box) return;
+  if(!FOURNS.length){ box.innerHTML='<div class="muted">Aucun fournisseur enregistré.</div>'; return; }
+  box.innerHTML='<table><thead><tr><th>Nom</th><th>Email litiges</th><th></th></tr></thead><tbody>'+
+    FOURNS.map((f,i)=>`<tr><td>${esc(f.nom)}</td><td>${esc(f.email||'')}</td><td><button class="btn" style="background:#fdecea;color:#c62828;padding:6px 10px;font-size:12px" onclick="delFourn(${i})">Suppr.</button></td></tr>`).join("")+'</tbody></table>';
+}
+function addFourn(){
+  const nom=document.getElementById("fnNom").value.trim(), mail=document.getElementById("fnMail").value.trim();
+  if(!nom) return;
+  FOURNS.push({nom, email:mail}); document.getElementById("fnNom").value=""; document.getElementById("fnMail").value=""; saveFourns();
+}
+function delFourn(i){ FOURNS.splice(i,1); saveFourns(); }
+function saveFourns(){
+  renderFournList();
+  apiRP("set-fournisseurs",{fournisseurs:FOURNS}).then(j=>{ const m=document.getElementById("fnMsg"); if(m) m.innerHTML=(j&&j.ok)?'<div class="ok">✓ Enregistré</div>':'<div class="err">Erreur : '+esc((j&&j.error)||'')+'</div>'; }).catch(e=>{ const m=document.getElementById("fnMsg"); if(m) m.innerHTML='<div class="err">'+esc(e.message)+'</div>'; });
 }
 
 /* ==================== ONGLET SUIVI LIVE ==================== */

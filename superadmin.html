@@ -98,10 +98,24 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version en cours (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.1";
 
 // BIBLE DES VERSIONS (côté master) — à compléter à chaque release.
 const VERSIONS = [
+  { v:"1.2.1", date:"2026-08", title:"Quantité réellement reçue et conversion G5", changes:[
+    "Pour tous les écarts, la quantité réellement reçue est calculée à partir de la quantité physique reçue/manquante.",
+    "Pour les articles en colis, le .txt G5 convertit automatiquement les pièces réellement reçues en quantité de colis (pièces ÷ CDT).",
+    "Suppression de la logique de sortie de stock liée aux écarts de conditionnement."
+  ]},
+  { v:"1.2.0", date:"2026-08", title:"Commande = référence, rapprochement, avoirs", changes:[
+    "Chargement de la commande G5 (.xlsx Biodis/SBV/Bodin) comme référence, fournisseur déduit.",
+    ".txt G5 dans l'unité de la commande : conversion colis (CDT), codes de la commande, ruptures = 0.",
+    "Poids variable : bouton conforme rouge + saisie poids obligatoire (repérage EAN 000000 / ENV).",
+    "Opérateur : colis affiché ; menu déroulant écarts (mauvaise qté, casse fournisseur/salarié, auto-conso, délotage, périmé) avec avoir/pas avoir et photo obligatoire sauf mauvaise qté.",
+    "Admin : écarts en tête + colonne photo, bouton rouge « voir les écarts ».",
+    "Onglet Suivi des avoirs (vue magasin/fournisseur, filtres, mail + PDF d'avoir) ; Archives (réceptions + litiges).",
+    "Onglet Fournisseurs (emails litiges). Magasin : popup code 3h expiré → nouveau code sans perdre la réception."
+  ]},
   { v:"1.1.0", date:"2026-08", title:"Sécurité & suivi", changes:[
     "Connexion vendeur à double code : code perso + code magasin (4 chiffres, valable 3h).",
     "Nouveau rôle « magasin » (magasin.html) : le bureau génère le code 3h.",
