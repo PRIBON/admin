@@ -32,11 +32,17 @@
   .pill.on { background:#e8f5e9; color:#2e7d32; } .pill.off { background:#fdecea; color:#c62828; }
   #gate { text-align:center; padding:30px 0; }
   .hidden { display:none; }
+  .ver-item { border-left:3px solid #1a4d2e; padding:6px 0 6px 12px; margin-bottom:14px; }
+  .ver-item .vh { font-weight:800; font-size:14px; color:#1a4d2e; }
+  .ver-item .vd { font-size:12px; color:#888; }
+  .ver-item ul { margin:6px 0 0; padding-left:18px; font-size:13px; line-height:1.5; }
+  .update-bar { position:fixed; top:0; left:0; right:0; z-index:300; background:#c62828; color:#fff; padding:10px 14px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:13px; font-weight:700; }
+  .update-bar button { background:#fff; color:#c62828; font-weight:800; padding:6px 14px; border-radius:6px; font-size:13px; border:none; cursor:pointer; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="header"><h1>🔐 PRIBON — Super-admin</h1><div class="sub">Réservé au gérant · gestion des codes vendeurs</div></div>
+  <div class="header"><h1>🔐 PRIBON — Super-admin</h1><div class="sub" id="hsub">Réservé au gérant · gestion des codes vendeurs</div></div>
 
   <!-- Écran de connexion -->
   <div class="card" id="gate">
@@ -80,11 +86,39 @@
       <div id="listErr" class="err"></div>
       <div id="list"></div>
     </div>
+
+    <div class="card">
+      <h2>📘 Historique des versions</h2>
+      <div class="muted" style="margin-bottom:10px">Suivi du développement de l'app. Version actuelle : <b id="curVer"></b>. Mets à jour ce bloc à chaque nouvelle version (dans ce fichier + VERSIONS.md).</div>
+      <div id="verList"></div>
+    </div>
   </div>
 </div>
 
 <script>
 /* =========================== CONFIGURATION =========================== */
+// Version en cours (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
+const APP_VERSION = "1.1.0";
+
+// BIBLE DES VERSIONS (côté master) — à compléter à chaque release.
+const VERSIONS = [
+  { v:"1.1.0", date:"2026-08", title:"Sécurité & suivi", changes:[
+    "Connexion vendeur à double code : code perso + code magasin (4 chiffres, valable 3h).",
+    "Nouveau rôle « magasin » (magasin.html) : le bureau génère le code 3h.",
+    "Session unique par code perso (blocage multi-appareils).",
+    "Auto-déconnexion après 20 min d'inactivité ; re-saisie du code perso pour rester connecté.",
+    "Rate-limit Apps Script (anti brute-force).",
+    "Numéro de version affiché + mise à jour automatique (get-version).",
+    "Messages push avec date de validité + accusé de lecture par salarié + suivi « qui a vu »."
+  ]},
+  { v:"1.0.0", date:"2026-08", title:"Baseline", changes:[
+    "Parsing 3 formats de BL (CSV Elibio, TXT Biodis, PDF Vitafrais).",
+    "App vendeur : pointage live multi-vendeurs, écarts + photo Drive, scan code-barres, validation figée.",
+    "Console responsable : chargement multi-magasin, à réceptionner sur G5, archives, suivi live.",
+    "Super-admin : génération/gestion des codes vendeurs. Génération .txt G5. Isolation stricte (1 base par magasin)."
+  ]}
+];
+
 // Client ID OAuth (Google Cloud Console -> Identifiants -> ID client OAuth "Application Web").
 // Ajoute l'URL où tu héberges cette page dans "Origines JavaScript autorisées".
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
@@ -94,6 +128,31 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6U
 
 let ID_TOKEN = null;
 
+/* --------------------------- VERSION / MAJ --------------------------- */
+function isNewer(a,b){
+  const pa=String(a).split(".").map(n=>parseInt(n,10)||0), pb=String(b).split(".").map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){ const x=pa[i]||0,y=pb[i]||0; if(y>x)return true; if(y<x)return false; }
+  return false;
+}
+function reloadToLatest(latest){ try{ const u=new URL(location.href); u.searchParams.set("v",latest||String(Date.now())); location.replace(u.toString()); }catch(e){ location.reload(); } }
+function showUpdateBar(latest){
+  if(document.getElementById("updbar")) return;
+  const d=document.createElement("div"); d.className="update-bar"; d.id="updbar";
+  d.innerHTML='<span>Nouvelle version '+esc(latest)+' disponible</span>';
+  const b=document.createElement("button"); b.textContent="Mettre à jour"; b.onclick=()=>reloadToLatest(latest);
+  d.appendChild(b); document.body.appendChild(d);
+}
+function checkVersion(){
+  fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"get-version"})})
+    .then(r=>r.json()).then(j=>{ if(j&&j.version&&isNewer(APP_VERSION,j.version)) showUpdateBar(j.version); }).catch(()=>{});
+}
+function renderVersions(){
+  const el=document.getElementById("verList"); if(!el) return;
+  el.innerHTML=VERSIONS.map(x=>`<div class="ver-item"><div class="vh">v${esc(x.v)} — ${esc(x.title||'')}</div>
+    <div class="vd">${esc(x.date||'')}</div><ul>${(x.changes||[]).map(c=>'<li>'+esc(c)+'</li>').join("")}</ul></div>`).join("");
+  const cv=document.getElementById("curVer"); if(cv) cv.textContent="v"+APP_VERSION;
+}
+
 function onCredential(resp){
   ID_TOKEN = resp.credential;
   try {
@@ -102,10 +161,13 @@ function onCredential(resp){
   } catch(e){}
   document.getElementById("gate").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
+  renderVersions();
   loadList();
 }
 
 window.onload = function(){
+  document.getElementById("hsub").textContent = "Réservé au gérant · gestion des codes vendeurs · v"+APP_VERSION;
+  checkVersion(); setInterval(checkVersion, 10*60*1000);
   if(OAUTH_CLIENT_ID.indexOf("__")!==-1){
     document.getElementById("gateErr").textContent = "Configuration requise : renseigne OAUTH_CLIENT_ID (et APPS_SCRIPT_URL) en haut du fichier.";
     return;

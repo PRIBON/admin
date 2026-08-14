@@ -34,8 +34,8 @@
   .btn-primary:disabled{background:#aaa;cursor:default}
   .btn-green{background:#2e7d32;color:#fff}
   .btn-lg{padding:16px 24px;font-size:16px}
-  input,select{font-family:inherit;font-size:15px;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;background:#fff}
-  input:focus,select:focus{outline:none;border-color:#1a4d2e}
+  input,select,textarea{font-family:inherit;font-size:15px;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;background:#fff}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#1a4d2e}
   label{font-size:12px;font-weight:700;color:#555;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
   /* Grille magasins */
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
@@ -57,6 +57,7 @@
   .rec{border:1.5px solid #e6e8ec;border-radius:10px;padding:12px;margin-bottom:10px}
   .rec.draft{background:#fff8e1;border-color:#ffb300}
   .rec.valid{background:#e8f5e9;border-color:#4caf50}
+  .rec.expired{background:#f4f5f7;border-color:#ccc;opacity:.75}
   .pbar{background:#e6e8ec;height:9px;border-radius:5px;overflow:hidden;margin-top:8px}
   .pfill{height:100%;background:#4caf50}
   .since{font-variant-numeric:tabular-nums;font-weight:700;color:#e65100}
@@ -68,6 +69,8 @@
   th{background:#f4f9f5}
   .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
   .modal-box{background:#fff;border-radius:12px;padding:20px;max-width:780px;width:100%;max-height:92vh;overflow:auto}
+  .update-bar{position:fixed;top:0;left:0;right:0;z-index:300;background:#c62828;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:700}
+  .update-bar button{background:#fff;color:#c62828;font-weight:800;padding:6px 14px;border-radius:6px;font-size:13px;border:none;cursor:pointer}
 </style>
 </head>
 <body>
@@ -90,23 +93,27 @@
     <button class="tab" data-tab="g5">📥 À réceptionner sur G5</button>
     <button class="tab" data-tab="archives">🗄️ Réceptions archivées</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
+    <button class="tab" data-tab="msg">📢 Messages</button>
   </div>
   <div id="tab-multi"></div>
   <div id="tab-simple" class="hidden"></div>
   <div id="tab-g5" class="hidden"></div>
   <div id="tab-archives" class="hidden"></div>
   <div id="tab-suivi" class="hidden"></div>
+  <div id="tab-msg" class="hidden"></div>
 </div>
 
 <script>
 /* =========================== CONFIGURATION =========================== */
+// Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
+const APP_VERSION = "1.1.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
 // Laisse firebaseConfig vide ({}) pour un magasin pas encore prêt.
 const STORES = [
-  { code:"ROBESPIERRE", label:"Pribon Robespierre", firebaseConfig:{ 
-    
+  { code:"ROBESPIERRE", label:"Pribon Robespierre", firebaseConfig:{
+
 apiKey: "AIzaSyAe-oMdObRk0_JSMHK7F4Mgqo7yMrHEK5g",
 
   authDomain: "robespierre-65cdf.firebaseapp.com",
@@ -116,7 +123,7 @@ apiKey: "AIzaSyAe-oMdObRk0_JSMHK7F4Mgqo7yMrHEK5g",
   projectId: "robespierre-65cdf",
 
   appId: "1:870656040014:web:8a33269cc4bc348145771f"
-  
+
   } },
   { code:"TOLBIAC",     label:"Pribon Tolbiac",     firebaseConfig:{ } },
   { code:"BICHAT",      label:"Pribon Bichat",      firebaseConfig:{ } },
@@ -125,13 +132,34 @@ apiKey: "AIzaSyAe-oMdObRk0_JSMHK7F4Mgqo7yMrHEK5g",
 /* =================================================================== */
 
 let ID_TOKEN=null;
+let ME_EMAIL="";
 const dbByStore={};      // code -> firebase database
 const names={};          // operatorCode -> "Prénom Nom"
-const state={};          // code -> { receptions, docs }
+const state={};          // code -> { receptions, docs, broadcasts }
 let pendingNames=false;
+let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function norm(s){ return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim(); }
 function toNum(s){ if(s==null) return 0; const n=parseFloat(String(s).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
+
+/* ============================ VERSION / MAJ ============================ */
+function isNewer(a,b){
+  const pa=String(a).split(".").map(n=>parseInt(n,10)||0), pb=String(b).split(".").map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){ const x=pa[i]||0,y=pb[i]||0; if(y>x)return true; if(y<x)return false; }
+  return false;
+}
+function reloadToLatest(latest){ try{ const u=new URL(location.href); u.searchParams.set("v",latest||String(Date.now())); location.replace(u.toString()); }catch(e){ location.reload(); } }
+function showUpdateBar(latest){
+  if(document.getElementById("updbar")) return;
+  const d=document.createElement("div"); d.className="update-bar"; d.id="updbar";
+  d.innerHTML='<span>Nouvelle version '+esc(latest)+' disponible</span>';
+  const b=document.createElement("button"); b.textContent="Mettre à jour"; b.onclick=()=>reloadToLatest(latest);
+  d.appendChild(b); document.body.appendChild(d);
+}
+function checkVersion(){
+  fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"get-version"})})
+    .then(r=>r.json()).then(j=>{ if(j&&j.version&&isNewer(APP_VERSION,j.version)) showUpdateBar(j.version); }).catch(()=>{});
+}
 
 /* ============================ AUTH ============================ */
 function onCredential(resp){
@@ -145,6 +173,8 @@ function onCredential(resp){
 }
 window.onload=function(){
   if(OAUTH_CLIENT_ID.indexOf("__")!==-1){ document.getElementById("gateErr").textContent="Renseigne OAUTH_CLIENT_ID et APPS_SCRIPT_URL en haut du fichier."; return; }
+  document.querySelector(".header .sub").textContent="Suivi & chargement des BL · tous les magasins · v"+APP_VERSION;
+  checkVersion(); setInterval(checkVersion, 10*60*1000);
   const t=setInterval(()=>{ if(window.google&&google.accounts&&google.accounts.id){ clearInterval(t);
     google.accounts.id.initialize({client_id:OAUTH_CLIENT_ID,callback:onCredential});
     google.accounts.id.renderButton(document.getElementById("gbtn"),{theme:"filled_blue",size:"large",text:"signin_with"});
@@ -154,6 +184,7 @@ window.onload=function(){
 const readyStores=()=>STORES.filter(s=>s.firebaseConfig&&s.firebaseConfig.databaseURL);
 
 function start(email){
+  ME_EMAIL=email;
   document.getElementById("gate").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   document.getElementById("whoami").textContent=email;
@@ -162,23 +193,24 @@ function start(email){
     try{
       const appF=firebase.initializeApp(s.firebaseConfig, s.code);
       dbByStore[s.code]=firebase.database(appF);
-      state[s.code]={receptions:{},docs:{}};
+      state[s.code]={receptions:{},docs:{},broadcasts:{}};
     }catch(e){ console.error("Firebase "+s.code, e); }
   });
   // Onglets
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
-  renderMulti(); renderSimple();
-  // Écouteurs live : réceptions + documents de chaque magasin
+  renderMulti(); renderSimple(); renderMsg();
+  // Écouteurs live : réceptions + documents + messages de chaque magasin
   readyStores().forEach(s=>{ const db=dbByStore[s.code]; if(!db) return;
     db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); });
     db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderArchives(); });
+    db.ref("broadcasts").on("value",snap=>{ state[s.code].broadcasts=snap.val()||{}; queueNames(); renderMsg(); });
   });
   renderG5(); renderArchives();
   setInterval(renderSuivi,1000);
 }
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["multi","simple","g5","archives","suivi"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  ["multi","simple","g5","archives","suivi","msg"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
 }
 
 /* ============================ PARSEURS ============================ */
@@ -513,15 +545,90 @@ function renderArchivesList(){
   box.innerHTML= total ? `<div class="live-grid">${html}</div>` : ('<div class="muted">Aucune réception archivée'+(q?' pour cette recherche':'')+'.</div>');
 }
 
+/* ==================== ONGLET MESSAGES (push v2) ==================== */
+// Écrit /broadcasts/{id} = { message, validUntil, createdAt, createdBy } dans la base du magasin.
+// Les vendeurs voient un popup tant que non expiré ET non validé par eux ; accusé par salarié.
+function endOfDayMs(iso){ if(!iso) return 0; const [y,m,d]=iso.split("-").map(Number); return new Date(y,m-1,d,23,59,59,999).getTime(); }
+function todayIso(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function renderMsg(){
+  const el=document.getElementById("tab-msg"); if(!el) return;
+  const ready=readyStores();
+  if(!msgStore && ready.length) msgStore=ready[0].code;
+  if(!el.dataset.built){
+    const opts=ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
+    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux vendeurs d'un magasin. Il s'affiche en popup tant qu'il est valable et tant que le vendeur ne l'a pas validé. Chaque vendeur qui se connecte le voit et le valide sous son code ; tu vois qui l'a vu.</p>
+      <div class="card">
+        <div class="field"><label>Magasin</label><select id="msgStoreSel" style="width:100%" onchange="msgStore=this.value;renderMsgList()">${opts}</select></div>
+        <div class="field"><label>Message</label><textarea id="msgText" rows="4" style="width:100%" placeholder="Ex : Vous n'aurez pas les yaourts X aujourd'hui, c'est normal."></textarea></div>
+        <div class="field"><label>Valable jusqu'au (inclus)</label><input id="msgDate" type="date" style="width:100%" value="${todayIso()}"/></div>
+        <button class="btn btn-primary btn-lg" id="msgSendBtn" onclick="sendBroadcast()" style="margin-top:8px">Envoyer le message</button>
+        <div id="msgSendMsg"></div>
+      </div>
+      <h3 style="margin:22px 0 8px">Messages du magasin</h3>
+      <div id="msgList"></div>`;
+    el.dataset.built="1";
+  }
+  const sel=document.getElementById("msgStoreSel"); if(sel && msgStore) sel.value=msgStore;
+  renderMsgList();
+}
+function renderMsgList(){
+  const box=document.getElementById("msgList"); if(!box) return;
+  if(!msgStore || !state[msgStore]){ box.innerHTML='<div class="muted">Magasin non configuré.</div>'; return; }
+  const now=Date.now();
+  const list=Object.entries(state[msgStore].broadcasts||{}).map(([id,b])=>({id,...b}))
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(!list.length){ box.innerHTML='<div class="muted">Aucun message pour ce magasin.</div>'; return; }
+  box.innerHTML=list.map(b=>{
+    const expired=b.validUntil && now>b.validUntil;
+    const reads=b.reads||{};
+    const codes=Object.keys(reads);
+    const who=codes.length? codes.map(c=>esc(names[c]||("code "+c))).join(", ") : "personne pour l'instant";
+    return `<div class="rec ${expired?'expired':'valid'}">
+      <div style="white-space:pre-wrap;font-size:14px">${esc(b.message||'')}</div>
+      <div style="font-size:12px;color:#666;margin-top:6px">
+        ${b.validUntil?('Valable jusqu\'au '+esc(dateShort(b.validUntil))):'Sans date'} ${expired?'<span class="badge warn">expiré</span>':'<span class="badge ok">actif</span>'}
+        · envoyé ${esc(dateShort(b.createdAt))}${b.createdBy?(' par '+esc(b.createdBy)):''}
+      </div>
+      <div style="font-size:12px;color:#1a4d2e;margin-top:6px"><b>Vu / validé par (${codes.length})</b> : ${who}</div>
+      <div style="margin-top:8px"><button class="btn" style="background:#fdecea;color:#c62828;padding:6px 12px;font-size:13px" onclick="deleteBroadcast('${esc(b.id)}')">Supprimer</button></div>
+    </div>`;
+  }).join("");
+}
+async function sendBroadcast(){
+  const code=msgStore; const db=dbByStore[code];
+  const text=(document.getElementById("msgText").value||"").trim();
+  const dateIso=document.getElementById("msgDate").value;
+  const out=document.getElementById("msgSendMsg");
+  if(!db){ out.innerHTML='<div class="err">Magasin non configuré.</div>'; return; }
+  if(!text){ out.innerHTML='<div class="err">Écris un message.</div>'; return; }
+  const validUntil=endOfDayMs(dateIso)||0;
+  const btn=document.getElementById("msgSendBtn"); btn.disabled=true; btn.textContent="Envoi…";
+  try{
+    const ref=db.ref("broadcasts").push();
+    await ref.set({ message:text, validUntil:validUntil, createdAt:firebase.database.ServerValue.TIMESTAMP, createdBy:ME_EMAIL });
+    document.getElementById("msgText").value="";
+    out.innerHTML='<div class="ok">✓ Message envoyé à '+esc((STORES.find(x=>x.code===code)||{}).label||code)+'.</div>';
+  }catch(e){ out.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
+  btn.disabled=false; btn.textContent="Envoyer le message";
+}
+async function deleteBroadcast(id){
+  const db=dbByStore[msgStore]; if(!db) return;
+  if(!confirm("Supprimer ce message ?")) return;
+  try{ await db.ref("broadcasts/"+id).remove(); }catch(e){ alert("Erreur : "+e.message); }
+}
+
 /* ==================== ONGLET SUIVI LIVE ==================== */
 function queueNames(){
   const need=new Set();
-  Object.values(state).forEach(st=>Object.values(st.receptions||{}).forEach(r=>{ if(r.operatorCode&&!(r.operatorCode in names)) need.add(r.operatorCode); }));
+  Object.values(state).forEach(st=>{
+    Object.values(st.receptions||{}).forEach(r=>{ if(r.operatorCode&&!(r.operatorCode in names)) need.add(r.operatorCode); });
+    Object.values(st.broadcasts||{}).forEach(b=>{ Object.keys(b.reads||{}).forEach(c=>{ if(!(c in names)) need.add(c); }); });
+  });
   if(!need.size||pendingNames) return;
   pendingNames=true;
   fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:JSON.stringify({action:"resolve-names",idToken:ID_TOKEN,codes:Array.from(need)})})
-    .then(r=>r.json()).then(j=>{ if(j&&j.names) Object.assign(names,j.names); pendingNames=false; renderSuivi(); })
+    .then(r=>r.json()).then(j=>{ if(j&&j.names) Object.assign(names,j.names); pendingNames=false; renderSuivi(); renderMsg(); })
     .catch(()=>{ pendingNames=false; });
 }
 function activeCount(doc){ if(!doc||!doc.lines) return 0; return doc.lines.filter(l=>!l.nonLivre).length; }
