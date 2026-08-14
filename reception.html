@@ -267,7 +267,7 @@ function cleanDesBiodis(s){ return String(s||"").replace(/\s+(Non\s+Bio|Bio|Conv
 function parseBiodisPDF(rowLines){
   const out=[]; let supplier="BIODIS", docNumber=""; let stopped=false;
   const reU  = /^(\d{3,7})\s+(.+?)\s+(\d{13})\s+\d+\s+(\d+)\s+U\s+[\d.,]+\s+[\d.,]+\s+\d+\s*$/;
-  const reKG = /^(\d{3,7})\s+(.+?)\s+(\d{13})\s+\d+\s+([\d.,]+)KG\s+[\d.,]+\s+[\d.,]+\s+\d+\s*$/;
+  const reKG = /^(\d{3,7})\s+(.+?)\s+(\d{13})\s+\d+\s+([\d.,]+)\s*KG\s+[\d.,]+\s+[\d.,]+\s+\d+\s*$/;
   const reND = /^(\d{3,7})\s+(.+?)\s+(Non livr[ée]|Produit sur commande|Rupture fournisseur)\s+(\d+)\s+U\s*$/i;
   const isItemNum=(s)=>reU.test(s)||reKG.test(s);
   const isMeta=(s)=>/^(Prix\b|DLC\b|DDM\b|Contribution\b|Lot\b|Sous-total\b|Commande n\b|SASU\b|NAF\b|No AGREMENT|www\.|http|BIO :|CONV\b|COSMEBIO|FR-BIO|Page \d|Poids\b|Date\b|Certification\b|Marque\b|Cat\.|TPF\b|TVA\b|Bon de Livraison|PRIBON|T[ée]l\.|Fax\b|e_mail|Site WEB|EAN\b|PRIX\b|Montant\b|Colis\b|UNITAIRE|H\.T\.|Scannez|Espace Pro|C'est Biodis|Vous pouvez|pr[ée]command|commerciales|Merci|ne pourrons|PARTICIPATION|prix indicatif|-{3,})/i.test(s) || /^[\d.,]+$/.test(String(s).trim());
