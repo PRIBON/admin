@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>PRIBON — Code magasin</title>
+
+<script>
+function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
+</script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js" onerror="__cdnFB('https://unpkg.com/react@18/umd/react.production.min.js')"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" onerror="__cdnFB('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js')"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js" onerror="__cdnFB('https://unpkg.com/@babel/standalone@7.26.4/babel.min.js')"></script>
+
+<!-- Google Identity Services : connexion 2FA du bureau du magasin (gmail du magasin) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f4f5f7; color:#1a1a1a; }
+  button { font-family:inherit; cursor:pointer; border:none; }
+  .screen-center { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
+  .logo { font-size:26px; font-weight:800; color:#1a4d2e; margin-bottom:4px; text-align:center; }
+  .tag { color:#666; font-size:14px; margin-bottom:24px; text-align:center; }
+  .card { width:100%; max-width:420px; background:#fff; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.08); padding:24px; text-align:center; }
+  .btn-primary { width:100%; padding:14px; font-size:16px; font-weight:700; background:#1a4d2e; color:#fff; border-radius:8px; }
+  .btn-primary:active { background:#0d3d20; }
+  .btn-primary:disabled { background:#aaa; }
+  .btn-secondary { width:100%; padding:12px; font-size:14px; font-weight:600; background:#f0f0f0; color:#333; border-radius:8px; margin-top:10px; }
+  .err { color:#d32f2f; font-size:13px; margin-top:10px; }
+  .small-note { font-size:12px; color:#888; margin-top:12px; line-height:1.4; }
+  .code-box { font-size:56px; font-weight:900; letter-spacing:12px; color:#1a4d2e; background:#eaf3ec; border-radius:14px; padding:22px 10px; margin:8px 0 6px; }
+  .count { font-size:15px; font-weight:700; color:#e65100; }
+  .count.ok { color:#2e7d32; }
+  .store-name { font-size:15px; font-weight:800; color:#1a4d2e; margin-bottom:14px; }
+  .ver-badge { position:fixed; bottom:6px; right:8px; font-size:10px; color:#9aa; }
+  .update-bar { position:fixed; top:0; left:0; right:0; z-index:300; background:#1a4d2e; color:#fff; padding:10px 14px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:13px; font-weight:600; }
+  .update-bar button { background:#fff; color:#1a4d2e; font-weight:800; padding:6px 14px; border-radius:6px; font-size:13px; }
+</style>
+</head>
+<body>
+<div id="root"><div style="max-width:440px;margin:80px auto;text-align:center;color:#666"><div style="font-size:34px">🏬</div><div style="margin-top:10px">Chargement…</div></div></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ============================ CONFIGURATION =========================== */
+const APP_VERSION = "1.1.0";
+
+// MÊME Client ID OAuth que les autres pages PRIBON.
+const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
+
+// MÊME Apps Script central que reception.html / superadmin.html / app vendeur.
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
+
+const OAUTH_READY = () => OAUTH_CLIENT_ID && !OAUTH_CLIENT_ID.includes("__");
+const APPS_SCRIPT_READY = () => APPS_SCRIPT_URL && !APPS_SCRIPT_URL.includes("__A_REMPLIR__");
+
+async function api(action, payload){
+  const res=await fetch(APPS_SCRIPT_URL,{ method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" },
+    body:JSON.stringify({ action, ...payload }) });
+  return await res.json();
+}
+
+async function fetchLatestVersion(){
+  if(!APPS_SCRIPT_READY()) return null;
+  try{ const j=await api("get-version",{}); return (j&&j.version)?String(j.version):null; }catch(e){ return null; }
+}
+function isNewer(a,b){
+  const pa=String(a).split(".").map(n=>parseInt(n,10)||0), pb=String(b).split(".").map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){ const x=pa[i]||0,y=pb[i]||0; if(y>x)return true; if(y<x)return false; }
+  return false;
+}
+function reloadToLatest(latest){ try{ const u=new URL(location.href); u.searchParams.set("v",latest||String(Date.now())); location.replace(u.toString()); }catch(e){ location.reload(); } }
+
+function fmtCountdown(ms){
+  if(ms<=0) return "expiré";
+  const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(h>0) return h+"h"+String(m).padStart(2,"0");
+  return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+}
+
+/* ============================ LOGIN GOOGLE =========================== */
+function GoogleLogin({ onToken }){
+  const ref=useRef(); const [err,setErr]=useState("");
+  useEffect(()=>{
+    if(!OAUTH_READY()) return;
+    let tries=0; const t=setInterval(()=>{
+      if(window.google && google.accounts && google.accounts.id){
+        clearInterval(t);
+        google.accounts.id.initialize({ client_id:OAUTH_CLIENT_ID, callback:(resp)=>onToken(resp.credential) });
+        try{ google.accounts.id.renderButton(ref.current,{ theme:"filled_blue", size:"large", text:"signin_with", width:280 }); }catch(e){}
+      } else if(++tries>60) clearInterval(t);
+    },150);
+    return ()=>clearInterval(t);
+  },[]);
+  if(!OAUTH_READY()) return <div className="err">Config OAuth manquante.</div>;
+  return (<div><div ref={ref} style={{display:"flex",justifyContent:"center"}}></div>{err&&<div className="err">{err}</div>}</div>);
+}
+
+/* ============================== APP ================================= */
+function App(){
+  const [token,setToken]=useState(null);
+  const [store,setStore]=useState(null);   // { storeCode, storeLabel, email }
+  const [session,setSession]=useState(null); // { code, expiresAt }
+  const [err,setErr]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [now,setNow]=useState(Date.now());
+  const [latest,setLatest]=useState(null);
+
+  // Horloge (compte à rebours)
+  useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(t); },[]);
+  // Vérif version
+  useEffect(()=>{ let stop=false; (async()=>{ const v=await fetchLatestVersion(); if(!stop&&v) setLatest(v); })(); return ()=>{ stop=true; }; },[]);
+  const updateAvailable = latest && isNewer(APP_VERSION, latest);
+
+  const onToken=async(idToken)=>{
+    setToken(idToken); setErr(""); setBusy(true);
+    try{
+      const j=await api("magasin-login",{ idToken });
+      if(j && j.allowed){ setStore({ storeCode:j.storeCode, storeLabel:j.storeLabel, email:j.email }); setSession(j.current||null); }
+      else setErr("Accès refusé"+((j&&j.email)?" : "+j.email:"")+" n'est pas un compte magasin autorisé.");
+    }catch(e){ setErr("Erreur : "+e.message); }
+    setBusy(false);
+  };
+
+  const generate=async()=>{
+    if(!token) return; setBusy(true); setErr("");
+    try{
+      const j=await api("generate-store-code",{ idToken:token });
+      if(j && j.code){ setSession({ code:j.code, expiresAt:j.expiresAt }); }
+      else setErr(j && j.error ? j.error : "Génération impossible.");
+    }catch(e){ setErr("Erreur : "+e.message); }
+    setBusy(false);
+  };
+
+  const logout=()=>{ try{ google.accounts.id.disableAutoSelect(); }catch(e){} setToken(null); setStore(null); setSession(null); setErr(""); };
+
+  const remaining = session ? (session.expiresAt - now) : 0;
+  const active = session && remaining>0;
+
+  return (
+    <div className="screen-center">
+      {updateAvailable && (
+        <div className="update-bar"><span>Nouvelle version {latest} disponible</span>
+          <button onClick={()=>reloadToLatest(latest)}>Mettre à jour</button></div>
+      )}
+
+      <div className="logo">🏬 PRIBON</div>
+      <div className="tag">Bureau magasin · code de réception</div>
+
+      {!store ? (
+        <div className="card">
+          <div style={{fontWeight:700,marginBottom:14}}>Connexion du magasin</div>
+          <GoogleLogin onToken={onToken}/>
+          {busy && <div className="small-note">Vérification…</div>}
+          {err && <div className="err">{err}</div>}
+          <div className="small-note">Connectez-vous avec le compte Google du magasin. Vous pourrez générer un code valable 3h à communiquer aux vendeurs.</div>
+        </div>
+      ) : (
+        <div className="card">
+          <div className="store-name">{store.storeLabel}</div>
+          {active ? (
+            <>
+              <div className="small-note" style={{marginTop:0}}>Code magasin actuel :</div>
+              <div className="code-box">{session.code}</div>
+              <div className={"count"+(remaining>30*60*1000?" ok":"")}>Valable encore {fmtCountdown(remaining)}</div>
+            </>
+          ) : (
+            <div className="small-note" style={{marginTop:0}}>Aucun code actif. Générez-en un pour la réception du jour.</div>
+          )}
+          <button className="btn-primary" style={{marginTop:16}} onClick={generate} disabled={busy}>
+            {busy?"…":(active?"Générer un nouveau code":"Générer un code (3h)")}
+          </button>
+          {active && <div className="small-note">Communiquez ce code aux vendeurs qui font la réception. Le même code fonctionne pour plusieurs vendeurs. En générer un nouveau annule l'ancien.</div>}
+          {err && <div className="err">{err}</div>}
+          <button className="btn-secondary" onClick={logout}>Se déconnecter</button>
+        </div>
+      )}
+
+      <div className="ver-badge">v{APP_VERSION}</div>
+    </div>
+  );
+}
+
+const rootEl=document.getElementById("root");
+ReactDOM.createRoot(rootEl).render(<App/>);
+</script>
+</body>
+</html>
