@@ -7,6 +7,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
   if (window['pdfjsLib']) window['pdfjsLib'].GlobalWorkerOptions.workerSrc =
@@ -312,8 +313,52 @@ async function readPDF(buf){
   }
   return pickPdfParser(rowLines);
 }
+/* ---------- LECTURE COMMANDE (export G5 xlsx) ---------- */
+// Code fournisseur G5 -> nom lisible (complète au besoin).
+const FOURN_MAP={ "K113":"SBV", "K005":"BODIN" };
+async function parseOrderXlsx(file){
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:"array"});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+  const N=(s)=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+  let h=-1;
+  for(let i=0;i<rows.length;i++){ const r=(rows[i]||[]).map(N);
+    if(r.includes("CODE") && r.some(c=>c.startsWith("DESIGNATION"))){ h=i; break; } }
+  if(h<0) throw new Error("Export de commande non reconnu (en-tête Code/Désignation introuvable).");
+  const head=rows[h].map(x=>String(x).trim());
+  const col=(names)=>{ for(const n of names){ const i=head.findIndex(c=>N(c)===N(n)); if(i>=0) return i; } return -1; };
+  const iCode=col(["Code"]), iRef=col(["Ref Fourn.","Ref Fourn"]), iDes=col(["Désignation","Designation"]),
+        iCdt=col(["CDT"]), iQte=col(["Qté","Qte"]), iFourn=col(["Fournisseur"]);
+  let dateLiv="", cmd="", supplier="";
+  rows.forEach(r=>{ const j=(r||[]).map(x=>String(x));
+    const li=j.findIndex(x=>/^\s*Le\s*$/i.test(x)); if(li>=0 && /\d{2}\/\d{2}\/\d{4}/.test(j[li+1]||"")) dateLiv=j[li+1].trim();
+    const ci=j.findIndex(x=>/Commande à la Centrale N°/i.test(x)); if(ci>=0 && j[ci+1]) cmd=String(j[ci+1]).trim();
+    const fi=j.findIndex(x=>/Adresse de Livraison/i.test(x)); if(fi>=0 && j[fi+1]) supplier=j[fi+1].trim();
+    j.forEach(x=>{ if(!cmd && /^\d{2}-\d-[A-Za-z0-9]+$/.test(String(x).trim())) cmd=String(x).trim(); });
+  });
+  const lines=[]; let fournCode="";
+  for(let i=h+1;i<rows.length;i++){
+    const r=rows[i]||[]; const code=String(r[iCode]||"").trim(); const des=String(r[iDes]||"").trim();
+    if(!/^(NC-|\d)/i.test(code) || !des) continue;              // ignore pied de page / 2e en-tête
+    const cdtRaw=iCdt>=0?String(r[iCdt]||"").trim():"";
+    const cdt=cdtRaw?toNum(cdtRaw.replace(/^C/i,"")):null;      // "C6" -> 6 (pièces par colis)
+    const qte=toNum(r[iQte]);
+    if(iFourn>=0 && r[iFourn] && !fournCode) fournCode=String(r[iFourn]).trim();
+    const isPV=/000000$/.test(code)||/^2\d{11,12}$/.test(code)||/\bENV\b/i.test(des);
+    const isEan=/^\d{12,13}$/.test(code);
+    lines.push({ article:code, code, ean:isEan?code.replace(/^0+(?=\d)/,""):"", ref:String(iRef>=0?r[iRef]||"":"").trim(),
+      designation:des, cdt, qteCmd:qte, unit:cdt?"colis":"piece",
+      attendu: cdt?Math.round(qte*cdt):qte, poidsVariable:isPV, categorie:"Autres" });
+  }
+  if(!supplier && fournCode) supplier=FOURN_MAP[fournCode]||fournCode;
+  if(!lines.length) throw new Error("Commande lue mais aucune ligne article trouvée.");
+  return { format:"CMD", g5Key:"code", supplier, docNumber:cmd||"", deliveryDate:dateLiv, lines };
+}
+
 async function parseAnyFile(file){
   const name=(file.name||"").toLowerCase();
+  if(name.endsWith(".xlsx")||name.endsWith(".xls")) return await parseOrderXlsx(file);
   if(name.endsWith(".pdf")){ const buf=await file.arrayBuffer(); return { ...(await readPDF(buf)), format:"PDF" }; }
   const buf=await file.arrayBuffer();
   let text; try{ text=new TextDecoder("windows-1252").decode(buf); }catch(e){ text=new TextDecoder("utf-8").decode(buf); }
@@ -347,17 +392,29 @@ function detectG5Key(parsed){
 }
 // Clé de ligne identique à l'app vendeur (pour retrouver la quantité réelle).
 function lineKeyOf(l,idx){ const a=(l.article||"").toString().trim(); return a?("a_"+a.replace(/[.#$/\[\]]/g,"_")):("i_"+idx); }
-// Construit le .txt G5 : col1 = EAN (ou code article), col2 = quantité réelle reçue. Séparateur tabulation.
+// Construit le .txt G5.
+// - code = colonne "Code" de la commande (l.code) si présent, sinon EAN/article (ancien mode).
+// - quantité exprimée dans l'unité de la commande :
+//     colis (l.cdt) -> pièces_reçues / cdt ; poids variable -> poids saisi ; sinon pièces.
 function buildG5Txt(rec, doc){
   const key=(doc&&doc.g5Key)||'ean';
   const active=((doc&&doc.lines)?doc.lines:[]).filter(l=>!l.nonLivre);
   const out=[];
   active.forEach((l,i)=>{
-    const st=(rec.lines||{})[lineKeyOf(l,i)];
-    const reel=st?(st.reel!=null?st.reel:l.attendu):l.attendu;
-    const code=key==='article'?(l.article||l.ean||''):(l.ean||l.article||'');
+    const st=(rec.lines||{})[lineKeyOf(l,i)]||{};
+    const reelPieces = st.status ? (st.reel!=null?st.reel:l.attendu) : l.attendu; // non pointé = attendu
+    let qty;
+    if(l.poidsVariable){
+      qty = (st.poids!=null && st.poids!=="") ? st.poids : (st.status?reelPieces:""); // poids saisi (P2) sinon repli
+    } else if(l.cdt){
+      const c = reelPieces / l.cdt;
+      qty = (Math.abs(c-Math.round(c))<1e-9) ? Math.round(c) : Number(c.toFixed(3)); // colis entiers si possible
+    } else {
+      qty = reelPieces;
+    }
+    const code = l.code || (key==='article'?(l.article||l.ean||''):(l.ean||l.article||''));
     if(!code) return;
-    out.push(code+"\t"+reel);
+    out.push(code+"\t"+qty);
   });
   return out.join("\r\n");
 }
@@ -380,9 +437,9 @@ function renderMulti(){
       <h3>${esc(s.label)} ${ready?'':'<span class="badge warn">non configuré</span>'}</h3>
       ${ready?`
         <div class="drop ${st.file?'has':''}" onclick="document.getElementById('mf_${s.code}').click()">
-          ${st.file?('✓ '+esc(st.file.name)):'📄 Choisir le fichier BL (CSV / TXT / PDF)'}
+          ${st.file?('✓ '+esc(st.file.name)):'📄 Commande (xlsx) ou BL (CSV / TXT / PDF)'}
         </div>
-        <input id="mf_${s.code}" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onMultiFile('${s.code}',this.files[0])"/>
+        <input id="mf_${s.code}" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onMultiFile('${s.code}',this.files[0])"/>
         <div class="field"><label>Fournisseur</label><input style="width:100%" value="${esc(st.supplier||'')}" oninput="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{supplier:this.value})" placeholder="Ex : Elibio, Biodis, Vitafrais…"/></div>
         <div class="field"><label>Livraison prévue</label><input type="date" style="width:100%" value="${esc(st.deliveryDate||'')}" onchange="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{deliveryDate:this.value})"/></div>
         <div id="mnote_${s.code}">${st.parsed?parseNote(st.parsed):''}</div>
@@ -397,6 +454,10 @@ function renderMulti(){
   updateMultiSummary();
 }
 function parseNote(p){
+  if(p.format==='CMD'){
+    const pv=p.lines.filter(l=>l.poidsVariable).length, cl=p.lines.filter(l=>l.cdt).length;
+    return `<div class="parse-note">📋 <b>Commande ${esc(p.supplier||'?')}</b> ${esc(p.docNumber||'')} · ${p.lines.length} lignes${cl?(' · '+cl+' en colis'):''}${pv?(' · '+pv+' poids variable'):''}</div>`;
+  }
   const g5 = p.g5Key==='article' ? ' · clé G5 : <b>code article</b>' : (p.g5Key==='ean' ? ' · clé G5 : EAN' : '');
   return `<div class="parse-note">N° <b>${esc(p.docNumber||'—')}</b> · ${esc(p.format)} · ${p.lines.length} lignes${p.skipped?(' · '+p.skipped+' ignorée(s)'):''}${g5}</div>`;
 }
@@ -406,7 +467,7 @@ async function onMultiFile(code,file){
   const note=document.getElementById('mnote_'+code); if(note) note.innerHTML='<div class="parse-note">Lecture…</div>';
   try{
     const parsed=await parseAnyFile(file);
-    parsed.g5Key=detectG5Key(parsed);
+    if(parsed.format!=='CMD') parsed.g5Key=detectG5Key(parsed);
     multiFiles[code].parsed=parsed;
     if(parsed.supplier && !multiFiles[code].supplier) multiFiles[code].supplier=parsed.supplier;
     renderMulti();
@@ -440,8 +501,8 @@ function renderSimple(){
   el.innerHTML=`<div class="card">
     <h2 style="margin-top:0">Charger un BL</h2>
     <p class="muted">Choisis un fichier, puis indique pour quel magasin et la date de livraison prévue.</p>
-    <div class="drop" id="sdrop" onclick="document.getElementById('sfile').click()">📄 Choisir le fichier BL (CSV / TXT / PDF)</div>
-    <input id="sfile" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onSimpleFile(this.files[0])"/>
+    <div class="drop" id="sdrop" onclick="document.getElementById('sfile').click()">📄 Commande (xlsx) ou BL (CSV / TXT / PDF)</div>
+    <input id="sfile" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onSimpleFile(this.files[0])"/>
     <div id="snote" style="margin-top:10px"></div>
     <div class="field" style="margin-top:12px"><label>Magasin</label><select id="sstore" style="width:100%">${opts}</select></div>
     <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Ex : Elibio, Biodis, Vitafrais…"/></div>
@@ -457,9 +518,10 @@ async function onSimpleFile(file){
   const note=document.getElementById('snote'); note.innerHTML='<div class="parse-note">Lecture…</div>';
   try{
     simpleParsed=await parseAnyFile(file);
-    simpleParsed.g5Key=detectG5Key(simpleParsed);
+    if(simpleParsed.format!=='CMD') simpleParsed.g5Key=detectG5Key(simpleParsed);
     note.innerHTML=parseNote(simpleParsed);
     if(simpleParsed.supplier) document.getElementById('ssup').value=simpleParsed.supplier;
+    if(simpleParsed.format==='CMD' && simpleParsed.deliveryDate){ const dp=String(simpleParsed.deliveryDate).split('/'); if(dp.length===3) document.getElementById('sdate').value=dp[2]+'-'+dp[1].padStart(2,'0')+'-'+dp[0].padStart(2,'0'); }
     document.getElementById('sbtn').disabled=false;
   }catch(e){ note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
 }
@@ -474,7 +536,7 @@ async function loadSimple(){
     await loadToStore(code, simpleParsed, {supplier,type,deliveryDate});
     document.getElementById('smsg').innerHTML='<div class="ok">✓ Chargé dans '+esc(code)+'. Visible immédiatement dans le magasin.</div>';
     simpleParsed=null; document.getElementById('snote').innerHTML='';
-    document.getElementById('sdrop').classList.remove('has'); document.getElementById('sdrop').textContent='📄 Choisir le fichier BL (CSV / TXT / PDF)';
+    document.getElementById('sdrop').classList.remove('has'); document.getElementById('sdrop').textContent='📄 Commande (xlsx) ou BL (CSV / TXT / PDF)';
   }catch(e){ document.getElementById('smsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
   btn.disabled=false; btn.textContent='Charger dans le magasin';
 }
