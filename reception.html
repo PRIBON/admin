@@ -262,6 +262,42 @@ function parsePDFLines(rowLines){
   }
   return { docNumber, supplier, lines:out };
 }
+// --- Parseur PDF Biodis (mise en page différente de Vitafrais) ---
+function cleanDesBiodis(s){ return String(s||"").replace(/\s+(Non\s+Bio|Bio|Conv(?:ersion)?|Cosmebio|Ecocert)\s*$/i,"").trim(); }
+function parseBiodisPDF(rowLines){
+  const out=[]; let supplier="BIODIS", docNumber=""; let stopped=false;
+  const reU  = /^(\d{3,7})\s+(.+?)\s+(\d{13})\s+\d+\s+(\d+)\s+U\s+[\d.,]+\s+[\d.,]+\s+\d+\s*$/;
+  const reKG = /^(\d{3,7})\s+(.+?)\s+(\d{13})\s+\d+\s+([\d.,]+)KG\s+[\d.,]+\s+[\d.,]+\s+\d+\s*$/;
+  const reND = /^(\d{3,7})\s+(.+?)\s+(Non livr[ée]|Produit sur commande|Rupture fournisseur)\s+(\d+)\s+U\s*$/i;
+  const isItemNum=(s)=>reU.test(s)||reKG.test(s);
+  const isMeta=(s)=>/^(Prix\b|DLC\b|DDM\b|Contribution\b|Lot\b|Sous-total\b|Commande n\b|SASU\b|NAF\b|No AGREMENT|www\.|http|BIO :|CONV\b|COSMEBIO|FR-BIO|Page \d|Poids\b|Date\b|Certification\b|Marque\b|Cat\.|TPF\b|TVA\b|Bon de Livraison|PRIBON|T[ée]l\.|Fax\b|e_mail|Site WEB|EAN\b|PRIX\b|Montant\b|Colis\b|UNITAIRE|H\.T\.|Scannez|Espace Pro|C'est Biodis|Vous pouvez|pr[ée]command|commerciales|Merci|ne pourrons|PARTICIPATION|prix indicatif|-{3,})/i.test(s) || /^[\d.,]+$/.test(String(s).trim());
+  for(let i=0;i<rowLines.length;i++){
+    const L=rowLines[i];
+    const doc=L.match(/(\d{2}\/\d{2}\/\d{4})\s+(\d{6,8})\s/); if(doc && !docNumber) docNumber=doc[2];
+    if(/Produits en arr[eê]t long|R[ée]f[ée]rence D[ée]s/i.test(L)){ stopped=true; continue; }
+    if(stopped) continue;
+    let m;
+    if((m=L.match(reND))){ out.push({ article:m[1], ean:"", designation:cleanDesBiodis(m[2]), marque:"", attendu:parseInt(m[4],10), categorie:"Autres", nonLivre:true, comment:m[3] }); continue; }
+    let art=null, ean="", att=0;
+    if((m=L.match(reU)))  { art=m[1]; ean=m[3]; att=parseInt(m[4],10); }
+    else if((m=L.match(reKG))){ art=m[1]; ean=m[3]; att=toNum(m[4]); }
+    if(art){
+      let des=[];
+      for(let j=i+1;j<rowLines.length && des.length<3;j++){
+        const N=rowLines[j];
+        if(isItemNum(N)||reND.test(N)||isMeta(N)) break;
+        des.push(N);
+      }
+      out.push({ article:art, ean:ean.replace(/^0+(?=\d)/,""), designation:cleanDesBiodis(des.join(" ")), marque:"", attendu:att, categorie:"Autres" });
+    }
+  }
+  return { docNumber, supplier, lines: out };
+}
+function pickPdfParser(rowLines){
+  const j=rowLines.join("\n");
+  if(/BIODIS/i.test(j)) return parseBiodisPDF(rowLines);
+  return parsePDFLines(rowLines); // Vitafrais (par défaut)
+}
 async function readPDF(buf){
   const pdf=await pdfjsLib.getDocument({data:buf}).promise;
   let rowLines=[];
@@ -274,7 +310,7 @@ async function readPDF(buf){
       if(line) rowLines.push(line);
     });
   }
-  return parsePDFLines(rowLines);
+  return pickPdfParser(rowLines);
 }
 async function parseAnyFile(file){
   const name=(file.name||"").toLowerCase();
@@ -504,11 +540,19 @@ function openDetail(code,id){
   back.onclick=(e)=>{ if(e.target===back) back.remove(); };
   document.body.appendChild(back);
 }
+// Nom de fichier G5 : AAMMJJ_FOURNISSEUR_BL.txt (ex : 260814_BIODIS_1154370.txt)
+function g5Filename(r){
+  const d=new Date(r.validatedAt||r.createdAt||Date.now());
+  const yy=String(d.getFullYear()).slice(-2), mm=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
+  const sup=String(r.supplier||"FOURNISSEUR").toUpperCase().replace(/[^A-Z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "FOURNISSEUR";
+  const bl=String(r.docNumber||"BL").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-+|-+$/g,"") || "BL";
+  return yy+mm+dd+"_"+sup+"_"+bl+".txt";
+}
 function dlG5(code,id){
   const st=state[code]; const r=st.receptions[id]; const doc=st.docs[r.docId]||null;
   const txt=buildG5Txt(r,doc);
   if(!txt){ alert("Aucune ligne avec code (EAN / article) — impossible de générer le .txt."); return; }
-  downloadTxt("G5_"+code+"_"+(r.docNumber||"BL")+".txt", txt);
+  downloadTxt(g5Filename(r), txt);
 }
 
 /* ==================== ONGLET RÉCEPTIONS ARCHIVÉES ==================== */
