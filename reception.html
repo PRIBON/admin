@@ -1077,15 +1077,15 @@ function centraleSessions(){
   return out;
 }
 function centraleTxt(sess){
-  const lines=centraleLines(sess); const rows=[];
-  rows.push("COMMANDE A LA CENTRALE - LA CENTRALE PDP");
-  rows.push("Fournisseur:\t"+(sess.meta.supplier||"?"));
-  rows.push("Date:\t"+new Date(sess.meta.startedAt||Date.now()).toLocaleString("fr-FR"));
-  rows.push("");
-  rows.push(["Code EAN","Designation","Colisage","Commande","Dispatche","Ecart","Motif(s)"].join("\t"));
-  lines.forEach(l=>{ const motifs=(l.ecarts||[]).map(e=>(e.storeLabel||e.store)+":"+e.reason+(e.reasonText?"("+e.reasonText+")":"")).join(" | ");
-    rows.push([l.article,l.designation,l.colisage||"",l.commande,l.dispatched,l.ecart,motifs].join("\t")); });
-  return rows.join("\r\n");
+  const lines = centraleLines(sess);
+  const out = [];
+  lines.forEach(l=>{
+    const code = String(l.article||"").trim();
+    if(!code) return;                                   // pas de code => ligne ignorée (voir note EAN)
+    const qty = (l.dispatched===0) ? 0 : l.commande;    // partiel = total ; 0 partout = 0
+    out.push(code + "\t" + String(qty).replace(".",","));
+  });
+  return out.join("\r\n");
 }
 function renderCentrale(){
   const el=document.getElementById("tab-centrale"); if(!el) return;
