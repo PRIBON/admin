@@ -461,28 +461,41 @@ function lineKeyOf(l,idx){ const a=(l.article||"").toString().trim(); return a?(
 // - code = colonne "Code" de la commande (l.code) si présent, sinon EAN/article (ancien mode).
 // - quantité exprimée dans l'unité de la commande :
 //     colis (l.cdt) -> pièces_reçues / cdt ; poids variable -> poids saisi ; sinon pièces.
-function buildG5Txt(rec, doc){
+
+  
+ function buildG5Txt(rec, doc){
   const key=(doc&&doc.g5Key)||'ean';
   const active=((doc&&doc.lines)?doc.lines:[]).filter(l=>!l.nonLivre);
   const out=[];
-  active.forEach((l,i)=>{
-    const st=(rec.lines||{})[lineKeyOf(l,i)]||{};
-    const reelPieces = st.status ? (st.reel!=null?st.reel:l.attendu) : l.attendu; // non pointé = attendu
-    let qty;
-    if(l.poidsVariable){
-      qty = (st.poids!=null && st.poids!=="") ? st.poids : (st.status?reelPieces:""); // poids saisi (P2) sinon repli
-    } else if(l.cdt){
-      const c = reelPieces / l.cdt;
-      qty = (Math.abs(c-Math.round(c))<1e-9) ? Math.round(c) : Number(c.toFixed(3)); // colis entiers si possible
-    } else {
-      qty = reelPieces;
-    }
-    const code = l.code || (key==='article'?(l.article||l.ean||''):(l.ean||l.article||''));
-    if(!code) return;
-    out.push(code+"\t"+qty);
-  });
+  if(active.length){
+    // Cas normal : on itère les lignes du document (commande/BL rapprochés)
+    active.forEach((l,i)=>{
+      const st=(rec.lines||{})[lineKeyOf(l,i)]||{};
+      let qty;
+      if(st.status==='nonrecu'){ qty=0; }                                              // pas reçu -> 0
+      else if(l.poidsVariable){ qty=(st.poids!=null&&st.poids!=="")?st.poids:(l.qteCmd!=null?l.qteCmd:l.attendu); } // poids réel
+      else { qty=(l.qteCmd!=null?l.qteCmd:l.attendu); }                                // quantité NORMALE
+      const code=l.code||(key==='article'?(l.article||l.ean||''):(l.ean||l.article||''));
+      if(!code||qty==null||qty==="") return;
+      out.push(code+"\t"+String(qty).replace(".",","));
+    });
+  } else {
+    // Secours : document non lié -> on lit les lignes stockées dans la réception elle-même
+    Object.values(rec.lines||{}).forEach(s=>{
+      if(s.nonLivre) return;
+      let qty;
+      if(s.status==='nonrecu'){ qty=0; }
+      else if(s.poids!=null&&s.poids!==""){ qty=s.poids; }
+      else { qty=(s.attendu!=null?s.attendu:null); }
+      const code=s.code||s.ean||s.article||'';
+      if(!code||qty==null||qty==="") return;
+      out.push(code+"\t"+String(qty).replace(".",","));
+    });
+  }
   return out.join("\r\n");
 }
+
+  
 function downloadTxt(filename, content){
   const blob=new Blob([content],{type:"text/plain;charset=utf-8"});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
