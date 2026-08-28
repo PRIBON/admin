@@ -114,7 +114,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -457,6 +457,15 @@ function docStatus(code, docKey){
   if(rs.some(r=>r.status!=="validated")) return {k:"encours", label:"🟡 Réception en cours", cls:"warn"};
   return {k:"attente", label:"📤 Chargé — en attente de réception", cls:"info"};
 }
+// Supprimer un document chargé (ex : doublon envoyé plusieurs fois).
+async function deleteDoc(code, docKey){
+  const db=dbByStore[code]; if(!db) return;
+  const rs=recsForDoc(code, docKey);
+  let msg="Supprimer ce document chargé du magasin ?\n\nÀ utiliser par ex. pour un doublon (même réception envoyée plusieurs fois).";
+  if(rs.length) msg="⚠️ Ce document a "+rs.length+" réception(s) liée(s) (en cours ou validée).\n\nLe supprimer quand même ? Les réceptions liées ne seront plus rattachées à ce document.";
+  if(!confirm(msg)) return;
+  try{ await db.ref("documents/"+docKey).remove(); }catch(e){ alert("Erreur : "+e.message); }
+}
 /* Panneau de confirmation des chargements (onglet multi + simple). Se met à jour en live. */
 let justLoaded={}; // code -> { at, count } chargements récents mis en avant
 function renderLoadStatus(){
@@ -472,7 +481,10 @@ function renderLoadStatus(){
       return `<div class="rec ${stt.k==='recu'?'valid':(stt.k==='encours'?'draft':'')}" style="${fresh&&stt.k==='attente'?'box-shadow:0 0 0 2px #2e7d32':''}">
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
           <div style="font-weight:800;font-size:13px">${esc(d.supplier||'?')} · ${esc(d.docNumber||'')}</div>
-          <span class="badge ${stt.cls}">${stt.label}</span></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge ${stt.cls}">${stt.label}</span>
+            <button class="btn" title="Supprimer ce document chargé (doublon…)" style="background:#fdecea;color:#c62828;padding:2px 9px;font-size:14px;line-height:1.2;border-radius:8px" onclick="deleteDoc('${s.code}','${d.id}')">✖</button>
+          </div></div>
         <div style="font-size:12px;color:#666;margin-top:2px">${esc(d.type||'BL')} · ${(d.lines||[]).length} ligne(s) · chargé ${esc(heure(d.createdAt))} ${esc(dateShort(d.createdAt))}</div>
       </div>`;
     }).join("");
