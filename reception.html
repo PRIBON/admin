@@ -114,7 +114,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.4.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -258,8 +258,8 @@ function start(email){
   apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; }).catch(()=>{});
   // Écouteurs live : réceptions + documents + messages de chaque magasin
   readyStores().forEach(s=>{ const db=dbByStore[s.code]; if(!db) return;
-    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); renderAvoirs(); });
-    db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderArchives(); });
+    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); renderAvoirs(); renderLoadStatus(); });
+    db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderArchives(); renderLoadStatus(); });
     db.ref("broadcasts").on("value",snap=>{ state[s.code].broadcasts=snap.val()||{}; queueNames(); renderMsg(); });
   });
   renderG5(); renderArchives();
@@ -443,6 +443,48 @@ async function loadToStore(code, parsed, {supplier,type,deliveryDate}){
     type:type||"BL", format:parsed.format, deliveryDate:fmtFr(deliveryDate)||"",
     g5Key:parsed.g5Key||'ean',
     createdAt:firebase.database.ServerValue.TIMESTAMP, lines:parsed.lines });
+  return ref.key;
+}
+/* Réceptions liées à un document chargé (pour savoir s'il a été pris en compte). */
+function recsForDoc(code, docKey){
+  const st=state[code]; if(!st) return [];
+  return Object.entries(st.receptions||{}).map(([id,r])=>({id,...r})).filter(r=>r.docId===docKey);
+}
+// Statut live d'un document chargé : attente / en cours / réceptionné.
+function docStatus(code, docKey){
+  const rs=recsForDoc(code, docKey);
+  if(rs.some(r=>r.status==="validated")) return {k:"recu", label:"✅ Réceptionné", cls:"ok"};
+  if(rs.some(r=>r.status!=="validated")) return {k:"encours", label:"🟡 Réception en cours", cls:"warn"};
+  return {k:"attente", label:"📤 Chargé — en attente de réception", cls:"info"};
+}
+/* Panneau de confirmation des chargements (onglet multi + simple). Se met à jour en live. */
+let justLoaded={}; // code -> { at, count } chargements récents mis en avant
+function renderLoadStatus(){
+  const boxes=document.querySelectorAll(".load-status-box"); if(!boxes.length) return;
+  const now=Date.now();
+  const blocks=STORES.map(s=>{
+    const st=state[s.code]; if(!st) return "";
+    const docs=Object.entries(st.docs||{}).map(([id,d])=>({id,...d}))
+      .filter(d=>(now-(d.createdAt||0))<36*3600*1000)      // chargements des dernières 36 h
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    if(!docs.length) return "";
+    const rows=docs.map(d=>{ const stt=docStatus(s.code, d.id); const fresh=justLoaded[s.code]&&(now-justLoaded[s.code].at)<20000;
+      return `<div class="rec ${stt.k==='recu'?'valid':(stt.k==='encours'?'draft':'')}" style="${fresh&&stt.k==='attente'?'box-shadow:0 0 0 2px #2e7d32':''}">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <div style="font-weight:800;font-size:13px">${esc(d.supplier||'?')} · ${esc(d.docNumber||'')}</div>
+          <span class="badge ${stt.cls}">${stt.label}</span></div>
+        <div style="font-size:12px;color:#666;margin-top:2px">${esc(d.type||'BL')} · ${(d.lines||[]).length} ligne(s) · chargé ${esc(heure(d.createdAt))} ${esc(dateShort(d.createdAt))}</div>
+      </div>`;
+    }).join("");
+    return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${docs.length} chargé(s)</span></h3>${rows}</div>`;
+  }).filter(Boolean).join("");
+  const out = blocks
+    ? `<div style="background:#eef6ef;border:1px solid #cfe6d5;border-radius:10px;padding:10px 12px;margin-bottom:14px">
+         <div style="font-weight:800;color:#1a4d2e;margin-bottom:8px">✅ Chargements récents — confirmation par magasin</div>
+         <div class="live-grid">${blocks}</div>
+       </div>`
+    : "";
+  boxes.forEach(b=>{ b.innerHTML=out; });
 }
 // Détermine la clé utilisée pour le .txt G5 : EAN si présent, sinon on propose le code article.
 function detectG5Key(parsed){
@@ -612,7 +654,7 @@ function parseNote(p){
 }
 function renderMulti(){
   const el=document.getElementById("tab-multi");
-  let html='<p class="muted" style="margin-top:0"><b>Étape 1 :</b> charge le bon de commande XLSX. <b>Étape 2 :</b> charge le BL reçu. L\'application rapproche les deux et utilise la commande comme référence pour le conditionnement, la quantité attendue et le code G5.</p><div class="grid">';
+  let html='<p class="muted" style="margin-top:0"><b>Étape 1 :</b> charge le bon de commande XLSX. <b>Étape 2 :</b> charge le BL reçu. L\'application rapproche les deux et utilise la commande comme référence pour le conditionnement, la quantité attendue et le code G5.</p><div class="load-status-box"></div><div class="grid">';
   for(const s of STORES){
     const ready=!!(s.firebaseConfig&&s.firebaseConfig.databaseURL);
     const st=multiFiles[s.code]||{};
@@ -637,6 +679,7 @@ function renderMulti(){
   el.innerHTML=html;
   el.insertAdjacentHTML('beforeend',`<div class="bar"><div class="muted" id="multiSummary"></div><button class="btn btn-green btn-lg" id="loadAllBtn" onclick="loadAll()">Charger tous les magasins</button></div>`);
   updateMultiSummary();
+  renderLoadStatus();
 }
 async function onMultiOrder(code,file){
   if(!file)return;
@@ -666,9 +709,11 @@ async function loadAll(){
   const toLoad=Object.keys(multiFiles).filter(c=>multiFiles[c]&&multiFiles[c].merged);
   if(!toLoad.length)return;
   if(!confirm('Charger '+toLoad.length+' magasin(s) après rapprochement BL + commande ?'))return;
-  const btn=document.getElementById('loadAllBtn');btn.disabled=true;btn.textContent='Chargement…';let ok=0,errs=[];
-  for(const code of toLoad){const m=multiFiles[code];try{await loadToStore(code,m.merged,{supplier:m.supplier||m.merged.supplier,type:"BL + commande",deliveryDate:m.deliveryDate});ok++;delete multiFiles[code];}catch(e){errs.push(code+': '+e.message);}}
-  renderMulti();alert('✓ '+ok+' magasin(s) chargé(s)'+(errs.length?'\n\nErreurs :\n'+errs.join('\n'):''));
+  const btn=document.getElementById('loadAllBtn');btn.disabled=true;btn.textContent='Chargement…';let ok=0,errs=[],okStores=[];
+  for(const code of toLoad){const m=multiFiles[code];try{await loadToStore(code,m.merged,{supplier:m.supplier||m.merged.supplier,type:"BL + commande",deliveryDate:m.deliveryDate});ok++;okStores.push(code);justLoaded[code]={at:Date.now()};delete multiFiles[code];}catch(e){errs.push(code+': '+e.message);}}
+  renderMulti();
+  const noms=okStores.map(c=>(STORES.find(x=>x.code===c)||{}).label||c).join(', ');
+  alert('✓ '+ok+' magasin(s) chargé(s) : '+noms+'.\n\nLa confirmation par magasin s\'affiche en haut de cet onglet (📤 en attente de réception → 🟡 en cours → ✅ réceptionné), et le détail est visible dans « Suivi live ».'+(errs.length?'\n\n⚠️ Erreurs :\n'+errs.join('\n'):''));
 }
 
 /* ==================== ONGLET CHARGEMENT SIMPLE ==================== */
@@ -676,7 +721,7 @@ let simpleOrder=null, simpleBL=null, simpleMerged=null;
 function renderSimple(){
   const el=document.getElementById("tab-simple");
   const opts=readyStores().map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
-  el.innerHTML=`<div class="card">
+  el.innerHTML=`<div class="load-status-box"></div><div class="card">
     <h2 style="margin-top:0">Charger BL + bon de commande</h2>
     <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5, quantité commandée, conditionnement).<br><b>2.</b> BL = référence de la livraison / n° BL.<br><b>3.</b> L'application rapproche automatiquement les lignes.</p>
     <div class="field"><label>1️⃣ Bon de commande</label><div class="drop" id="sorderDrop" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
@@ -687,6 +732,7 @@ function renderSimple(){
     <div class="field"><label>Livraison prévue</label><input id="sdate" type="date" style="width:100%"/></div>
     <button class="btn btn-primary btn-lg" id="sbtn" onclick="loadSimple()" disabled style="margin-top:8px">Rapprocher et charger dans le magasin</button><div id="smsg"></div>
   </div>`;
+  renderLoadStatus();
 }
 function showSimpleState(){
   const note=document.getElementById('snote'); if(!note)return;
@@ -701,7 +747,7 @@ async function onSimpleBL(file){
   try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!simpleMerged;}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
 async function loadSimple(){
   if(!simpleMerged)return;const code=document.getElementById('sstore').value;const supplier=document.getElementById('ssup').value;const deliveryDate=document.getElementById('sdate').value;const btn=document.getElementById('sbtn');btn.disabled=true;btn.textContent='Chargement…';
-  try{await loadToStore(code,simpleMerged,{supplier,type:'BL + commande',deliveryDate});document.getElementById('smsg').innerHTML='<div class="ok">✓ BL + commande rapprochés et chargés dans '+esc(code)+'. Le magasin dispose maintenant du conditionnement et du code G5.</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
+  try{await loadToStore(code,simpleMerged,{supplier,type:'BL + commande',deliveryDate});justLoaded[code]={at:Date.now()};document.getElementById('smsg').innerHTML='<div class="ok">✓ BL + commande rapprochés et chargés dans '+esc(code)+'. Confirmation ci-dessous (📤 en attente de réception) et dans « Suivi live ».</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
   catch(e){document.getElementById('smsg').innerHTML='<div class="err">'+esc(e.message)+'</div>';btn.disabled=false;btn.textContent='Rapprocher et charger dans le magasin';}
 }
 
@@ -1036,31 +1082,86 @@ function since(ts){ if(!ts) return ""; let s=Math.max(0,Math.floor((Date.now()-t
   const h=Math.floor(s/3600); s%=3600; const m=Math.floor(s/60); s%=60;
   return (h?h+"h":"")+String(m).padStart(h?2:1,"0")+"m"+String(s).padStart(2,"0"); }
 function heure(ts){ if(!ts) return ""; const d=new Date(ts); return d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}); }
+/* --- Suivi live : regroupé par DATE D'ENVOI (chargement du document au magasin) --- */
+function tsFromFr(fr){ if(!fr) return 0; const m=String(fr).split("/"); if(m.length!==3) return 0; const t=new Date(+m[2],+m[1]-1,+m[0]).getTime(); return isNaN(t)?0:t; }
+function dayKeyTs(ts){ const d=new Date(ts); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function dayLabel(ts){ if(!ts) return "Sans date d'envoi"; const d=new Date(ts); const kd=dayKeyTs(ts), kt=dayKeyTs(Date.now()), ky=dayKeyTs(Date.now()-86400000);
+  if(kd===kt) return "Aujourd'hui — "+d.toLocaleDateString("fr-FR");
+  if(kd===ky) return "Hier — "+d.toLocaleDateString("fr-FR");
+  return d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}); }
+// Supprimer / fermer une réception (ex : brouillon abandonné, repris par quelqu'un d'autre).
+async function deleteReception(code,id){
+  const db=dbByStore[code]; if(!db) return;
+  if(!confirm("Fermer / supprimer cette réception en cours ?\n\nÀ utiliser si elle a été abandonnée (par ex. reprise puis terminée par quelqu'un d'autre).\nElle disparaîtra du Suivi live. Action définitive.")) return;
+  try{ await db.ref("receptions/"+id).remove(); }catch(e){ alert("Erreur : "+e.message); }
+}
 function renderSuivi(){
-  const el=document.getElementById("tab-suivi");
-  if(el.classList.contains("hidden") && el.dataset.rendered) { /* still update timers if visible */ }
-  let totalDraft=0;
-  const html=STORES.map(s=>{
-    const st=state[s.code];
-    if(!st) return `<div class="store-card nocfg"><h3>${esc(s.label)}</h3><div class="muted">Non configuré</div></div>`;
-    const recs=Object.entries(st.receptions||{}).map(([id,r])=>({id,...r}));
-    const drafts=recs.filter(r=>r.status!=="validated").sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
-    const valids=recs.filter(r=>r.status==="validated").sort((a,b)=>(b.validatedAt||0)-(a.validatedAt||0)).slice(0,4);
-    totalDraft+=drafts.length;
-    const card=(r,isDraft)=>{ const doc=st.docs[r.docId]; const tot=activeCount(doc); const p=pointed(r.lines); const pct=tot?Math.round(p/tot*100):0;
-      const who=names[r.operatorCode]||"…";
-      return `<div class="rec ${isDraft?'draft':'valid'}">
-        <div style="display:flex;justify-content:space-between;gap:8px"><div><div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>
-        <div style="font-size:12px;color:#1a4d2e;font-weight:700">👤 ${esc(who)}</div></div>
-        <span class="badge ${isDraft?'warn':'ok'}">${isDraft?'En cours':'Validée'}</span></div>
-        <div class="pbar"><div class="pfill" style="width:${pct}%"></div></div>
-        <div style="font-size:12px;color:#666;margin-top:4px">${p}/${tot||'?'} pointés (${pct}%)${isDraft?` · débutée ${esc(heure(r.createdAt))} · <span class="since">depuis ${esc(since(r.createdAt))}</span>`:` · validée ${esc(heure(r.validatedAt))}`}${r.ecartCount?` · ⚠ ${r.ecartCount} écart(s)`:''}</div></div>`;
-    };
-    const body=(drafts.length?drafts.map(r=>card(r,true)).join(""):'<div class="muted">Aucune réception en cours.</div>')
-      +(valids.length?'<div class="muted" style="margin-top:6px">Dernières validées</div>'+valids.map(r=>card(r,false)).join(""):"");
-    return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info"><span class="dot"></span> LIVE</span></h3>${body}</div>`;
+  const el=document.getElementById("tab-suivi"); if(!el) return;
+  const WINDOW=7*86400*1000, now=Date.now();
+  const items=[]; let totalDraft=0;
+  readyStores().forEach(s=>{
+    const st=state[s.code]; if(!st) return;
+    const docs=st.docs||{}, recs=st.receptions||{};
+    const recsByDoc={};
+    Object.entries(recs).forEach(([id,r])=>{ if(r.docId){ (recsByDoc[r.docId]=recsByDoc[r.docId]||[]).push({id,...r}); } });
+    // Documents chargés (envoyés) et leur état de réception
+    Object.entries(docs).forEach(([id,d])=>{
+      const sendTs=d.createdAt||tsFromFr(d.deliveryDate)||0;
+      const rs=recsByDoc[id]||[];
+      const hasValid=rs.some(r=>r.status==="validated");
+      if(!rs.length){ items.push({store:s, sendTs, kind:"attente", doc:d}); return; }
+      rs.forEach(r=>{ const draft=r.status!=="validated";
+        if(draft){ totalDraft++; items.push({store:s, sendTs, kind:"encours", doc:d, rec:r, dupValidated:hasValid}); }
+        else if((now-sendTs)<WINDOW || !sendTs){ items.push({store:s, sendTs, kind:"valid", doc:d, rec:r}); }
+      });
+    });
+    // Réceptions sans document rattaché (héritage / doc supprimé)
+    Object.entries(recs).forEach(([id,r])=>{ if(r.docId&&docs[r.docId]) return;
+      const draft=r.status!=="validated"; const sendTs=r.createdAt||r.validatedAt||0;
+      if(draft){ totalDraft++; items.push({store:s, sendTs, kind:"encours", rec:{id,...r}, orphan:true}); }
+      else if((now-sendTs)<WINDOW){ items.push({store:s, sendTs, kind:"valid", rec:{id,...r}, orphan:true}); }
+    });
+  });
+  // Regroupement par date d'envoi
+  const byDay={};
+  items.forEach(it=>{ const k=it.sendTs?dayKeyTs(it.sendTs):"0"; (byDay[k]=byDay[k]||{ts:it.sendTs||0, list:[]}); byDay[k].list.push(it); });
+  const dayKeys=Object.keys(byDay).sort((a,b)=>(byDay[b].ts||0)-(byDay[a].ts||0));
+
+  const card=(it)=>{
+    const s=it.store||{}; const storeLabel=s.label||"";
+    if(it.kind==="attente"){ const d=it.doc;
+      return `<div class="rec">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
+          <div><div style="font-weight:800;font-size:14px">${esc(d.supplier||'?')} · ${esc(d.docNumber||'')}</div>
+          <div style="font-size:12px;color:#1a4d2e;font-weight:700">🏬 ${esc(storeLabel)}</div></div>
+          <span class="badge info">📤 Envoyé</span></div>
+        <div style="font-size:12px;color:#666;margin-top:4px">${(d.lines||[]).length} ligne(s) · envoyé ${esc(heure(it.sendTs))} · <b>en attente de réception</b></div></div>`;
+    }
+    const r=it.rec; const draft=it.kind==="encours"; const doc=it.doc||null;
+    const tot=activeCount(doc); const p=pointed(r.lines); const pct=tot?Math.round(p/tot*100):0;
+    const who=names[r.operatorCode]||"…";
+    const stale=draft&&r.createdAt&&(now-r.createdAt)>12*3600*1000;
+    return `<div class="rec ${draft?'draft':'valid'}" style="${stale?'border-color:#e53935;border-width:2px':''}">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
+        <div><div style="font-weight:800;font-size:14px">${esc(r.supplier||(doc&&doc.supplier)||'?')} · ${esc(r.docNumber||(doc&&doc.docNumber)||'')}</div>
+        <div style="font-size:12px;color:#1a4d2e;font-weight:700">🏬 ${esc(storeLabel)} · 👤 ${esc(who)}</div></div>
+        <span class="badge ${draft?'warn':'ok'}">${draft?'🟡 En cours':'✅ Réceptionnée'}</span></div>
+      ${draft?`<div class="pbar"><div class="pfill" style="width:${pct}%"></div></div>`:''}
+      <div style="font-size:12px;color:#666;margin-top:4px">${draft?`${p}/${tot||'?'} pointés (${pct}%) · débutée ${esc(heure(r.createdAt))} · <span class="since">depuis ${esc(since(r.createdAt))}</span>`:`validée ${esc(heure(r.validatedAt))}`}${r.ecartCount?` · ⚠ ${r.ecartCount} écart(s)`:''}</div>
+      ${it.dupValidated?`<div class="parse-note" style="color:#c62828;background:#fdecea;margin-top:6px">⚠️ Ce document a déjà été réceptionné par ailleurs — cette réception est probablement un brouillon abandonné.</div>`:''}
+      ${draft?`<div style="margin-top:8px"><button class="btn" style="background:#fdecea;color:#c62828;padding:6px 12px;font-size:13px" onclick="deleteReception('${s.code}','${r.id}')">✖ Fermer / Supprimer cette réception</button></div>`:''}
+    </div>`;
+  };
+
+  const html=dayKeys.map(k=>{
+    const day=byDay[k]; day.list.sort((a,b)=>(b.sendTs||0)-(a.sendTs||0));
+    const nAtt=day.list.filter(i=>i.kind==="attente").length, nEnc=day.list.filter(i=>i.kind==="encours").length, nVal=day.list.filter(i=>i.kind==="valid").length;
+    return `<div style="margin:18px 0 6px"><h3 style="margin:0;font-size:15px;color:#1a4d2e;text-transform:capitalize">📅 ${esc(dayLabel(day.ts))}</h3>
+      <div class="muted" style="font-size:12px">📤 ${nAtt} envoyé(s) en attente · 🟡 ${nEnc} en cours · ✅ ${nVal} réceptionné(s)</div></div>
+      <div class="live-grid">${day.list.map(card).join("")}</div>`;
   }).join("");
-  el.innerHTML=`<p class="muted" style="margin-top:0">${readyStores().length} magasin(s) connecté(s) · ${totalDraft} réception(s) en cours — mise à jour en temps réel.</p><div class="live-grid">${html}</div>`;
+
+  el.innerHTML=`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} réception(s) en cours — vue par <b>date d'envoi</b>, mise à jour en temps réel.</p>${html||'<div class="muted">Aucun envoi récent à suivre.</div>'}`;
   el.dataset.rendered="1";
 }
 
