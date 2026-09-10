@@ -114,7 +114,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.4.2";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -386,6 +386,32 @@ async function parseOrderXlsx(file){
   const wb=XLSX.read(buf,{type:"array"});
   const ws=wb.Sheets[wb.SheetNames[0]];
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+  // --- Format AGIDRA (export commande depuis leur site) : REF / Désignation produit / Code EAN / Colisage / Qté(colis) ---
+  {
+    const NA=(s)=>String(s==null?"":s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+    let ah=-1;
+    for(let i=0;i<Math.min(rows.length,10);i++){ const r=(rows[i]||[]).map(NA);
+      if(r.some(x=>x==="REF") && r.some(x=>x.includes("COLISAGE")) && r.some(x=>x.includes("DESIGNATION"))){ ah=i; break; } }
+    if(ah>=0){
+      const head=rows[ah].map(x=>String(x).trim());
+      const acol=(names)=>{ for(const nm of names){ const i=head.findIndex(x=>NA(x)===NA(nm)||NA(x).includes(NA(nm))); if(i>=0) return i; } return -1; };
+      const iRef=acol(["REF"]), iDes=acol(["DESIGNATION"]), iEan=acol(["CODE EAN","EAN"]),
+            iCol=acol(["COLISAGE"]), iQte=acol(["QTE","QUANTITE"]);
+      const lines=[];
+      for(let i=ah+1;i<rows.length;i++){
+        const r=rows[i]||[];
+        const ref=String(iRef>=0?r[iRef]:"").trim(), des=String(iDes>=0?r[iDes]:"").trim();
+        if(!ref||!des) continue;
+        const cdt=toNum(iCol>=0?r[iCol]:0)||null, qte=toNum(iQte>=0?r[iQte]:0);
+        lines.push({ article:ref, code:ref, ean:String(iEan>=0?r[iEan]:"").trim().replace(/^0+(?=\d)/,""),
+          ref, designation:des, cdt, qteCmd:qte, unit:cdt?"colis":"piece",
+          attendu: cdt?Math.round(qte*cdt):qte, poidsVariable:false, categorie:"Autres" });
+      }
+      if(!lines.length) throw new Error("Commande Agidra lue mais aucune ligne article trouvee.");
+      const mCmd=String(file.name||"").match(/commande[_-]?(\d{5,})/i);
+      return { format:"CMD", g5Key:"code", supplier:"AGIDRA", docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines };
+    }
+  }
   const N=(s)=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
   let h=-1;
   for(let i=0;i<rows.length;i++){ const r=(rows[i]||[]).map(N);
@@ -735,14 +761,14 @@ function renderSimple(){
   const opts=readyStores().map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
   el.innerHTML=`<div class="load-status-box"></div><div class="card">
     <h2 style="margin-top:0">Charger BL + bon de commande</h2>
-    <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5, quantité commandée, conditionnement).<br><b>2.</b> BL = référence de la livraison / n° BL.<br><b>3.</b> L'application rapproche automatiquement les lignes.</p>
+    <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5 <b>ou Agidra</b>, quantité commandée, conditionnement).<br><b>2.</b> BL = livraison / n° BL — <b>optionnel</b> (ex. Agidra : la facture arrive après → charge la commande seule).<br><b>3.</b> Avec BL : rapprochement automatique. Sans BL : la commande sert de document à pointer.</p>
     <div class="field"><label>1️⃣ Bon de commande</label><div class="drop" id="sorderDrop" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
     <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div class="drop" id="sblDrop" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.csv / .txt / .pdf)</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
     <div id="snote" style="margin-top:10px"></div>
     <div class="field" style="margin-top:12px"><label>Magasin</label><select id="sstore" style="width:100%">${opts}</select></div>
     <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Déduit de la commande / BL…"/></div>
     <div class="field"><label>Livraison prévue</label><input id="sdate" type="date" style="width:100%"/></div>
-    <button class="btn btn-primary btn-lg" id="sbtn" onclick="loadSimple()" disabled style="margin-top:8px">Rapprocher et charger dans le magasin</button><div id="smsg"></div>
+    <button class="btn btn-primary btn-lg" id="sbtn" onclick="loadSimple()" disabled style="margin-top:8px">Charger dans le magasin</button><div id="smsg"></div>
   </div>`;
   renderLoadStatus();
 }
@@ -753,13 +779,13 @@ function showSimpleState(){
 }
 async function onSimpleOrder(file){
   if(!file)return; document.getElementById('sorderDrop').classList.add('has');document.getElementById('sorderDrop').textContent='✓ '+file.name;
-  try{simpleOrder=await parseAnyFile(file);if(simpleOrder.format!=='CMD')throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.');if(simpleOrder.supplier)document.getElementById('ssup').value=simpleOrder.supplier;if(simpleOrder.deliveryDate){const d=String(simpleOrder.deliveryDate).split('/');if(d.length===3)document.getElementById('sdate').value=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0');}simpleMerged=(simpleBL?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!simpleMerged;}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
+  try{simpleOrder=await parseAnyFile(file);if(simpleOrder.format!=='CMD')throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.');if(simpleOrder.supplier)document.getElementById('ssup').value=simpleOrder.supplier;if(simpleOrder.deliveryDate){const d=String(simpleOrder.deliveryDate).split('/');if(d.length===3)document.getElementById('sdate').value=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0');}simpleMerged=(simpleBL?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
 async function onSimpleBL(file){
   if(!file)return;document.getElementById('sblDrop').classList.add('has');document.getElementById('sblDrop').textContent='✓ '+file.name;
-  try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!simpleMerged;}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
+  try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
 async function loadSimple(){
-  if(!simpleMerged)return;const code=document.getElementById('sstore').value;const supplier=document.getElementById('ssup').value;const deliveryDate=document.getElementById('sdate').value;const btn=document.getElementById('sbtn');btn.disabled=true;btn.textContent='Chargement…';
-  try{await loadToStore(code,simpleMerged,{supplier,type:'BL + commande',deliveryDate});justLoaded[code]={at:Date.now()};document.getElementById('smsg').innerHTML='<div class="ok">✓ BL + commande rapprochés et chargés dans '+esc(code)+'. Confirmation ci-dessous (📤 en attente de réception) et dans « Suivi live ».</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
+  const _doc=simpleMerged||simpleOrder; if(!_doc)return;const code=document.getElementById('sstore').value;const supplier=document.getElementById('ssup').value;const deliveryDate=document.getElementById('sdate').value;const btn=document.getElementById('sbtn');btn.disabled=true;btn.textContent='Chargement…';
+  try{await loadToStore(code,_doc,{supplier,type:(simpleMerged?'BL + commande':'Commande'),deliveryDate});justLoaded[code]={at:Date.now()};document.getElementById('smsg').innerHTML='<div class="ok">✓ '+(simpleMerged?'BL + commande rapprochés':'Commande seule')+' chargé(e) dans '+esc(code)+'. Confirmation ci-dessous (📤 en attente de réception) et dans « Suivi live ».</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
   catch(e){document.getElementById('smsg').innerHTML='<div class="err">'+esc(e.message)+'</div>';btn.disabled=false;btn.textContent='Rapprocher et charger dans le magasin';}
 }
 
