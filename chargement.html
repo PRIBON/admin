@@ -92,7 +92,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="multi">📦 Chargement</button>
     <button class="tab" data-tab="g5">📥 Réception</button>
-    <button class="tab" data-tab="centrale">🏬 Dispatch palette</button>
+    <button class="tab" data-tab="centrale">🏬 Dispatch & Découpe</button>
     <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
     <button class="tab" data-tab="msg">📢 Messages</button>
@@ -110,7 +110,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.6.2";
+const APP_VERSION = "1.7.2";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -175,7 +175,8 @@ let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
 const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{} };
-let centraleView="ecarts";                 // onglet Dispatch palette : ecarts | histo
+let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
+let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
 let recView="todo";                        // onglet Réception : todo | archives
 let suiviType="tous";                      // filtre Suivi live : tous | reception | dispatch | decoupe
@@ -841,11 +842,25 @@ function parseDecoupeS37Rows(rowLines){
   if(!products.length) throw new Error("PDF découpe : aucune ligne reconnue — charge plutôt l'Excel.");
   return { products };
 }
+/* Référence des fromages Kelbongoo vendus À LA PIÈCE (poids cible g) — liste Henry, seule source.
+   Fourchettes (Petit Perche 81–99, Selles sur Cher 180–220) → médian + tol ±10 %. */
+const FROMAGE_KBG_REF=[["Abondance Fermier AOP",200],["Bethmale Grand Cru",200],["Bleu d'Auvergne Fermier AOP",200],["Bleu du Vercors-Sassenage AOP",200],["Brie de Meaux AOP 1/2 affiné",200],["Brie de Nangis",200],["Brousse de Brebis",450],["Camembert fermier AOP",250],["Chaource AOP",250],["Charolais AOP",250],["Coeur Neufchâtel Bio AOP",200],["Couronne Lochoise",170],["Délice des Deux Sèvres",150],["Epoisses Fermier AOP",250],["Fer à Cheval Cendré",100],["Fleur du Maquis",170],["Gratte Paille",350],["Hervé à la bière AOP",200],["L'Ami du Chambertin",200],["La Pelta",230],["Laguiole Grand Aubrac",200],["Langres AOP",200],["Le Gour Noir Fermier Bio",210],["Le Petit Perche Fumé",90],["Mimolette Extra Vieille 18 mois",200],["Morbier millésime 100J AOP",200],["Mothais Sur Feuille AOC",200],["Munster Fermier AOP",170],["Ossau Iraty AOP",200],["Perail des Cabasses",150],["Roquefort AOP",200],["Saint-Nectaire Fermier AOP",200],["Sainte Maure Fermier AOP",250],["Selles sur Cher Fermier AOP",200],["Tomme de Savoie Fermière IGP",200],["Comté AOP 18 mois",200]];
+const _KBG_STOP=new Set(["aop","aoc","igp","fermier","fermiere","bio","de","du","des","la","le","les","sur","d","grand","cru","a","au","1","2"]);
+function _kbgKey(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w&&!_KBG_STOP.has(w)).join(" "); }
+const _KBGREF=FROMAGE_KBG_REF.map(r=>{ const k=_kbgKey(r[0]); return { poids:r[1], key:k, toks:k.split(" ").filter(Boolean) }; });
+function kbgRefPoids(designation){
+  const k=_kbgKey(designation); if(!k) return 0; const kt=k.split(" ").filter(Boolean);
+  let hit=_KBGREF.find(r=>r.key===k); if(hit) return hit.poids;
+  hit=_KBGREF.find(r=>r.key&&(k.indexOf(r.key)>=0||r.key.indexOf(k)>=0)); if(hit) return hit.poids;
+  let best=null,bs=0; _KBGREF.forEach(r=>{ const n=r.toks.filter(t=>kt.indexOf(t)>=0).length; if(n>bs){bs=n;best=r;} });
+  return (best&&(bs>=2||bs===kt.length))?best.poids:0;
+}
 // Transforme les lignes découpe en produits lisibles par l'app (module Découpe).
 function decoupeProductsForApp(parsed, entity){
-  return (parsed.products||[]).map(p=>({ article:p.article||"", designation:p.designation, fournisseur:p.fournisseur||"",
-    robCmd: entity==="ROB"?p.commande:0, kbgTarget: entity==="KBG"?Math.round(p.commande):0,
-    poids:(p.poids&&p.poids>0)?p.poids:200, tol:10, envoiPrevu:p.envoi||0, rupture:!!p.rupture })); }
+  return (parsed.products||[]).map(p=>{ const rp=(entity==="KBG")?kbgRefPoids(p.designation):0;
+    return { article:p.article||"", designation:p.designation, fournisseur:p.fournisseur||"",
+      robCmd: entity==="ROB"?p.commande:0, kbgTarget: entity==="KBG"?Math.round(p.commande):0,
+      poids: rp>0?rp:((p.poids&&p.poids>0)?p.poids:200), tol:10, envoiPrevu:p.envoi||0, rupture:!!p.rupture }; }); }
 
 /* --- État + rendu de la carte « La Centrale PDP » --- */
 const cpdp={ dispatch:{ supplier:"", parsed:null, fileName:"", bdc:null, bdcInfo:"", sent:false, err:"" },
@@ -1530,8 +1545,11 @@ function renderCentrale(){
   const view=centraleView||"ecarts";
   const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
-    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique dispatch</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='decoupe'?'#8a5a00':'#eef2f7'};color:${view==='decoupe'?'#fff':'#333'}" onclick="centraleView='decoupe';renderCentrale()">🧀 Historique découpe</button>
   </div>`;
+
+  if(view==="decoupe"){ renderDecoupeHisto(el, bar); return; }
 
   if(view==="ecarts"){
     const withEc=sessions.map(s=>({s, ec:sessionEcarts(s)})).filter(x=>x.ec.length>0);
@@ -1616,6 +1634,118 @@ function markCentrale(sid){
 function unmarkCentrale(sid){
   if(!dbCentrale) return;
   dbCentrale.ref("centrale_reception/"+sid).remove().catch(e=>alert("Erreur : "+e.message));
+}
+
+/* ===== Historique DÉCOUPE FROMAGE ===================================== */
+function decoupeProductKey(p, idx){ const code=(p.article||"").toString().trim(); return code?("a_"+code):("l_"+idx); }
+// Agrège une session de découpe : quantités KBG/ROB, poids, rendement, détail par fromage.
+function decoupeAgg(sess){
+  const ent=((sess.recap&&sess.recap.entity)||sess.meta.entity||"").toUpperCase();
+  const r=sess.recap;
+  if(r && (r.kbgN!=null||r.robN!=null||r.robMeules!=null)){
+    const t=(r.kbgG||0)+(r.robG||0);
+    return { entity:ent, kbgN:r.kbgN||0, kbgG:r.kbgG||0, robN:r.robN||0, robG:r.robG||0, robMeules:r.robMeules||0,
+      rend:(r.rendement!=null?r.rendement:(t>0?Math.round((r.kbgG||0)/t*100):0)),
+      lines:(r.lines||[]), by:r.by||sess.meta.createdBy||"", updatedAt:r.updatedAt||0,
+      done:(r.done!=null?r.done:0), total:(sess.meta.products||[]).length, hasData:((r.kbgN||0)+(r.robN||0)+(r.robMeules||0))>0 };
+  }
+  const products=(sess.meta&&sess.meta.products)||[]; const stt=sess.state||{};
+  let kbgN=0,kbgG=0,robN=0,robG=0,robMeules=0,done=0; const lines=[];
+  products.forEach((p,idx)=>{ const st=stt[decoupeProductKey(p,idx)]||{};
+    let k=0,kg=0,rr=0,rg=0,rm=0; const pieces=st.pieces||[];
+    pieces.forEach(pc=>{ if(pc.dest==="KBG"){k++;kg+=(pc.w||0);}else{rr++;rg+=(pc.w||0);} });
+    if(st.sticker){ const n=st.stickerCount||0; const w=(st.stickerWeight!=null&&st.stickerWeight!=="")?Number(st.stickerWeight):((p.poids||200)*n); if((st.magasin||"KBG")==="KBG"){k+=n;kg+=w;}else{rr+=n;rg+=w;} }
+    if(st.rob){ const m=Number(st.rob.meules)||0, mc=Number(st.rob.morceaux)||0; const pu=(st.rob.poidsUnit!=null&&st.rob.poidsUnit!=="")?Number(st.rob.poidsUnit):(Number(p.poidsUnit)||0); rm+=m; rr+=mc; rg+=m*pu*1000; }
+    if(st.done) done++;
+    if(k+rr+rm>0) lines.push({ designation:p.designation, kbgN:k, kbgTarget:p.kbgTarget||0, robN:rr, kbgG:Math.round(kg), robG:Math.round(rg), robMeules:rm, robUnit:(st.rob&&st.rob.unit)||"meule" });
+    kbgN+=k;kbgG+=kg;robN+=rr;robG+=rg;robMeules+=rm;
+  });
+  const t=kbgG+robG; const rend=t>0?Math.round(kbgG/t*100):0;
+  return { entity:ent, kbgN,kbgG:Math.round(kbgG),robN,robG:Math.round(robG),robMeules,rend,lines,by:sess.meta.createdBy||"",updatedAt:0,done,total:products.length,hasData:(kbgN+robN+robMeules)>0 };
+}
+function decoupeSessions(){
+  const out=[];
+  Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{ if(s&&s.meta&&s.meta.startedAt) out.push(Object.assign({id:sid},s)); });
+  out.sort((a,b)=>(b.meta.startedAt||0)-(a.meta.startedAt||0));
+  return out;
+}
+function renderDecoupeHisto(el, bar){
+  let list=decoupeSessions();
+  if(dpDecoupeSearch){ const q=norm(dpDecoupeSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)||norm(s.meta.docNumber||"").includes(q)); }
+  if(dpDecoupeDate){ list=list.filter(s=>{ const d=new Date(s.meta.startedAt||0); const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); return iso===dpDecoupeDate; }); }
+  const card=(s)=>{ const a=decoupeAgg(s); const isRob=a.entity==="ROB"; const rendOk=a.rend>=85; const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
+    const metrics = isRob
+      ? `<span class="badge" style="background:#f3e5f5;color:#6a1b9a">Robespierre <b>${a.robMeules}</b> meule(s)/colis · <b>${a.robN}</b> morceaux${kg>0?(' · ≈ '+kg+' kg'):''}</span>`
+      : `<span class="badge" style="background:#e3f2fd;color:#1565c0">Kelbongoo <b>${a.kbgN}</b> pc · ${a.kbgG} g</span>
+         <span class="badge" style="background:#f3e5f5;color:#6a1b9a">→ Robespierre <b>${a.robN}</b> pc · ${a.robG} g</span>
+         <span style="font-weight:800;color:${rendOk?'#2e7d32':'#e65100'}">Rendement ${a.rend}%</span>`;
+    return `<div class="rec valid" style="border-color:#e0c48a">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <div style="font-weight:800;font-size:15px">🧀 ${esc(s.meta.supplier||'Découpe')} <span class="badge" style="background:${isRob?'#f3e5f5':'#e3f2fd'};color:${isRob?'#6a1b9a':'#1565c0'}">${isRob?'Montreuil':'Kelbongoo'}</span></div>
+        <div style="font-size:12px;color:#999">${esc(dateShort(s.meta.startedAt))} ${esc(heure(s.meta.startedAt))}</div></div>
+      <div style="font-size:12px;color:#666;margin:2px 0 6px">👤 ${esc(a.by||s.meta.createdBy||'—')}${s.meta.docNumber?(' · BL '+esc(s.meta.docNumber)):''}${s.meta.deliveryDate?(' · récep. prévue '+esc(s.meta.deliveryDate)):''}</div>
+      <div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap;align-items:center">
+        ${metrics}
+        <span style="color:#888">${a.done}/${a.total} fromages</span>
+      </div>
+      ${a.hasData?'':'<div style="font-size:12px;color:#c62828;margin-top:6px">Aucune découpe saisie pour l\'instant.</div>'}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDecoupeDetail('${esc(s.id)}')">👁 Détail par fromage</button>
+        <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlDecoupeTxt('${esc(s.id)}')">⬇️ .txt</button>
+      </div></div>`; };
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique des découpes fromage envoyées à l'app (quantités découpées, poids, rendement Kelbongoo).</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <input placeholder="🔎 fournisseur, opérateur, n° BL…" style="flex:1;min-width:180px" value="${esc(dpDecoupeSearch)}" oninput="dpDecoupeSearch=this.value;renderCentrale()"/>
+      <span><b>Date :</b></span><input type="date" value="${esc(dpDecoupeDate)}" onchange="dpDecoupeDate=this.value;renderCentrale()"/>
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpDecoupeDate='';dpDecoupeSearch='';renderCentrale()">✕</button>
+    </div>
+    ${list.length?('<div class="live-grid">'+list.map(card).join("")+'</div>'):'<div class="muted">Aucune découpe dans l\'historique.</div>'}`;
+}
+function openDecoupeDetail(sid){
+  const s=(centraleState.decoupe||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s); const a=decoupeAgg(sess); const isRob=a.entity==="ROB";
+  const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
+  const head=isRob
+    ? `<tr><th>Fromage</th><th>Découpé</th><th>Morceaux</th><th>Poids approx.</th></tr>`
+    : `<tr><th>Fromage</th><th>KBG pc</th><th>KBG poids</th><th>→ ROB pc</th><th>ROB poids</th></tr>`;
+  const rows=(a.lines||[]).map(l=>{ const lkg=(l.robG||0)>0?(Math.round((l.robG||0)/1000*10)/10+' kg'):'—';
+    return isRob
+      ? `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.robMeules||0} ${l.robUnit==='colis'?'colis':'meule(s)'}</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${lkg}</td></tr>`
+      : `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.kbgN||0}${l.kbgTarget>0?(' / '+l.kbgTarget):''}</td><td style="text-align:center">${Math.round(l.kbgG||0)} g</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${Math.round(l.robG||0)} g</td></tr>`;
+  }).join("");
+  const colspan=isRob?4:5;
+  const summary=isRob
+    ? `${a.robMeules} meule(s)/colis · ${a.robN} morceaux${kg>0?(' · ≈ '+kg+' kg'):''}`
+    : `Rendement <b>${a.rend}%</b> · KBG ${a.kbgN} pc / ROB ${a.robN} pc`;
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">Découpe ${isRob?'Montreuil':'Kelbongoo'} · ${esc(sess.meta.supplier||'')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div class="muted" style="margin:4px 0 10px">${esc(dateShort(sess.meta.startedAt))} · ${esc(a.by||sess.meta.createdBy||'—')} · ${summary}</div>
+    <div style="overflow:auto;max-height:60vh"><table><thead>${head}</thead><tbody>${rows||('<tr><td colspan="'+colspan+'" style="color:#999">Aucune découpe saisie.</td></tr>')}</tbody></table></div>
+    <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlDecoupeTxt('${esc(sid)}')">⬇️ Télécharger le .txt</button>
+  </div>`;
+  back.onclick=(e)=>{ if(e.target===back) back.remove(); };
+  document.body.appendChild(back);
+}
+function dlDecoupeTxt(sid){
+  const s=(centraleState.decoupe||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s); const a=decoupeAgg(sess); const isRob=a.entity==="ROB";
+  const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
+  let txt="LA CENTRALE PDP — Découpe fromage "+(isRob?"MONTREUIL (Robespierre)":"KELBONGOO")+"\n";
+  txt+=(sess.meta.supplier||"")+"\n"+dateShort(sess.meta.startedAt)+" "+heure(sess.meta.startedAt)+"\n";
+  if(sess.meta.docNumber) txt+="BL : "+sess.meta.docNumber+"\n";
+  txt+="Opérateur : "+(a.by||sess.meta.createdBy||"-")+"\n";
+  if(isRob){
+    txt+="Total : "+a.robMeules+" meule(s)/colis · "+a.robN+" morceaux"+(kg>0?(" · ≈ "+kg+" kg"):"")+"\n";
+    txt+="\nFromage\tMeules/colis\tMorceaux\tPoids approx (kg)\n";
+    (a.lines||[]).forEach(l=>{ const lkg=(l.robG||0)>0?(Math.round((l.robG||0)/1000*10)/10):""; txt+=(l.designation||"")+"\t"+(l.robMeules||0)+" "+((l.robUnit==="colis")?"colis":"meule")+"\t"+(l.robN||0)+"\t"+lkg+"\n"; });
+  } else {
+    txt+="Rendement Kelbongoo : "+a.rend+"%\n";
+    txt+="Total KBG : "+a.kbgN+" pc / "+a.kbgG+" g   -   Hors gabarit → ROB : "+a.robN+" pc / "+a.robG+" g\n";
+    txt+="\nFromage\tKBG pc\tKBG g\tROB pc\tROB g\n";
+    (a.lines||[]).forEach(l=>{ txt+=(l.designation||"")+"\t"+(l.kbgN||0)+"\t"+Math.round(l.kbgG||0)+"\t"+(l.robN||0)+"\t"+Math.round(l.robG||0)+"\n"; });
+  }
+  const d=new Date(sess.meta.startedAt||Date.now());
+  const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");
+  downloadTxt(yy+mm+dd+"_DECOUPE_"+(a.entity||sess.meta.entity||"")+".txt", txt);
 }
 </script>
 </body>
