@@ -110,7 +110,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.6.2";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -786,6 +786,47 @@ function parseDecoupeExcelS37(workbook){
   if(!products.length) throw new Error("Aucune ligne fromage trouvée.");
   return { products };
 }
+// BL fournisseur UGALAIT (Excel) : Code article | Désignation | Cdt | Qté colis | Qté pièces | Poids net…
+function parseUgalaitBL(workbook){
+  const ws=workbook.Sheets[workbook.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""}); const N=normColC;
+  let h=-1,header=null;
+  for(let i=0;i<Math.min(rows.length,30);i++){ const r=rows[i].map(N);
+    if(r.some(c=>c.includes("designation")) && (r.some(c=>c.includes("code article")||c==="code") ) && r.some(c=>c.includes("piece")||c.includes("colis")||c.includes("qte")||c.includes("poids"))){ h=i; header=rows[i]; break; } }
+  if(h===-1) throw new Error("En-têtes BL Ugalait introuvables.");
+  let iCode=-1,iDes=-1,iPie=-1,iCol=-1,iPds=-1;
+  header.forEach((c,idx)=>{ const n=N(c);
+    if(iCode<0&&(n.includes("code article")||n==="code")) iCode=idx;
+    if(iDes<0&&n.includes("designation")) iDes=idx;
+    if(iPie<0&&(n.includes("piece"))) iPie=idx;
+    if(iCol<0&&(n.includes("colis"))) iCol=idx;
+    if(iPds<0&&(n.includes("poids"))) iPds=idx; });
+  if(iDes<0) throw new Error("Colonne Désignation introuvable (BL Ugalait).");
+  const num=(v)=>{ const n=parseFloat(String(v).replace(",",".").replace(/[^\d.]/g,"")); return isNaN(n)?0:n; };
+  const products=[]; let docNumber="";
+  for(let i=h+1;i<rows.length;i++){ const row=rows[i]; if(!row) continue;
+    const des=String(row[iDes]||"").trim(); if(!des) continue;
+    const dl=stripAccentsC(des.toLowerCase()); if(dl.includes("ne pas remplacer")||dl.includes("total")) continue;
+    const code=iCode>=0?String(row[iCode]||"").trim():"";
+    const pie=iPie>=0?num(row[iPie]):0, col=iCol>=0?num(row[iCol]):0, pds=iPds>=0?num(row[iPds]):0;
+    const qte=pie||col||0;
+    const poids=(pie>0&&pds>0)?Math.round(pds/pie*1000):0; // g/pièce si dispo
+    products.push({ article:code, ref:code, code, designation:des, fournisseur:"UGALAIT", commande:qte, decoupePlan:0, envoi:0, poids:poids||0, rupture:qte===0 }); }
+  if(!products.length) throw new Error("Aucune ligne article trouvée dans le BL.");
+  const mBL=String(workbook.__name||"").match(/(\d{5,})/); if(mBL) docNumber=mBL[1];
+  return { products, supplier:"UGALAIT", docNumber };
+}
+// Choisit automatiquement le bon parseur Excel (découpe S37 OU BL Ugalait).
+function parseDecoupeAnyExcel(workbook){
+  const ws=workbook.Sheets[workbook.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""}); const N=normColC;
+  let isS37=false, isBL=false;
+  for(let i=0;i<Math.min(rows.length,30);i++){ const r=rows[i].map(N);
+    if(r.some(c=>c.includes("decoupe"))||r.some(c=>c==="ref")||r.some(c=>c.includes("cmd"))) isS37=true;
+    if(r.some(c=>c.includes("code article"))&&(r.some(c=>c.includes("piece"))||r.some(c=>c.includes("poids")))) isBL=true; }
+  if(isBL && !isS37) return parseUgalaitBL(workbook);
+  try { return parseDecoupeExcelS37(workbook); } catch(e){ return parseUgalaitBL(workbook); }
+}
 async function readDecoupePDFrows(buf){
   const pdf=await pdfjsLib.getDocument({data:buf}).promise; let rowLines=[];
   for(let p=1;p<=pdf.numPages;p++){ const page=await pdf.getPage(p); const tc=await page.getTextContent(); const rows={};
@@ -803,11 +844,12 @@ function parseDecoupeS37Rows(rowLines){
 // Transforme les lignes découpe en produits lisibles par l'app (module Découpe).
 function decoupeProductsForApp(parsed, entity){
   return (parsed.products||[]).map(p=>({ article:p.article||"", designation:p.designation, fournisseur:p.fournisseur||"",
-    robCmd: entity==="ROB"?p.commande:0, kbgTarget: entity==="KBG"?Math.round(p.commande):0, poids:200, tol:10, envoiPrevu:p.envoi||0 })); }
+    robCmd: entity==="ROB"?p.commande:0, kbgTarget: entity==="KBG"?Math.round(p.commande):0,
+    poids:(p.poids&&p.poids>0)?p.poids:200, tol:10, envoiPrevu:p.envoi||0, rupture:!!p.rupture })); }
 
 /* --- État + rendu de la carte « La Centrale PDP » --- */
 const cpdp={ dispatch:{ supplier:"", parsed:null, fileName:"", bdc:null, bdcInfo:"", sent:false, err:"" },
-             decoupe:{ entity:"ROB", parsed:null, fileName:"", sent:false, err:"" } };
+             decoupe:{ entity:"ROB", deliveryDate:"", parsed:null, fileName:"", sent:false, err:"" } };
 function renderCPDPCard(){
   const box=document.getElementById("cpdp-card"); if(!box) return;
   const D=cpdp.dispatch, C=cpdp.decoupe;
@@ -830,20 +872,22 @@ function renderCPDPCard(){
         ${D.err?`<div class="err">${esc(D.err)}</div>`:''}
         <button class="btn btn-green btn-lg" onclick="cpdpSendDispatch()" ${(!D.parsed||D.sent)?'disabled':''} style="margin-top:6px">${D.sent?'🎉 Dispatch envoyé':'🚀 Envoyer le dispatch'}</button>
       </div>
-      <!-- Découpe -->
+      <!-- Découpe / BL Ugalait -->
       <div class="store-card" style="background:#fff">
-        <h3 style="font-size:15px">🧀 Découpe fromage</h3>
-        <div class="field"><label>Entité (commande à découper)</label>
+        <h3 style="font-size:15px">🧀 Découpe fromage — BL Ugalait</h3>
+        <div class="field"><label>Entité</label>
           <select id="cpdpEnt" style="width:100%" onchange="cpdp.decoupe.entity=this.value;renderCPDPCard()">
             <option value="ROB" ${C.entity==='ROB'?'selected':''}>Pribon Robespierre (Montreuil)</option>
             <option value="KBG" ${C.entity==='KBG'?'selected':''}>Kelbongoo (Pantin)</option>
           </select></div>
-        <div class="field"><label>Fichier de découpe (Excel ou PDF, ex. S37)</label>
-          <div class="drop ${C.parsed?'has':''}" onclick="document.getElementById('cpdpDecFile').click()">${C.parsed?('✓ '+esc(C.fileName)):'🧀 Charger la découpe (.xlsx / .pdf)'}</div>
+        <div class="field"><label>Date de réception prévue</label>
+          <input type="date" style="width:100%" value="${esc(C.deliveryDate||'')}" onchange="cpdp.decoupe.deliveryDate=this.value"/></div>
+        <div class="field"><label>Fichier — BL Ugalait ou fichier découpe (Excel/PDF)</label>
+          <div class="drop ${C.parsed?'has':''}" onclick="document.getElementById('cpdpDecFile').click()">${C.parsed?('✓ '+esc(C.fileName)):'🧀 Charger le BL / la découpe (.xlsx / .pdf)'}</div>
           <input id="cpdpDecFile" type="file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="cpdpDecoupeFile(this.files[0])"/></div>
-        ${C.parsed?`<div class="parse-note">🧀 ${C.parsed.products.length} fromage(s) à découper · cible = colonne commande</div>`:''}
+        ${C.parsed?`<div class="parse-note">🧀 ${C.parsed.products.length} article(s)${C.parsed.supplier?(' · '+esc(C.parsed.supplier)):''} · à réceptionner / découper</div>`:''}
         ${C.err?`<div class="err">${esc(C.err)}</div>`:''}
-        <button class="btn btn-green btn-lg" onclick="cpdpSendDecoupe()" ${(!C.parsed||C.sent)?'disabled':''} style="margin-top:6px">${C.sent?'🎉 Découpe envoyée':'🚀 Envoyer la découpe'}</button>
+        <button class="btn btn-green btn-lg" onclick="cpdpSendDecoupe()" ${(!C.parsed||C.sent)?'disabled':''} style="margin-top:6px">${C.sent?'🎉 Envoyé':'🚀 Envoyer à l entrepôt'}</button>
       </div>
     </div>
   </div>`;
@@ -867,16 +911,17 @@ async function cpdpSendDispatch(){
 async function cpdpDecoupeFile(file){ if(!file) return; cpdp.decoupe.err=""; cpdp.decoupe.fileName=file.name||"decoupe";
   try{ const name=(file.name||"").toLowerCase(); const buf=await file.arrayBuffer();
     if(name.endsWith(".pdf")){ const rows=await readDecoupePDFrows(buf); cpdp.decoupe.parsed=parseDecoupeS37Rows(rows); }
-    else { const wb=XLSX.read(buf,{type:"array"}); cpdp.decoupe.parsed=parseDecoupeExcelS37(wb); }
+    else { const wb=XLSX.read(buf,{type:"array"}); wb.__name=file.name||""; cpdp.decoupe.parsed=parseDecoupeAnyExcel(wb); }
     cpdp.decoupe.sent=false;
   }catch(e){ cpdp.decoupe.parsed=null; cpdp.decoupe.err="Erreur : "+e.message; } renderCPDPCard(); }
 async function cpdpSendDecoupe(){
   const C=cpdp.decoupe; if(!C.parsed) return; if(!dbCentrale){ C.err="Connexion centrale indisponible."; renderCPDPCard(); return; }
   const entLabel=C.entity==="KBG"?"Kelbongoo":"Robespierre"; const products=decoupeProductsForApp(C.parsed,C.entity);
+  const supLabel=(C.parsed.supplier?(C.parsed.supplier+" → "):"")+entLabel;
   const sid="decoupe_"+C.entity.toLowerCase()+"_"+Date.now();
-  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").set({ supplier:"Découpe "+entLabel, entity:C.entity, startedAt:Date.now(), products, createdBy:ME_EMAIL });
-    C.sent=true; C.err=""; renderCPDPCard(); alert("✓ Découpe "+entLabel+" envoyée à l'app La Centrale PDP.");
-    setTimeout(()=>{ cpdp.decoupe={ entity:C.entity, parsed:null, fileName:"", sent:false, err:"" }; renderCPDPCard(); },1500);
+  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").set({ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:(C.parsed.docNumber||""), startedAt:Date.now(), products, createdBy:ME_EMAIL });
+    C.sent=true; C.err=""; renderCPDPCard(); alert("✓ BL "+entLabel+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+".");
+    setTimeout(()=>{ cpdp.decoupe={ entity:C.entity, deliveryDate:C.deliveryDate, parsed:null, fileName:"", sent:false, err:"" }; renderCPDPCard(); },1500);
   }catch(e){ C.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
 }
 
@@ -1102,8 +1147,8 @@ function renderMsg(){
   const ready=readyStores();
   if(!msgStore && ready.length) msgStore=ready[0].code;
   if(!el.dataset.built){
-    const opts='<option value="CENTRALE">🏬 Entrepôt La Centrale PDP (dispatch / découpe)</option>'+ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
-    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux <b>vendeurs d'un magasin</b> ou aux <b>opérateurs de l'entrepôt</b> (apps Dispatch / Découpe). Il s'affiche tant qu'il est valable.</p>
+    const opts='<option value="CENTRALE:dispatch">🚚 Entrepôt — Dispatch palette</option><option value="CENTRALE:decoupe">🧀 Entrepôt — Découpe fromage</option>'+ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
+    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux <b>vendeurs d'un magasin</b> ou aux <b>opérateurs de l'entrepôt</b> — au choix <b>Dispatch palette</b> ou <b>Découpe fromage</b>. Il s'affiche tant qu'il est valable.</p>
       <div class="card">
         <div class="field"><label>Magasin</label><select id="msgStoreSel" style="width:100%" onchange="msgStore=this.value;renderMsgList()">${opts}</select></div>
         <div class="field"><label>Message</label><textarea id="msgText" rows="4" style="width:100%" placeholder="Ex : Vous n'aurez pas les yaourts X aujourd'hui, c'est normal."></textarea></div>
@@ -1120,12 +1165,14 @@ function renderMsg(){
 }
 function renderMsgList(){
   const box=document.getElementById("msgList"); if(!box) return;
-  const isCentrale=(msgStore==="CENTRALE");
+  const isCentrale=(String(msgStore).indexOf("CENTRALE")===0);
+  const target=isCentrale?(String(msgStore).split(":")[1]||"all"):"";
   const src = isCentrale ? (centraleState.broadcasts||{}) : ((state[msgStore]&&state[msgStore].broadcasts)||null);
   if(!isCentrale && !src){ box.innerHTML='<div class="muted">Magasin non configuré.</div>'; return; }
   const now=Date.now();
-  const list=Object.entries(src||{}).map(([id,b])=>({id,...b}))
+  let list=Object.entries(src||{}).map(([id,b])=>({id,...b}))
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(isCentrale) list=list.filter(b=>(b.target||"all")===target);
   if(!list.length){ box.innerHTML='<div class="muted">Aucun message pour ce magasin.</div>'; return; }
   box.innerHTML=list.map(b=>{
     const expired=b.validUntil && now>b.validUntil;
@@ -1145,7 +1192,8 @@ function renderMsgList(){
 }
 async function sendBroadcast(){
   const code=msgStore;
-  const isCentrale=(code==="CENTRALE");
+  const isCentrale=(String(code).indexOf("CENTRALE")===0);
+  const target=isCentrale?(String(code).split(":")[1]||"all"):"";
   const db=isCentrale?dbCentrale:dbByStore[code];
   const text=(document.getElementById("msgText").value||"").trim();
   const dateIso=document.getElementById("msgDate").value;
@@ -1156,15 +1204,17 @@ async function sendBroadcast(){
   const btn=document.getElementById("msgSendBtn"); btn.disabled=true; btn.textContent="Envoi…";
   try{
     const ref=db.ref("broadcasts").push();
-    await ref.set({ message:text, validUntil:validUntil, createdAt:firebase.database.ServerValue.TIMESTAMP, createdBy:ME_EMAIL });
+    const payload={ message:text, validUntil:validUntil, createdAt:firebase.database.ServerValue.TIMESTAMP, createdBy:ME_EMAIL };
+    if(isCentrale) payload.target=target;
+    await ref.set(payload);
     document.getElementById("msgText").value="";
-    const label=isCentrale?"l'entrepôt La Centrale PDP":((STORES.find(x=>x.code===code)||{}).label||code);
+    const label=isCentrale?("entrepôt · "+(target==="dispatch"?"Dispatch palette":target==="decoupe"?"Découpe fromage":"tous")):((STORES.find(x=>x.code===code)||{}).label||code);
     out.innerHTML='<div class="ok">✓ Message envoyé à '+esc(label)+'.</div>';
   }catch(e){ out.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
   btn.disabled=false; btn.textContent="Envoyer le message";
 }
 async function deleteBroadcast(id){
-  const db=(msgStore==="CENTRALE")?dbCentrale:dbByStore[msgStore]; if(!db) return;
+  const db=(String(msgStore).indexOf("CENTRALE")===0)?dbCentrale:dbByStore[msgStore]; if(!db) return;
   if(!confirm("Supprimer ce message ?")) return;
   try{ await db.ref("broadcasts/"+id).remove(); }catch(e){ alert("Erreur : "+e.message); }
 }
