@@ -91,10 +91,9 @@
 <div class="wrap hidden" id="app">
   <div class="tabs">
     <button class="tab active" data-tab="multi">📦 Chargement</button>
-    <button class="tab" data-tab="g5">📥 À réceptionner sur G5</button>
-    <button class="tab" data-tab="centrale">🏬 Commande à la centrale</button>
+    <button class="tab" data-tab="g5">📥 Réception</button>
+    <button class="tab" data-tab="centrale">🏬 Dispatch palette</button>
     <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
-    <button class="tab" data-tab="archives">🗄️ Archives</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
     <button class="tab" data-tab="msg">📢 Messages</button>
     <button class="tab" data-tab="fourn">🏭 Fournisseurs</button>
@@ -103,7 +102,6 @@
   <div id="tab-g5" class="hidden"></div>
   <div id="tab-centrale" class="hidden"></div>
   <div id="tab-avoirs" class="hidden"></div>
-  <div id="tab-archives" class="hidden"></div>
   <div id="tab-suivi" class="hidden"></div>
   <div id="tab-msg" class="hidden"></div>
   <div id="tab-fourn" class="hidden"></div>
@@ -112,7 +110,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -176,8 +174,11 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, reception:{} };
-let centraleView="todo";                   // onglet Commande à la centrale : todo | done
+const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{} };
+let centraleView="ecarts";                 // onglet Dispatch palette : ecarts | histo
+let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
+let recView="todo";                        // onglet Réception : todo | archives
+let suiviType="tous";                      // filtre Suivi live : tous | reception | dispatch | decoupe
 let FOURNS=[];           // répertoire fournisseurs (nom + email litiges)
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function norm(s){ return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim(); }
@@ -247,8 +248,11 @@ function start(email){
   try{
     const appC=firebase.initializeApp(CENTRALE_FIREBASE_CONFIG,"CENTRALE");
     dbCentrale=firebase.database(appC);
-    dbCentrale.ref("dispatch").on("value",snap=>{ centraleState.dispatch=snap.val()||{}; renderCentrale(); });
+    dbCentrale.ref("dispatch").on("value",snap=>{ centraleState.dispatch=snap.val()||{}; renderCentrale(); renderSuivi(); });
+    dbCentrale.ref("decoupe").on("value",snap=>{ centraleState.decoupe=snap.val()||{}; renderCentrale(); renderSuivi(); });
     dbCentrale.ref("centrale_reception").on("value",snap=>{ centraleState.reception=snap.val()||{}; renderCentrale(); });
+    dbCentrale.ref("ecarts_suivi").on("value",snap=>{ centraleState.ecartsSuivi=snap.val()||{}; renderCentrale(); });
+    dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
   // Onglets
   document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
@@ -256,16 +260,16 @@ function start(email){
   apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; }).catch(()=>{});
   // Écouteurs live : réceptions + documents + messages de chaque magasin
   readyStores().forEach(s=>{ const db=dbByStore[s.code]; if(!db) return;
-    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderArchives(); renderAvoirs(); renderLoadStatus(); });
-    db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderArchives(); renderLoadStatus(); });
+    db.ref("receptions").on("value",snap=>{ state[s.code].receptions=snap.val()||{}; queueNames(); renderSuivi(); renderG5(); renderAvoirs(); renderLoadStatus(); });
+    db.ref("documents").on("value",snap=>{ state[s.code].docs=snap.val()||{}; renderSuivi(); renderG5(); renderLoadStatus(); });
     db.ref("broadcasts").on("value",snap=>{ state[s.code].broadcasts=snap.val()||{}; queueNames(); renderMsg(); });
   });
-  renderG5(); renderArchives();
+  renderG5();
   setInterval(renderSuivi,1000);
 }
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["multi","g5","centrale","avoirs","archives","suivi","msg","fourn"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  ["multi","g5","centrale","avoirs","suivi","msg","fourn"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
   if(t==="avoirs") renderAvoirs();
   if(t==="centrale") renderCentrale();
   if(t==="fourn") renderFournisseurs();
@@ -983,11 +987,19 @@ function recsOf(code, filterFn){
 }
 function renderG5(){
   const el=document.getElementById("tab-g5"); if(!el) return;
-  let total=0;
+  const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${recView==='todo'?'#1a4d2e':'#eef2f7'};color:${recView==='todo'?'#fff':'#333'}" onclick="recView='todo';renderG5()">📥 À réceptionner sur G5</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${recView==='archives'?'#1a4d2e':'#eef2f7'};color:${recView==='archives'?'#fff':'#333'}" onclick="recView='archives';renderG5()">🗄️ Archives</button>
+  </div>`;
+  if(recView==='archives'){
+    el.innerHTML=bar+`<p class="muted" style="margin-top:0">Réceptions saisies sur G5, archivées (trié par date, par magasin). Recherche par n° BL ou fournisseur.</p>
+      <input id="archSearch" placeholder="🔎 Rechercher (n° BL, fournisseur…)" style="width:100%;max-width:440px;margin-bottom:12px" value="${esc(archSearch)}" oninput="archSearch=this.value;document.getElementById('g5ArchList').innerHTML=archivesListHTML()"/>
+      <div id="g5ArchList">${archivesListHTML()}</div>`;
+    return;
+  }
   const html=STORES.map(s=>{
     const st=state[s.code]; if(!st) return '';
     const recs=recsOf(s.code, r=>r.status==="validated" && !r.g5Validated).sort((a,b)=>(b.validatedAt||0)-(a.validatedAt||0));
-    total+=recs.length;
     if(!recs.length) return `<div class="store-card"><h3>${esc(s.label)}</h3><div class="muted">Rien à réceptionner sur G5.</div></div>`;
     const rows=recs.map(r=>{ const nm=names[r.operatorCode]||""; const ec=recEcartLines(r).length, av=recAvoirLines(r).length;
       return `<div class="rec valid" style="${ec?'border-color:#e53935;border-width:2px':''}">
@@ -1002,7 +1014,7 @@ function renderG5(){
     }).join("");
     return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${recs.length}</span></h3>${rows}</div>`;
   }).join("");
-  el.innerHTML=`<p class="muted" style="margin-top:0">Réceptions validées par les vendeurs, à saisir dans G5 (trié par date, par magasin). « Afficher » = détail + photos + <b>.txt G5</b>. « Validé sur G5 » = fait → va dans les archives.</p><div class="live-grid">${html}</div>`;
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Réceptions validées par les vendeurs, à saisir dans G5. « Afficher » = détail + photos + <b>.txt G5</b>. « Validé sur G5 » → passe dans les Archives (bouton ci-dessus).</p><div class="live-grid">${html}</div>`;
 }
 async function markG5(code,id){
   if(!confirm("Confirmer : cette réception a bien été saisie sur G5 ?\n\nElle passera dans « Réceptions archivées ».")) return;
@@ -1058,21 +1070,9 @@ function dlG5(code,id){
   downloadTxt(g5Filename(r), txt);
 }
 
-/* ==================== ONGLET RÉCEPTIONS ARCHIVÉES ==================== */
+/* ==================== ARCHIVES (intégrées dans l'onglet Réception) ==================== */
 let archSearch="";
-function renderArchives(){
-  const el=document.getElementById("tab-archives"); if(!el) return;
-  if(!el.dataset.built){
-    el.innerHTML=`<p class="muted" style="margin-top:0">Réceptions saisies sur G5, archivées (trié par date, par magasin). Recherche par n° BL ou fournisseur.</p>
-      <input id="archSearch" placeholder="🔎 Rechercher (n° BL, fournisseur…)" style="width:100%;max-width:440px;margin-bottom:12px" oninput="archSearch=this.value;renderArchivesList()"/>
-      <div id="archList"></div>`;
-    el.dataset.built="1";
-    const inp=document.getElementById("archSearch"); if(inp) inp.value=archSearch;
-  }
-  renderArchivesList();
-}
-function renderArchivesList(){
-  const box=document.getElementById("archList"); if(!box) return;
+function archivesListHTML(){
   const q=norm(archSearch); let total=0;
   const html=STORES.map(s=>{
     const st=state[s.code]; if(!st) return '';
@@ -1089,7 +1089,7 @@ function renderArchivesList(){
     }).join("");
     return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${recs.length}</span></h3>${rows}</div>`;
   }).join("");
-  box.innerHTML= total ? `<div class="live-grid">${html}</div>` : ('<div class="muted">Aucune réception archivée'+(q?' pour cette recherche':'')+'.</div>');
+  return total ? `<div class="live-grid">${html}</div>` : ('<div class="muted">Aucune réception archivée'+(q?' pour cette recherche':'')+'.</div>');
 }
 
 /* ==================== ONGLET MESSAGES (push v2) ==================== */
@@ -1102,8 +1102,8 @@ function renderMsg(){
   const ready=readyStores();
   if(!msgStore && ready.length) msgStore=ready[0].code;
   if(!el.dataset.built){
-    const opts=ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
-    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux vendeurs d'un magasin. Il s'affiche en popup tant qu'il est valable et tant que le vendeur ne l'a pas validé. Chaque vendeur qui se connecte le voit et le valide sous son code ; tu vois qui l'a vu.</p>
+    const opts='<option value="CENTRALE">🏬 Entrepôt La Centrale PDP (dispatch / découpe)</option>'+ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
+    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux <b>vendeurs d'un magasin</b> ou aux <b>opérateurs de l'entrepôt</b> (apps Dispatch / Découpe). Il s'affiche tant qu'il est valable.</p>
       <div class="card">
         <div class="field"><label>Magasin</label><select id="msgStoreSel" style="width:100%" onchange="msgStore=this.value;renderMsgList()">${opts}</select></div>
         <div class="field"><label>Message</label><textarea id="msgText" rows="4" style="width:100%" placeholder="Ex : Vous n'aurez pas les yaourts X aujourd'hui, c'est normal."></textarea></div>
@@ -1120,9 +1120,11 @@ function renderMsg(){
 }
 function renderMsgList(){
   const box=document.getElementById("msgList"); if(!box) return;
-  if(!msgStore || !state[msgStore]){ box.innerHTML='<div class="muted">Magasin non configuré.</div>'; return; }
+  const isCentrale=(msgStore==="CENTRALE");
+  const src = isCentrale ? (centraleState.broadcasts||{}) : ((state[msgStore]&&state[msgStore].broadcasts)||null);
+  if(!isCentrale && !src){ box.innerHTML='<div class="muted">Magasin non configuré.</div>'; return; }
   const now=Date.now();
-  const list=Object.entries(state[msgStore].broadcasts||{}).map(([id,b])=>({id,...b}))
+  const list=Object.entries(src||{}).map(([id,b])=>({id,...b}))
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(!list.length){ box.innerHTML='<div class="muted">Aucun message pour ce magasin.</div>'; return; }
   box.innerHTML=list.map(b=>{
@@ -1142,11 +1144,13 @@ function renderMsgList(){
   }).join("");
 }
 async function sendBroadcast(){
-  const code=msgStore; const db=dbByStore[code];
+  const code=msgStore;
+  const isCentrale=(code==="CENTRALE");
+  const db=isCentrale?dbCentrale:dbByStore[code];
   const text=(document.getElementById("msgText").value||"").trim();
   const dateIso=document.getElementById("msgDate").value;
   const out=document.getElementById("msgSendMsg");
-  if(!db){ out.innerHTML='<div class="err">Magasin non configuré.</div>'; return; }
+  if(!db){ out.innerHTML='<div class="err">'+(isCentrale?'Connexion centrale indisponible.':'Magasin non configuré.')+'</div>'; return; }
   if(!text){ out.innerHTML='<div class="err">Écris un message.</div>'; return; }
   const validUntil=endOfDayMs(dateIso)||0;
   const btn=document.getElementById("msgSendBtn"); btn.disabled=true; btn.textContent="Envoi…";
@@ -1154,12 +1158,13 @@ async function sendBroadcast(){
     const ref=db.ref("broadcasts").push();
     await ref.set({ message:text, validUntil:validUntil, createdAt:firebase.database.ServerValue.TIMESTAMP, createdBy:ME_EMAIL });
     document.getElementById("msgText").value="";
-    out.innerHTML='<div class="ok">✓ Message envoyé à '+esc((STORES.find(x=>x.code===code)||{}).label||code)+'.</div>';
+    const label=isCentrale?"l'entrepôt La Centrale PDP":((STORES.find(x=>x.code===code)||{}).label||code);
+    out.innerHTML='<div class="ok">✓ Message envoyé à '+esc(label)+'.</div>';
   }catch(e){ out.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
   btn.disabled=false; btn.textContent="Envoyer le message";
 }
 async function deleteBroadcast(id){
-  const db=dbByStore[msgStore]; if(!db) return;
+  const db=(msgStore==="CENTRALE")?dbCentrale:dbByStore[msgStore]; if(!db) return;
   if(!confirm("Supprimer ce message ?")) return;
   try{ await db.ref("broadcasts/"+id).remove(); }catch(e){ alert("Erreur : "+e.message); }
 }
@@ -1324,7 +1329,7 @@ function renderSuivi(){
   const el=document.getElementById("tab-suivi"); if(!el) return;
   const WINDOW=7*86400*1000, now=Date.now();
   const items=[]; let totalDraft=0;
-  readyStores().forEach(s=>{
+  if(suiviType==='tous'||suiviType==='reception') readyStores().forEach(s=>{
     const st=state[s.code]; if(!st) return;
     const docs=st.docs||{}, recs=st.receptions||{};
     const recsByDoc={};
@@ -1334,25 +1339,44 @@ function renderSuivi(){
       const sendTs=d.createdAt||tsFromFr(d.deliveryDate)||0;
       const rs=recsByDoc[id]||[];
       const hasValid=rs.some(r=>r.status==="validated");
-      if(!rs.length){ items.push({store:s, sendTs, kind:"attente", doc:d}); return; }
+      if(!rs.length){ items.push({type:"reception", store:s, sendTs, kind:"attente", doc:d}); return; }
       rs.forEach(r=>{ const draft=r.status!=="validated";
-        if(draft){ totalDraft++; items.push({store:s, sendTs, kind:"encours", doc:d, rec:r, dupValidated:hasValid}); }
-        else if((now-sendTs)<WINDOW || !sendTs){ items.push({store:s, sendTs, kind:"valid", doc:d, rec:r}); }
+        if(draft){ totalDraft++; items.push({type:"reception", store:s, sendTs, kind:"encours", doc:d, rec:r, dupValidated:hasValid}); }
+        else if((now-sendTs)<WINDOW || !sendTs){ items.push({type:"reception", store:s, sendTs, kind:"valid", doc:d, rec:r}); }
       });
     });
     // Réceptions sans document rattaché (héritage / doc supprimé)
     Object.entries(recs).forEach(([id,r])=>{ if(r.docId&&docs[r.docId]) return;
       const draft=r.status!=="validated"; const sendTs=r.createdAt||r.validatedAt||0;
-      if(draft){ totalDraft++; items.push({store:s, sendTs, kind:"encours", rec:{id,...r}, orphan:true}); }
-      else if((now-sendTs)<WINDOW){ items.push({store:s, sendTs, kind:"valid", rec:{id,...r}, orphan:true}); }
+      if(draft){ totalDraft++; items.push({type:"reception", store:s, sendTs, kind:"encours", rec:{id,...r}, orphan:true}); }
+      else if((now-sendTs)<WINDOW){ items.push({type:"reception", store:s, sendTs, kind:"valid", rec:{id,...r}, orphan:true}); }
     });
   });
+  // Sessions CENTRALE (dispatch + découpe) en live
+  if(suiviType==='tous'||suiviType==='dispatch') Object.entries(centraleState.dispatch||{}).forEach(([sid,s])=>{
+    if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=dispatchStats(sess); const sendTs=s.meta.startedAt||0;
+    if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"dispatch", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
+  if(suiviType==='tous'||suiviType==='decoupe') Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{
+    if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=dispatchStats(sess); const sendTs=s.meta.startedAt||0;
+    if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"decoupe", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
   // Regroupement par date d'envoi
   const byDay={};
   items.forEach(it=>{ const k=it.sendTs?dayKeyTs(it.sendTs):"0"; (byDay[k]=byDay[k]||{ts:it.sendTs||0, list:[]}); byDay[k].list.push(it); });
   const dayKeys=Object.keys(byDay).sort((a,b)=>(byDay[b].ts||0)-(byDay[a].ts||0));
 
   const card=(it)=>{
+    if(it.type==="dispatch"||it.type==="decoupe"){
+      const s=it.sess, stx=it.stats, draft=it.kind==="encours";
+      const icon=it.type==="dispatch"?"🚚":"🧀", lab=it.type==="dispatch"?"Dispatch palette":"Découpe fromage";
+      const pct=stx.total?Math.round(stx.done/stx.total*100):0;
+      return `<div class="rec ${draft?'draft':'valid'}">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
+          <div><div style="font-weight:800;font-size:14px">${icon} ${esc(s.meta.supplier||lab)}</div>
+          <div style="font-size:12px;color:#1a4d2e;font-weight:700">${lab} · 👤 ${esc(s.meta.createdBy||'—')}${stx.operators.length?(' · '+esc(stx.operators.join(', '))):''}</div></div>
+          <span class="badge ${draft?'warn':'ok'}">${draft?'🟡 En cours':'✅ Terminé'}</span></div>
+        <div class="pbar"><div class="pfill" style="width:${pct}%"></div></div>
+        <div style="font-size:12px;color:#666;margin-top:4px">${stx.done}/${stx.total} (${pct}%) · démarré ${esc(heure(it.sendTs))}</div></div>`;
+    }
     const s=it.store||{}; const storeLabel=s.label||"";
     if(it.kind==="attente"){ const d=it.doc;
       return `<div class="rec">
@@ -1386,7 +1410,9 @@ function renderSuivi(){
       <div class="live-grid">${day.list.map(card).join("")}</div>`;
   }).join("");
 
-  el.innerHTML=`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} réception(s) en cours — vue par <b>date d'envoi</b>, mise à jour en temps réel.</p>${html||'<div class="muted">Aucun envoi récent à suivre.</div>'}`;
+  const fbtn=(v,lab)=>`<button class="btn" style="padding:7px 12px;font-size:13px;background:${suiviType===v?'#1a4d2e':'#eef2f7'};color:${suiviType===v?'#fff':'#333'}" onclick="suiviType='${v}';renderSuivi()">${lab}</button>`;
+  const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('decoupe','🧀 Découpe')}</div>`;
+  el.innerHTML=filterBar+`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} en cours — vue par <b>date d'envoi</b>, temps réel.</p>${html||'<div class="muted">Rien à suivre pour ce filtre.</div>'}`;
   el.dataset.rendered="1";
 }
 
@@ -1426,38 +1452,87 @@ function centraleTxt(sess){
   });
   return out.join("\r\n");
 }
+function dispatchStats(sess){
+  const products=(sess.meta&&sess.meta.products)||[]; const stt=sess.state||{};
+  let done=0; const ts=[]; const ops={};
+  products.forEach((p,idx)=>{ const st=stt[cKeyOfLine(p,idx)]; if(st&&st.done){ done++; if(st.doneAt) ts.push(st.doneAt); if(st.doneBy) ops[st.doneBy]=(ops[st.doneBy]||0)+1; } });
+  ts.sort((a,b)=>a-b);
+  return { total:products.length, done, durationMs: ts.length?ts[ts.length-1]-ts[0]:0, operators:Object.keys(ops) };
+}
+function fmtDurMs(ms){ if(!ms) return "—"; const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60); if(h>0) return h+"h"+String(m%60).padStart(2,"0"); if(m>0) return m+" min"; return s+" s"; }
+// Toutes les lignes en écart d'une session (écart quantité et/ou motif déclaré).
+function sessionEcarts(sess){
+  const lines=centraleLines(sess); const out=[];
+  lines.forEach(l=>{
+    if(l.ecarts&&l.ecarts.length){ l.ecarts.forEach(e=>out.push({ designation:l.designation, article:l.article, storeLabel:(e.storeLabel||e.store||""), reason:e.reason, reasonText:e.reasonText||"", planned:e.planned, real:e.real, fournisseur:!!e.fournisseur })); }
+    else if(l.ecart!==0){ out.push({ designation:l.designation, article:l.article, storeLabel:"", reason:(l.ecart>0?"SURPLUS":"MANQUE"), reasonText:"", planned:l.commande, real:l.dispatched, fournisseur:false }); }
+  });
+  return out;
+}
+function ecartsTraite(sid){ return !!(centraleState.ecartsSuivi&&centraleState.ecartsSuivi[sid]&&centraleState.ecartsSuivi[sid].done); }
+function markEcartsTraite(sid){ if(!dbCentrale) return; dbCentrale.ref("ecarts_suivi/"+sid).set({done:true,at:firebase.database.ServerValue.TIMESTAMP,by:ME_EMAIL}).catch(e=>alert("Erreur : "+e.message)); }
+function unmarkEcartsTraite(sid){ if(!dbCentrale) return; dbCentrale.ref("ecarts_suivi/"+sid).remove().catch(e=>alert("Erreur : "+e.message)); }
+
 function renderCentrale(){
   const el=document.getElementById("tab-centrale"); if(!el) return;
   if(!dbCentrale){ el.innerHTML='<div class="muted">Connexion à la centrale indisponible.</div>'; return; }
   const sessions=centraleSessions();
-  const isDone=(s)=>!!(centraleState.reception&&centraleState.reception[s.id]&&centraleState.reception[s.id].receivedAt);
-  const todo=sessions.filter(s=>!isDone(s));
-  const done=sessions.filter(s=>isDone(s));
-  const view=centraleView||"todo";
-  const list=view==="done"?done:todo;
-  const card=(s)=>{
-    const lines=centraleLines(s);
-    const totCmd=lines.reduce((a,l)=>a+l.commande,0);
-    const totDisp=lines.reduce((a,l)=>a+l.dispatched,0);
-    const ecartLines=lines.filter(l=>l.ecart!==0||(l.ecarts&&l.ecarts.length));
-    return `<div class="rec valid" style="${ecartLines.length?'border-color:#e53935;border-width:2px':''}">
-      <div style="font-weight:800;font-size:15px">${esc(s.meta.supplier||'?')}</div>
-      <div style="font-size:12px;color:#666;margin-top:2px">${esc(dateShort(s.meta.startedAt))} · commande ${totCmd} → dispatché ${totDisp}</div>
-      ${ecartLines.length?`<div style="margin-top:6px"><span class="badge warn">⚠ ${ecartLines.length} écart(s)</span></div>`:'<div style="margin-top:6px"><span class="badge ok">conforme</span></div>'}
+  const view=centraleView||"ecarts";
+  const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique</button>
+  </div>`;
+
+  if(view==="ecarts"){
+    const withEc=sessions.map(s=>({s, ec:sessionEcarts(s)})).filter(x=>x.ec.length>0);
+    const open=withEc.filter(x=>!ecartsTraite(x.s.id)), done=withEc.filter(x=>ecartsTraite(x.s.id));
+    const card=(x)=>{ const s=x.s, traite=ecartsTraite(s.id);
+      const items=x.ec.map(e=>`<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #f0e0e0">
+        <b>${esc(e.designation||e.article||'?')}</b> ${e.storeLabel?('· '+esc(e.storeLabel)):''} : ${e.planned} → <b style="color:#c62828">${e.real}</b>
+        · ${esc(e.reason||'')}${e.reasonText?(' ('+esc(e.reasonText)+')'):''} <span class="badge ${e.fournisseur?'warn':'info'}">${e.fournisseur?'avoir fourn.':'interne'}</span></div>`).join("");
+      return `<div class="rec valid" style="border-color:${traite?'#4caf50':'#e53935'};border-width:2px">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <div style="font-weight:800;font-size:15px">${esc(s.meta.supplier||'?')}</div>
+          <span class="badge ${traite?'ok':'warn'}">${traite?'✓ traité':(x.ec.length+' écart(s)')}</span></div>
+        <div style="font-size:12px;color:#666;margin:2px 0 6px">${esc(dateShort(s.meta.startedAt))} · dispatché par ${esc(s.meta.createdBy||'—')}</div>
+        <div>${items}</div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openCentraleDetail('${esc(s.id)}')">👁 Détail</button>
+          <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlCentraleTxt('${esc(s.id)}')">⬇️ .txt</button>
+          ${traite?`<button class="btn" style="background:#fff3e0;color:#e65100;padding:8px 12px;font-size:13px" onclick="unmarkEcartsTraite('${esc(s.id)}')">↩︎ Rouvrir</button>`
+                  :`<button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="markEcartsTraite('${esc(s.id)}')">✓ Marquer traité</button>`}
+        </div></div>`; };
+    el.innerHTML=bar+`<p class="muted" style="margin-top:0">Écarts de tous les dispatch (commande centrale vs dispatché en magasins). Action « traité » pour le suivi (non relié au Suivi des avoirs pour l'instant).</p>
+      ${open.length?('<div class="live-grid">'+open.map(card).join("")+'</div>'):'<div class="muted">Aucun écart en attente. 🎉</div>'}
+      ${done.length?('<h3 style="margin:18px 0 8px;font-size:15px;color:#2e7d32">✓ Traités ('+done.length+')</h3><div class="live-grid">'+done.map(card).join("")+'</div>'):''}`;
+    return;
+  }
+
+  // Historique
+  let list=sessions.slice();
+  if(dpHistoSearch){ const q=norm(dpHistoSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)); }
+  if(dpHistoDate){ list=list.filter(s=>{ const d=new Date(s.meta.startedAt||0); const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); return iso===dpHistoDate; }); }
+  const card=(s)=>{ const st=dispatchStats(s); const ec=sessionEcarts(s).length;
+    return `<div class="rec valid">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <div style="font-weight:800;font-size:15px">${esc(s.meta.supplier||'?')}</div>
+        <div style="font-size:12px;color:#999">${esc(dateShort(s.meta.startedAt))} ${esc(heure(s.meta.startedAt))}</div></div>
+      <div style="font-size:12px;color:#666;margin:2px 0 6px">👤 ${esc(s.meta.createdBy||'—')}${st.operators.length?(' · '+esc(st.operators.join(', '))):''}</div>
+      <div style="display:flex;gap:12px;font-size:12px;flex-wrap:wrap">
+        <span>📦 <b>${st.done}/${st.total}</b></span>
+        <span>⏱ ${fmtDurMs(st.durationMs)}</span>
+        ${ec?`<span style="color:#c62828;font-weight:700">⚠ ${ec} écart(s)</span>`:'<span style="color:#2e7d32">conforme</span>'}
+      </div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openCentraleDetail('${esc(s.id)}')">👁 Détail / écarts</button>
+        <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openCentraleDetail('${esc(s.id)}')">👁 Détail</button>
         <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlCentraleTxt('${esc(s.id)}')">⬇️ .txt</button>
-        ${view==="done"
-          ? `<button class="btn" style="background:#fff3e0;color:#e65100;padding:8px 12px;font-size:13px" onclick="unmarkCentrale('${esc(s.id)}')">↩︎ Ré-ouvrir</button>`
-          : `<button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="markCentrale('${esc(s.id)}')">✓ Réceptionné centrale</button>`}
-      </div></div>`;
-  };
-  el.innerHTML=`<p class="muted" style="margin-top:0">Commandes passées à la centrale (Porte de Pantin) puis dispatchées en magasins — <b>par fournisseur</b>. Données issues de l'app Dispatch. « Détail » = écarts avec motif · « .txt » = export G5 · « Réceptionné centrale » = archive.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='todo'?'#1a4d2e':'#eef2f7'};color:${view==='todo'?'#fff':'#333'}" onclick="centraleView='todo';renderCentrale()">À réceptionner (${todo.length})</button>
-      <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='done'?'#1a4d2e':'#eef2f7'};color:${view==='done'?'#fff':'#333'}" onclick="centraleView='done';renderCentrale()">Réceptionnées (${done.length})</button>
+      </div></div>`; };
+  el.innerHTML=bar+`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <input placeholder="🔎 fournisseur, dispatcheur…" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
+      <span><b>Date :</b></span><input type="date" value="${esc(dpHistoDate)}" onchange="dpHistoDate=this.value;renderCentrale()"/>
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpHistoDate='';dpHistoSearch='';renderCentrale()">✕</button>
     </div>
-    ${list.length?('<div class="live-grid">'+list.map(card).join("")+'</div>'):'<div class="muted">'+(view==='done'?'Aucune réception centrale archivée.':'Aucune commande centrale à réceptionner.')+'</div>'}`;
+    ${list.length?('<div class="live-grid">'+list.map(card).join("")+'</div>'):'<div class="muted">Aucun dispatch dans l\'historique.</div>'}`;
 }
 function openCentraleDetail(sid){
   const s=(centraleState.dispatch||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s);
