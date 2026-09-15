@@ -527,8 +527,11 @@ async function parseOrderXlsx(file){
   if(h<0) throw new Error("Export de commande non reconnu (en-tête Code/Désignation introuvable).");
   const head=rows[h].map(x=>String(x).trim());
   const col=(names)=>{ for(const n of names){ const i=head.findIndex(c=>N(c)===N(n)); if(i>=0) return i; } return -1; };
-  const iCode=col(["Code"]), iRef=col(["Ref Fourn.","Ref Fourn"]), iDes=col(["Désignation","Designation"]),
-        iCdt=col(["CDT"]), iQte=col(["Qté","Qte"]), iFourn=col(["Fournisseur"]);
+  const iCode=col(["Code"]), iRef=col(["Ref Fourn.","Ref Fourn","Réf fournisseur","Ref fournisseur"]), iDes=col(["Désignation","Designation"]),
+        iCdt=col(["CDT"]), iFourn=col(["Fournisseur"]);
+  // Quantité : la colonne peut s'appeler « Qté », « Qté finale », « Quantité », « Qté cde »… → correspondance tolérante.
+  let iQte=col(["Qté finale","Qte finale","Qté","Qte","Quantité","Quantite","Qté cde","Qte cde","Qté commandée"]);
+  if(iQte<0) iQte=head.findIndex(c=>{ const x=N(c); return x==="QTE"||x.startsWith("QTE ")||x.startsWith("QUANTITE"); });
   let dateLiv="", cmd="", supplier="";
   rows.forEach(r=>{ const j=(r||[]).map(x=>String(x));
     const li=j.findIndex(x=>/^\s*Le\s*$/i.test(x)); if(li>=0 && /\d{2}\/\d{2}\/\d{4}/.test(j[li+1]||"")) dateLiv=j[li+1].trim();
