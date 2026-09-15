@@ -180,6 +180,7 @@ let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
 let recView="todo";                        // onglet Réception : todo | archives
 let suiviType="tous";                      // filtre Suivi live : tous | reception | dispatch | decoupe
+let _suiviReg=[];                          // registre des cartes Suivi live (pour ouvrir le détail au clic)
 let FOURNS=[];           // répertoire fournisseurs (nom + email litiges)
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function norm(s){ return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim(); }
@@ -1500,7 +1501,7 @@ async function deleteReception(code,id){
 function renderSuivi(){
   const el=document.getElementById("tab-suivi"); if(!el) return;
   const WINDOW=7*86400*1000, now=Date.now();
-  const items=[]; let totalDraft=0;
+  const items=[]; let totalDraft=0; _suiviReg=[];
   if(suiviType==='tous'||suiviType==='reception') readyStores().forEach(s=>{
     const st=state[s.code]; if(!st) return;
     const docs=st.docs||{}, recs=st.receptions||{};
@@ -1537,11 +1538,13 @@ function renderSuivi(){
   const dayKeys=Object.keys(byDay).sort((a,b)=>(byDay[b].ts||0)-(byDay[a].ts||0));
 
   const card=(it)=>{
+    const _idx=_suiviReg.length; _suiviReg.push(it);
+    const _clic=`onclick="suiviCardClick(event,${_idx})" style="cursor:pointer" title="Cliquer pour voir la liste des produits"`;
     if(it.type==="dispatch"||it.type==="decoupe"){
       const s=it.sess, stx=it.stats, draft=it.kind==="encours";
       const icon=it.type==="dispatch"?"🚚":"🧀", lab=it.type==="dispatch"?"Dispatch palette":"Découpe fromage";
       const pct=stx.total?Math.round(stx.done/stx.total*100):0;
-      return `<div class="rec ${draft?'draft':'valid'}">
+      return `<div class="rec ${draft?'draft':'valid'}" onclick="suiviCardClick(event,${_idx})" title="Cliquer pour voir la liste des produits" style="cursor:pointer">
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
           <div><div style="font-weight:800;font-size:14px">${icon} ${esc(s.meta.supplier||lab)}</div>
           <div style="font-size:12px;color:#1a4d2e;font-weight:700">${lab} · 👤 ${esc(s.meta.createdBy||'—')}${stx.operators.length?(' · '+esc(stx.operators.join(', '))):''}</div></div>
@@ -1551,7 +1554,7 @@ function renderSuivi(){
     }
     const s=it.store||{}; const storeLabel=s.label||"";
     if(it.kind==="attente"){ const d=it.doc;
-      return `<div class="rec">
+      return `<div class="rec" onclick="suiviCardClick(event,${_idx})" title="Cliquer pour voir la liste des produits" style="cursor:pointer">
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
           <div><div style="font-weight:800;font-size:14px">${esc(d.supplier||'?')} · ${esc(d.docNumber||'')}</div>
           <div style="font-size:12px;color:#1a4d2e;font-weight:700">🏬 ${esc(storeLabel)}</div></div>
@@ -1562,7 +1565,7 @@ function renderSuivi(){
     const tot=activeCount(doc); const p=pointed(r.lines); const pct=tot?Math.round(p/tot*100):0;
     const who=names[r.operatorCode]||"…";
     const stale=draft&&r.createdAt&&(now-r.createdAt)>12*3600*1000;
-    return `<div class="rec ${draft?'draft':'valid'}" style="${stale?'border-color:#e53935;border-width:2px':''}">
+    return `<div class="rec ${draft?'draft':'valid'}" onclick="suiviCardClick(event,${_idx})" title="Cliquer pour voir la liste des produits" style="cursor:pointer;${stale?'border-color:#e53935;border-width:2px':''}">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
         <div><div style="font-weight:800;font-size:14px">${esc(r.supplier||(doc&&doc.supplier)||'?')} · ${esc(r.docNumber||(doc&&doc.docNumber)||'')}</div>
         <div style="font-size:12px;color:#1a4d2e;font-weight:700">🏬 ${esc(storeLabel)} · 👤 ${esc(who)}</div></div>
@@ -1586,6 +1589,52 @@ function renderSuivi(){
   const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('decoupe','🧀 Découpe')}</div>`;
   el.innerHTML=filterBar+`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} en cours — vue par <b>date d'envoi</b>, temps réel.</p>${html||'<div class="muted">Rien à suivre pour ce filtre.</div>'}`;
   el.dataset.rendered="1";
+}
+
+/* ---- Détail d'une carte Suivi live : liste des produits telle que vue dans l'appli ---- */
+function suiviCardClick(ev,idx){ if(ev&&ev.target&&ev.target.closest('button')) return; openSuiviDetail(idx); }
+function suiviStatusTxt(s){ return s==='conforme'?'✅ conforme':s==='ecart'?'⚠️ écart':s==='nonrecu'?'✗ pas reçu':s==='surplus'?'➕ surplus':(s||'—'); }
+function openSuiviDetail(idx){
+  const it=_suiviReg[idx]; if(!it) return;
+  let title="", sub="", head="", body="", foot="";
+  const T=`<table style="width:100%;border-collapse:collapse;font-size:13px">`;
+  const th=(t,w)=>`<th style="text-align:left;padding:6px 8px;border-bottom:2px solid #e0e0e0${w?';width:'+w:''}">${t}</th>`;
+  const td=(v,extra)=>`<td style="padding:5px 8px;border-bottom:1px solid #f0f0f0${extra?';'+extra:''}">${v}</td>`;
+  if(it.type==="dispatch"||it.type==="decoupe"){
+    const lab=it.type==="dispatch"?"Dispatch palette":"Découpe fromage";
+    title=it.sess.meta.supplier||lab; sub=lab+" · 👤 "+esc(it.sess.meta.createdBy||'—');
+    const lines=centraleLines(it.sess);
+    head=`<tr>${th('Désignation')}${th('Cmd','60px')}${th('Dispatché','80px')}${th('Écart','70px')}${th('✓','40px')}</tr>`;
+    body=lines.map(l=>`<tr>${td(esc(l.designation||''))}${td(l.commande)}${td(l.dispatched)}${td((l.ecart>0?'+':'')+l.ecart,'color:'+(l.ecart?'#c62828':'#1a4d2e')+';font-weight:700')}${td(l.done?'✅':'')}</tr>`).join('');
+    foot=`${lines.length} produit(s)`;
+  } else {
+    const doc=it.doc||null, r=it.rec||null;
+    title=(r&&r.supplier)||(doc&&doc.supplier)||'?';
+    sub="🏬 "+esc((it.store&&it.store.label)||"")+" · "+esc((r&&r.docNumber)||(doc&&doc.docNumber)||'')+(r?(r.status==='validated'?' · ✅ réceptionnée':' · 🟡 en cours'):' · 📤 en attente');
+    const withRec=!!r;
+    const master=(doc&&doc.lines&&doc.lines.length)?doc.lines:(r?Object.values(r.lines||{}):[]);
+    head=`<tr>${th('Désignation')}${th('Marque','120px')}${th('Attendu','70px')}${withRec?th('Reçu','60px')+th('Statut','100px'):''}</tr>`;
+    body=master.map((l,i)=>{
+      const st = (doc&&doc.lines) ? (r?((r.lines||{})[lineKeyOf(l,i)]||{}):{}) : (l||{}); // sans doc : la ligne EST l'état
+      const reel = st&&st.reel!=null?st.reel:'';
+      const stTxt = st&&st.status?suiviStatusTxt(st.status):'';
+      const des=esc(l.designation||st.designation||'');
+      const mar=esc(l.marque||'');
+      const att=(l.attendu!=null?l.attendu:(st.attendu!=null?st.attendu:''));
+      return `<tr>${td(des)}${td(mar)}${td(att)}${withRec?td(reel)+td(stTxt):''}</tr>`;
+    }).join('');
+    foot=`${master.length} ligne(s)`;
+    if(!master.length) body=`<tr><td colspan="5" style="padding:10px;color:#999">Aucune ligne trouvée.</td></tr>`;
+  }
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+      <div><h2 style="margin:0;font-size:17px">${esc(title)}</h2><div class="muted" style="font-size:12px;margin-top:2px">${sub}</div></div>
+      <button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div style="overflow:auto;margin-top:12px">${T}<thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <div class="muted" style="font-size:12px;margin-top:8px">${foot}</div></div>`;
+  back.addEventListener('click',e=>{ if(e.target===back) back.remove(); });
+  document.body.appendChild(back);
 }
 
 /* ==================== ONGLET COMMANDE À LA CENTRALE ==================== */
