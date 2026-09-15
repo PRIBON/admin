@@ -362,8 +362,31 @@ function parseBiodisPDF(rowLines){
   }
   return { docNumber, supplier, lines: out };
 }
+// --- Parseur PDF Savage Roasters (torréfacteur café) ---
+// Mise en page : désignation sur 2 lignes (nom en haut, "CERTIPAQ… Lavé" en bas),
+// et la ligne du milieu porte les valeurs : <certif> <Grains|Moulu> <cdt> kg <QUANTITÉ> <poids net>.
+// Aucun code article ni EAN sur ce BL -> on nomme via origine + type, marque = Savage Roasters.
+function parseSavagePDF(rowLines){
+  const out=[]; let docNumber="";
+  for(const L of rowLines){
+    const m=L.match(/Bon de livraison\s+BL?\s*([0-9][0-9-]{6,})/i) || L.match(/BL\s*#\s*([0-9][0-9-]{6,})/i);
+    if(m){ docNumber=m[1]; break; }
+  }
+  const valRe=/^(.+?)\s+(Grains|Moulu|Capsules?|Dosettes?)\s+([\d.,]+)\s*kg\s+([\d.,]+)\s+([\d.,]+)\s*$/i;
+  for(let i=0;i<rowLines.length;i++){
+    const m=rowLines[i].match(valRe); if(!m) continue;
+    const type=m[2], attendu=Math.round(toNum(m[4]));            // QUANTITÉ (col. 4), pas le poids
+    const top=(rowLines[i-1]||"").trim();
+    const bot=(rowLines[i+1]||"").trim();
+    const cont=(bot && !valRe.test(bot) && !/^(TOTAL|POIDS|\(KG|D[ÉE]SIGNATION)/i.test(bot)) ? " "+bot : "";
+    const des=((top+cont).replace(/\s+/g," ").trim()+" — "+type).trim();
+    out.push({ article:"", ean:"", designation:des, marque:"Savage Roasters", attendu, categorie:"Café" });
+  }
+  return { docNumber, supplier:"SAVAGE ROASTERS", lines:out };
+}
 function pickPdfParser(rowLines){
   const j=rowLines.join("\n");
+  if(/SAVAGE\s+ROASTERS/i.test(j)) return parseSavagePDF(rowLines);
   if(/BIODIS/i.test(j)) return parseBiodisPDF(rowLines);
   return parsePDFLines(rowLines); // Vitafrais (par défaut)
 }
@@ -379,8 +402,89 @@ async function readPDF(buf){
       if(line) rowLines.push(line);
     });
   }
-  return pickPdfParser(rowLines);
+  const parsed=pickPdfParser(rowLines);
+  parsed._raw=rowLines.join("\n");   // texte brut conservé (éditeur manuel / envoi si format non reconnu)
+  return parsed;
 }
+
+/* ==================== ÉDITEUR MANUEL DE BL (format non reconnu / correction) ====================
+   S'ouvre automatiquement si un BL PDF n'est reconnu par aucun parseur (0 ligne), ou à la demande.
+   Permet d'éditer désignation / quantité / marque, de charger le BL SEUL en réception,
+   et d'envoyer le BL non reconnu à hg@probon.fr pour mise à jour de l'appli. */
+let _blEdit=null;
+function openBLEditor(parsed, ctx){
+  ctx=ctx||{};
+  const src=(parsed&&parsed.lines&&parsed.lines.length)
+    ? parsed.lines.map(l=>({designation:l.designation||"", qte:(l.attendu!=null?l.attendu:""), marque:l.marque||""}))
+    : [{designation:"",qte:"",marque:""},{designation:"",qte:"",marque:""},{designation:"",qte:"",marque:""}];
+  _blEdit={ rows:src, raw:(parsed&&parsed._raw)||"", supplier:(parsed&&parsed.supplier)||ctx.supplier||"", docNumber:(parsed&&parsed.docNumber)||"", fileName:ctx.fileName||"" };
+  const back=document.createElement("div"); back.className="modal-back"; back.id="blEditBack";
+  const opts=readyStores().map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
+  const recon=(parsed&&parsed.lines&&parsed.lines.length)?'':' <span class="badge" style="background:#fdecea;color:#c62828">format non reconnu</span>';
+  back.innerHTML=`<div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h2 style="margin:0;font-size:17px">✏️ Saisie manuelle du BL${recon}</h2>
+      <button class="btn" style="background:#eef2f7" onclick="closeBLEditor()">Fermer</button></div>
+    <p class="muted" style="margin-top:6px">Corrige / complète les lignes puis charge en réception. Pense à envoyer le BL à <b>hg@probon.fr</b> pour que le format soit ajouté à l'appli (plus de saisie manuelle ensuite).</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+      <div class="field" style="flex:1;min-width:150px"><label>Magasin</label><select id="blStore" style="width:100%">${opts}</select></div>
+      <div class="field" style="flex:1;min-width:150px"><label>Fournisseur</label><input id="blSup" style="width:100%" value="${esc(_blEdit.supplier)}"/></div>
+      <div class="field" style="flex:1;min-width:120px"><label>N° BL</label><input id="blNum" style="width:100%" value="${esc(_blEdit.docNumber)}"/></div>
+      <div class="field" style="flex:1;min-width:130px"><label>Livraison</label><input id="blDate" type="date" style="width:100%"/></div></div>
+    <div id="blRows"></div>
+    <button class="btn" style="background:#eef2f7;margin:6px 0" onclick="blAddRow()">➕ Ajouter une ligne</button>
+    ${_blEdit.raw?`<details style="margin:8px 0"><summary class="muted" style="cursor:pointer">Texte brut extrait du PDF</summary><textarea readonly style="width:100%;height:120px;font-size:11px;font-family:monospace;margin-top:6px">${esc(_blEdit.raw)}</textarea></details>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-primary" onclick="blLoad()">📥 Charger en réception</button>
+      <button class="btn" style="background:#0b5cad;color:#fff" onclick="blSendHenry()">✉️ Envoyer à hg@probon.fr</button></div>
+    <div id="blMsg" style="margin-top:8px"></div></div>`;
+  document.body.appendChild(back); blRenderRows();
+}
+function closeBLEditor(){ const b=document.getElementById("blEditBack"); if(b) b.remove(); _blEdit=null; }
+function blSyncFromDom(){ if(!_blEdit) return; document.querySelectorAll("#blRows [data-blrow]").forEach(r=>{ const i=+r.getAttribute("data-blrow"); if(!_blEdit.rows[i]) return; _blEdit.rows[i].designation=r.querySelector(".bl-des").value; _blEdit.rows[i].qte=r.querySelector(".bl-qte").value; _blEdit.rows[i].marque=r.querySelector(".bl-mar").value; }); }
+function blRenderRows(){
+  const box=document.getElementById("blRows"); if(!box) return;
+  box.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>
+    <th style="text-align:left;padding:4px">Désignation</th><th style="width:60px;padding:4px">Qté</th><th style="text-align:left;width:130px;padding:4px">Marque</th><th style="width:34px"></th></tr></thead><tbody>${
+    _blEdit.rows.map((r,i)=>`<tr data-blrow="${i}">
+      <td style="padding:3px"><input class="bl-des" style="width:100%" value="${esc(r.designation)}"/></td>
+      <td style="padding:3px"><input class="bl-qte" inputmode="numeric" style="width:100%" value="${esc(r.qte)}"/></td>
+      <td style="padding:3px"><input class="bl-mar" style="width:100%" value="${esc(r.marque)}"/></td>
+      <td style="padding:3px;text-align:center"><button class="btn" style="background:#fdecea;color:#c62828;padding:4px 8px" onclick="blDelRow(${i})">✖</button></td></tr>`).join('')
+  }</tbody></table>`;
+}
+function blAddRow(){ blSyncFromDom(); _blEdit.rows.push({designation:"",qte:"",marque:""}); blRenderRows(); }
+function blDelRow(i){ blSyncFromDom(); _blEdit.rows.splice(i,1); if(!_blEdit.rows.length)_blEdit.rows.push({designation:"",qte:"",marque:""}); blRenderRows(); }
+function blBuildLines(){ blSyncFromDom(); return _blEdit.rows.map(r=>({ article:"", ean:"", designation:(r.designation||"").trim(), marque:(r.marque||"").trim(), attendu:Math.round(toNum(r.qte))||0, categorie:"Autres" })).filter(l=>l.designation); }
+async function blLoad(){
+  const msg=document.getElementById("blMsg"); const lines=blBuildLines();
+  if(!lines.length){ msg.innerHTML='<div class="err">Ajoute au moins une ligne avec une désignation.</div>'; return; }
+  const code=document.getElementById("blStore").value;
+  const supplier=document.getElementById("blSup").value.trim();
+  const docNumber=document.getElementById("blNum").value.trim();
+  const deliveryDate=document.getElementById("blDate").value;
+  const parsed={ format:"MANUEL", g5Key:"ean", docNumber, supplier, lines };
+  try{ await loadToStore(code, parsed, {supplier, type:"BL (saisie manuelle)", deliveryDate}); justLoaded[code]={at:Date.now()};
+    msg.innerHTML='<div class="ok">✓ '+lines.length+' ligne(s) chargée(s) dans '+esc(code)+'.</div>';
+    setTimeout(()=>{ closeBLEditor(); try{renderSimple();}catch(e){} try{renderMulti();}catch(e){} },900);
+  }catch(e){ msg.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
+}
+function blSendHenry(){
+  blSyncFromDom();
+  const supplier=(document.getElementById("blSup")||{}).value||_blEdit.supplier||"";
+  const docNumber=(document.getElementById("blNum")||{}).value||_blEdit.docNumber||"";
+  const code=(document.getElementById("blStore")||{}).value||"";
+  const lines=blBuildLines();
+  const subj="BL non reconnu — MAJ appli console ("+(supplier||"fournisseur ?")+")";
+  let body="Bonjour,\n\nCe BL n'est pas reconnu automatiquement par la console. Merci d'ajouter son format a l'appli.\n\n";
+  body+="Fournisseur : "+(supplier||"?")+"\nN BL : "+(docNumber||"?")+"\nMagasin : "+(code||"?")+"\nFichier : "+(_blEdit.fileName||"-")+"\nEnvoye par : "+(ME_EMAIL||"")+"\n\n";
+  body+="--- Lignes saisies a la main ("+lines.length+") ---\n"+lines.map(l=>l.attendu+" x "+l.designation+(l.marque?" ["+l.marque+"]":"")).join("\n")+"\n\n";
+  if(_blEdit.raw){ let raw=_blEdit.raw; if(raw.length>4000) raw=raw.slice(0,4000)+"\n...(tronque)"; body+="--- Texte brut extrait du PDF ---\n"+raw+"\n\n"; }
+  body+="/!\\ Merci de joindre le PDF original du BL a cet email.\n";
+  window.location.href="mailto:hg@probon.fr?subject="+encodeURIComponent(subj)+"&body="+encodeURIComponent(body);
+  const m=document.getElementById("blMsg"); if(m) m.innerHTML='<div class="ok">✉️ Email prepare pour hg@probon.fr — pense a joindre le PDF.</div>';
+}
+async function onManualBLFile(file){ if(!file) return; let p; try{ p=await parseAnyFile(file); }catch(e){ p={lines:[],_raw:"",supplier:"",docNumber:""}; } if(p.format==='CMD'){ alert("C'est une commande, pas un BL."); return; } openBLEditor(p,{fileName:file.name}); }
 /* ---------- LECTURE COMMANDE (export G5 xlsx) ---------- */
 // Code fournisseur G5 -> nom lisible (complète au besoin).
 const FOURN_MAP={ "K113":"SBV", "K005":"BODIN" };
@@ -1015,6 +1119,7 @@ function renderSimple(){
     <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5 <b>ou Agidra</b>, quantité commandée, conditionnement).<br><b>2.</b> BL = livraison / n° BL — <b>optionnel</b> (ex. Agidra : la facture arrive après → charge la commande seule).<br><b>3.</b> Avec BL : rapprochement automatique. Sans BL : la commande sert de document à pointer.</p>
     <div class="field"><label>1️⃣ Bon de commande</label><div class="drop" id="sorderDrop" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
     <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div class="drop" id="sblDrop" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.csv / .txt / .pdf)</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
+    <div class="field"><label>BL non reconnu / sans commande ?</label><div class="drop" style="border-color:#0b5cad;background:#eef5fb" onclick="document.getElementById('manualBLFile').click()">✏️ Saisie manuelle — charger un BL seul ou corriger un format inconnu</div><input id="manualBLFile" type="file" accept=".pdf,.csv,.txt" style="display:none" onchange="onManualBLFile(this.files[0]);this.value=''"/></div>
     <div id="snote" style="margin-top:10px"></div>
     <div class="field" style="margin-top:12px"><label>Magasin</label><select id="sstore" style="width:100%">${opts}</select></div>
     <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Déduit de la commande / BL…"/></div>
@@ -1033,7 +1138,9 @@ async function onSimpleOrder(file){
   try{simpleOrder=await parseAnyFile(file);if(simpleOrder.format!=='CMD')throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.');if(simpleOrder.supplier)document.getElementById('ssup').value=simpleOrder.supplier;if(simpleOrder.deliveryDate){const d=String(simpleOrder.deliveryDate).split('/');if(d.length===3)document.getElementById('sdate').value=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0');}simpleMerged=(simpleBL?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
 async function onSimpleBL(file){
   if(!file)return;document.getElementById('sblDrop').classList.add('has');document.getElementById('sblDrop').textContent='✓ '+file.name;
-  try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
+  try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');
+    if(!simpleBL.lines||simpleBL.lines.length===0){ document.getElementById('snote').innerHTML='<div class="err">⚠️ Format de BL non reconnu — saisie manuelle ouverte.</div>'; document.getElementById('sblDrop').classList.remove('has'); document.getElementById('sblDrop').textContent='📄 Charger le BL (.csv / .txt / .pdf)'; const _p=simpleBL; simpleBL=null; openBLEditor(_p,{fileName:file.name}); return; }
+    simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
 async function loadSimple(){
   const _doc=simpleMerged||simpleOrder; if(!_doc)return;const code=document.getElementById('sstore').value;const supplier=document.getElementById('ssup').value;const deliveryDate=document.getElementById('sdate').value;const btn=document.getElementById('sbtn');btn.disabled=true;btn.textContent='Chargement…';
   try{await loadToStore(code,_doc,{supplier,type:(simpleMerged?'BL + commande':'Commande'),deliveryDate});justLoaded[code]={at:Date.now()};document.getElementById('smsg').innerHTML='<div class="ok">✓ '+(simpleMerged?'BL + commande rapprochés':'Commande seule')+' chargé(e) dans '+esc(code)+'. Confirmation ci-dessous (📤 en attente de réception) et dans « Suivi live ».</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
