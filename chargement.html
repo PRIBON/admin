@@ -110,7 +110,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.7.3";
+const APP_VERSION = "1.7.4";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -175,7 +175,7 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{} };
+const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{} };
 let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
@@ -252,6 +252,7 @@ function start(email){
     dbCentrale=firebase.database(appC);
     dbCentrale.ref("dispatch").on("value",snap=>{ centraleState.dispatch=snap.val()||{}; renderCentrale(); renderSuivi(); });
     dbCentrale.ref("decoupe").on("value",snap=>{ centraleState.decoupe=snap.val()||{}; renderCentrale(); renderSuivi(); });
+    dbCentrale.ref("tracabilite").on("value",snap=>{ centraleState.tracabilite=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("centrale_reception").on("value",snap=>{ centraleState.reception=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("ecarts_suivi").on("value",snap=>{ centraleState.ecartsSuivi=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
@@ -1578,9 +1579,11 @@ function renderCentrale(){
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique dispatch</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='decoupe'?'#8a5a00':'#eef2f7'};color:${view==='decoupe'?'#fff':'#333'}" onclick="centraleView='decoupe';renderCentrale()">🧀 Historique découpe</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='traca'?'#8a5a00':'#eef2f7'};color:${view==='traca'?'#fff':'#333'}" onclick="centraleView='traca';renderCentrale()">🏷️ Traçabilité</button>
   </div>`;
 
   if(view==="decoupe"){ renderDecoupeHisto(el, bar); return; }
+  if(view==="traca"){ renderTracaAdmin(el, bar); return; }
 
   if(view==="ecarts"){
     const withEc=sessions.map(s=>({s, ec:sessionEcarts(s)})).filter(x=>x.ec.length>0);
@@ -1700,6 +1703,70 @@ function decoupeSessions(){
   out.sort((a,b)=>(b.meta.startedAt||0)-(a.meta.startedAt||0));
   return out;
 }
+/* ===== Traçabilité fromage — correction du lieu par l'admin ===== */
+// Toutes les étiquettes de traçabilité (decoupe/<sid>/tracabilite + tracabilite/<jour>).
+function tracaAllEntries(){
+  const out=[];
+  Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{
+    const t=(s&&s.tracabilite)||{};
+    Object.entries(t).forEach(([id,e])=>{ if(e&&typeof e==="object") out.push(Object.assign({ ref:"decoupe/"+sid+"/tracabilite/"+id, id }, e)); });
+  });
+  Object.entries(centraleState.tracabilite||{}).forEach(([dk,grp])=>{
+    if(grp&&typeof grp==="object") Object.entries(grp).forEach(([id,e])=>{ if(e&&typeof e==="object") out.push(Object.assign({ ref:"tracabilite/"+dk+"/"+id, id }, e)); });
+  });
+  out.sort((a,b)=>(b.at||0)-(a.at||0));
+  return out;
+}
+function frDateShort_(iso){ const p=String(iso||"").split("-"); return p.length===3?(p[2]+"/"+p[1]+"/"+p[0]):String(iso||""); }
+function jourFromEntry(e){
+  if(e.decoupeDate){ const p=String(e.decoupeDate).split("-"); return p.length===3?(p[2]+"/"+p[1]+"/"+p[0]):String(e.decoupeDate); }
+  if(e.at){ return new Date(e.at).toLocaleDateString("fr-FR"); }
+  return "";
+}
+function renderTracaAdmin(el, bar){
+  const list=tracaAllEntries();
+  const rows=list.map(e=>{
+    const jour=jourFromEntry(e); const mag=String(e.magasin||"").toUpperCase();
+    return `<div class="rec valid" style="border-color:#e0c48a">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="font-weight:800;font-size:14px">🧀 ${esc(e.nom||"(sans nom)")}</div>
+        <div style="font-size:12px;color:#999">${esc(jour)}${e.by?(" · "+esc(e.by)):""}</div></div>
+      <div style="font-size:12px;color:#666;margin:2px 0 8px">
+        ${e.lot?("Lot "+esc(e.lot)):"(lot ?)"}${e.bl?(" · BL "+esc(e.bl)):""}${e.dlc?(" · DLC "+esc(frDateShort_(e.dlc))):""}${e.photoUrl?(' · <a href="'+esc(e.photoUrl)+'" target="_blank" rel="noreferrer">📷</a>'):""}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:#555;font-weight:700">Lieu de vente :</span>
+        <select onchange="changeTracaLieu('${esc(e.ref)}',this.value)" style="padding:6px 10px">
+          <option value="KBG" ${mag==="KBG"?"selected":""}>Kelbongoo</option>
+          <option value="ROB" ${mag==="ROB"?"selected":""}>Pribon Robespierre</option>
+        </select>
+        <span class="badge" style="background:${mag==="KBG"?"#e3f2fd":"#f3e5f5"};color:${mag==="KBG"?"#1565c0":"#6a1b9a"}">${esc(mag||"?")}</span>
+      </div></div>`;
+  }).join("");
+  el.innerHTML=bar+`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <p class="muted" style="margin:0;flex:1;min-width:220px">Corrige le <b>lieu de vente</b> d'une étiquette si erroné (ex. KBG → Robespierre). Effet immédiat sur l'app et le suivi. « Resynchroniser » réécrit le tableau lots du Sheet dédié.</p>
+      <button class="btn btn-green" style="padding:10px 14px;font-size:13px;white-space:nowrap" onclick="resyncTracaLots(this)">⟳ Resynchroniser le tableau lots</button>
+    </div>
+    <div style="margin-top:12px">${list.length?('<div class="live-grid">'+rows+'</div>'):'<div class="muted">Aucune étiquette de traçabilité pour l\'instant.</div>'}</div>`;
+}
+function changeTracaLieu(ref,val){
+  if(!dbCentrale) return;
+  dbCentrale.ref(ref+"/magasin").set(val).catch(e=>alert("Erreur : "+e.message));
+  // Le listener Firebase rafraîchit l'affichage automatiquement.
+}
+async function resyncTracaLots(btn){
+  const list=tracaAllEntries();
+  if(!list.length){ alert("Aucune étiquette à synchroniser."); return; }
+  const entries=list.map(e=>({ lot:e.lot||"", nom:e.nom||"", bl:e.bl||"", dlc:e.dlc||"", dlcWrite:e.dlcWrite||"", decoupeDate:jourFromEntry(e), magasin:e.magasin||"", photoUrl:e.photoUrl||"" }));
+  if(btn){ btn.disabled=true; btn.textContent="Synchronisation…"; }
+  try{
+    const r=await fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"rebuild-traca-lots",idToken:ID_TOKEN,entries})});
+    const j=await r.json();
+    if(j&&j.ok) alert("✓ Tableau lots resynchronisé ("+j.lots+" lot(s)).");
+    else alert("Erreur : "+((j&&j.error)||"réponse inattendue")+"\\n\\n(Le case rebuild-traca-lots est-il ajouté et l'Apps Script redéployé ?)");
+  }catch(e){ alert("Erreur réseau : "+e.message); }
+  if(btn){ btn.disabled=false; btn.textContent="⟳ Resynchroniser le tableau lots"; }
+}
+
 function renderDecoupeHisto(el, bar){
   let list=decoupeSessions();
   if(dpDecoupeSearch){ const q=norm(dpDecoupeSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)||norm(s.meta.docNumber||"").includes(q)); }
