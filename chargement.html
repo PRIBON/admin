@@ -110,7 +110,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.7.4";
+const APP_VERSION = "1.7.8";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -329,7 +329,9 @@ function parsePDFLines(rowLines){
     const mBL=L.match(/n[°º]\s*BL\s*:?\s*(\d+)/i); if(mBL) docNumber=mBL[1];
     if(/^(Palette|Colis \d|Poids|Total|Distribution|Page|Commande|BIO :|DEM :)/i.test(L)) continue;
     const m=L.match(lineRe); if(!m) continue;
-    out.push({ article:m[1], ean:m[3].replace(/^0+(?=\d)/,""), designation:m[2].replace(/\s+\d+$/,"").trim(), marque:"", attendu:parseInt(m[4],10), categorie:"Autres" });
+    let des=m[2].replace(/\s+\d+\s+\d+\s*$/,"").replace(/\s+\d+\s*$/,""); // retire colis + PCB (ou l'un des deux)
+    des=des.replace(/\s*(BIO|DEM)\s*$/i,"").trim();                        // retire le label de fin (même collé : "150gBIO")
+    out.push({ article:m[1], ean:m[3].replace(/^0+(?=\d)/,""), designation:des, marque:"", attendu:parseInt(m[4],10), categorie:"Autres" });
   }
   return { docNumber, supplier, lines:out };
 }
@@ -415,6 +417,41 @@ async function parseOrderXlsx(file){
       if(!lines.length) throw new Error("Commande Agidra lue mais aucune ligne article trouvee.");
       const mCmd=String(file.name||"").match(/commande[_-]?(\d{5,})/i);
       return { format:"CMD", g5Key:"code", supplier:"AGIDRA", docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines };
+    }
+  }
+  // --- Format commande "simple" (export interne : Code(EAN) / Réf fournisseur / Désignation / Qté finale) ---
+  // Détecté par : Code + Désignation + une colonne Qté* + une Réf, ET absence de colonne CDT
+  // (la colonne CDT est la signature de l'export G5 standard, traité plus bas).
+  {
+    const NS=(s)=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
+    let sh=-1;
+    for(let i=0;i<Math.min(rows.length,12);i++){ const r=(rows[i]||[]).map(NS);
+      const hasCode=r.some(x=>x==="CODE"), hasDes=r.some(x=>x.includes("DESIGNATION")),
+            hasQte=r.some(x=>x.startsWith("QTE")), hasRef=r.some(x=>x.includes("REF")),
+            hasCDT=r.some(x=>x==="CDT");
+      if(hasCode&&hasDes&&hasQte&&hasRef&&!hasCDT){ sh=i; break; } }
+    if(sh>=0){
+      const head=rows[sh].map(x=>String(x).trim());
+      const find=(pred)=>head.findIndex(x=>pred(NS(x)));
+      const iCode=find(x=>x==="CODE"), iRef=find(x=>x.includes("REF")),
+            iDes=find(x=>x.includes("DESIGNATION")), iQte=find(x=>x.startsWith("QTE"));
+      const lines=[];
+      for(let i=sh+1;i<rows.length;i++){
+        const r=rows[i]||[];
+        const codeCell=String(iCode>=0?(r[iCode]??""):"").trim();
+        const ref=String(iRef>=0?(r[iRef]??""):"").trim();
+        const des=String(iDes>=0?(r[iDes]??""):"").trim();
+        if(!des||(!codeCell&&!ref)) continue;
+        const qte=toNum(iQte>=0?r[iQte]:0);
+        const isEan=/^\d{12,13}$/.test(codeCell);
+        lines.push({ article:codeCell||ref, code:codeCell||ref,
+          ean:isEan?codeCell.replace(/^0+(?=\d)/,""):"", ref,
+          designation:des, cdt:null, qteCmd:qte, unit:"piece",
+          attendu:qte, poidsVariable:false, categorie:"Autres" });
+      }
+      if(!lines.length) throw new Error("Commande lue mais aucune ligne article trouvée (format simple).");
+      const mCmd=String(file.name||"").match(/(\d{6,})/);
+      return { format:"CMD", g5Key:"code", supplier:"", docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines };
     }
   }
   const N=(s)=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
@@ -637,7 +674,7 @@ function mergeOrderAndBL(order, bl){
       code: ol.code || blLine?.code || "",
       ean: blLine?.ean || ol.ean || (String(ol.code||"").match(/^\d{12,13}$/)?String(ol.code):"") || "",
       ref: ol.ref || blLine?.article || "",
-      designation: blLine?.designation || ol.designation || "",
+      designation: ol.designation || blLine?.designation || "",
       marque: blLine?.marque || ol.marque || "",
       cdt: ol.cdt || null,
       qteCmd: ol.qteCmd != null ? ol.qteCmd : null,
@@ -814,7 +851,7 @@ function parseUgalaitBL(workbook){
     const pie=iPie>=0?num(row[iPie]):0, col=iCol>=0?num(row[iCol]):0, pds=iPds>=0?num(row[iPds]):0;
     const qte=pie||col||0;
     const poids=(pie>0&&pds>0)?Math.round(pds/pie*1000):0; // g/pièce si dispo
-    products.push({ article:code, ref:code, code, designation:des, fournisseur:"UGALAIT", commande:qte, decoupePlan:0, envoi:0, poids:poids||0, rupture:qte===0 }); }
+    products.push({ article:code, ref:code, code, designation:des, fournisseur:"UGALAIT", commande:qte, decoupePlan:0, envoi:0, poids:poids||0, poidsRecu:pds||0, rupture:qte===0 }); }
   if(!products.length) throw new Error("Aucune ligne article trouvée dans le BL.");
   const mBL=String(workbook.__name||"").match(/(\d{5,})/); if(mBL) docNumber=mBL[1];
   return { products, supplier:"UGALAIT", docNumber };
@@ -844,34 +881,54 @@ function parseDecoupeS37Rows(rowLines){
   if(!products.length) throw new Error("PDF découpe : aucune ligne reconnue — charge plutôt l'Excel.");
   return { products };
 }
-// BL fournisseur UGALAIT en PDF (v1.7.3). Mise en page différente de la découpe S37 :
-//   CODE_ARTICLE  DÉSIGNATION  Cdt(Pi/C)  QtéColis(C)  QtéPièces(Pi)  PoidsNet(Kg)  P.U.  MtHT
-// Les lignes en RUPTURE n'ont pas de quantités.
+// BL fournisseur UGALAIT en PDF (v1.7.5). pdf.js sort chaque article sur TROIS lignes
+// consécutives : (1) les quantités « Cdt Colis Pièces PoidsNet PU MtHT » — parfois
+// préfixées de *BIO* ou PROMO, ou de la forme « Cdt RUPTURE 0,000 » ; (2) le code
+// article seul (ex. 043646D) ; (3) la désignation seule (ex. BLEU BREBIS REGALIS).
 function cleanUgalaitDes(s){
-  return String(s||"").replace(/\s+(PROMO|\*\s*BIO\s*\*)/gi," ").replace(/\s{2,}/g," ").trim();
+  return String(s||"").replace(/\*\s*BIO\s*\*/gi," ").replace(/\bPROMO\b/gi," ").replace(/\s{2,}/g," ").trim();
 }
 function parseUgalaitPDFrows(rowLines){
   const products=[]; let docNumber="";
-  for(const L of rowLines){
+  const isCode = (s)=>/^\d{5,7}[A-Za-z]?$/.test(String(s||"").trim());
+  for(let i=0;i<rowLines.length;i++){
+    const L=String(rowLines[i]||"").trim();
     const mBL=L.match(/BL\s*n[°ºo]?\s*:?\s*(\d{4,})/i); if(mBL&&!docNumber) docNumber=mBL[1];
-    // Ligne article : code + désignation + 3 entiers (cdt/colis/pièces) + poids + PU + montant
-    let m=L.match(/^(\d{5,7}[A-Za-z]?)\s+(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s*$/);
-    if(m){
-      const pie=parseInt(m[5],10)||0, poidsKg=toNum(m[6]);
-      const poidsG=(pie>0&&poidsKg>0)?Math.round(poidsKg/pie*1000):0; // g / pièce
-      products.push({ article:m[1], ref:m[1], code:m[1], designation:cleanUgalaitDes(m[2]),
-        fournisseur:"UGALAIT", commande:pie, decoupePlan:0, envoi:0, poids:poidsG||0, rupture:false });
-      continue;
+    if(!isCode(L)) continue;                       // on s'ancre sur la ligne "code article"
+    const code=L;
+    const numbers=String(rowLines[i-1]||"");       // ligne AU-DESSUS = quantités
+    let desig=String(rowLines[i+1]||"");           // ligne EN-DESSOUS = désignation
+    if(isCode(desig) || /RUPTURE/i.test(desig) || /^[\d.,\s]+$/.test(desig)) desig=""; // garde-fou
+    const nb=numbers.replace(/\*\s*BIO\s*\*/gi," ").replace(/\bPROMO\b/gi," ").trim();
+    let pieces=0, poidsG=0, poidsKg=0, rupture=false;
+    if(/RUPTURE/i.test(nb)){ rupture=true; }
+    else {
+      const nums=nb.match(/\d+(?:[.,]\d+)?/g)||[];  // [Cdt, Colis, Pièces, PoidsKg, PU, MtHT]
+      if(nums.length>=3){
+        pieces=parseInt(nums[2],10)||0;
+        poidsKg=(nums.length>=4)?toNum(nums[3]):0;   // poids net TOTAL reçu (kg) de la ligne
+        poidsG=(pieces>0&&poidsKg>0)?Math.round(poidsKg/pieces*1000):0; // g / pièce
+      }
     }
-    // Ligne en rupture : code + désignation + cdt + RUPTURE
-    m=L.match(/^(\d{5,7}[A-Za-z]?)\s+(.+?)\s+(\d+)\s+RUPTURE\b/i);
-    if(m){
-      products.push({ article:m[1], ref:m[1], code:m[1], designation:cleanUgalaitDes(m[2]),
-        fournisseur:"UGALAIT", commande:0, decoupePlan:0, envoi:0, poids:0, rupture:true });
+    const designation=cleanUgalaitDes(desig) || ("Article "+code);
+    products.push({ article:code, ref:code, code:code, designation,
+      fournisseur:"UGALAIT", commande:pieces, decoupePlan:0, envoi:0, poids:poidsG||0, poidsRecu:poidsKg||0, rupture });
+  }
+  // Secours : ancien format 1-ligne (autre mise en page éventuelle).
+  if(!products.length){
+    for(const L of rowLines){
+      const m=String(L).match(/^(\d{5,7}[A-Za-z]?)\s+(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d.,]+)/);
+      if(m){ const pj=parseInt(m[5],10)||0, pk=toNum(m[6]);
+        products.push({ article:m[1], ref:m[1], code:m[1], designation:cleanUgalaitDes(m[2]),
+          fournisseur:"UGALAIT", commande:pj, decoupePlan:0, envoi:0,
+          poids:(pj>0&&pk>0)?Math.round(pk/pj*1000):0, poidsRecu:pk||0, rupture:false }); }
     }
   }
   if(!products.length) throw new Error("PDF Ugalait : aucune ligne article reconnue.");
-  return { products, supplier:"UGALAIT", docNumber };
+  // Dédoublonnage : le PDF contient souvent plusieurs exemplaires du même BL (1/3, 2/3, 3/3).
+  const seen={}, uniq=[];
+  for(const p of products){ const k=String(p.code||p.designation||""); if(k&&!seen[k]){ seen[k]=1; uniq.push(p); } }
+  return { products:uniq, supplier:"UGALAIT", docNumber };
 }
 /* Référence des fromages Kelbongoo vendus À LA PIÈCE (poids cible g) — liste Henry, seule source.
    Fourchettes (Petit Perche 81–99, Selles sur Cher 180–220) → médian + tol ±10 %. */
@@ -891,11 +948,12 @@ function decoupeProductsForApp(parsed, entity){
   return (parsed.products||[]).map(p=>{ const rp=(entity==="KBG")?kbgRefPoids(p.designation):0;
     return { article:p.article||"", designation:p.designation, fournisseur:p.fournisseur||"",
       robCmd: entity==="ROB"?p.commande:0, kbgTarget: entity==="KBG"?Math.round(p.commande):0,
-      poids: rp>0?rp:((p.poids&&p.poids>0)?p.poids:200), tol:10, envoiPrevu:p.envoi||0, rupture:!!p.rupture }; }); }
+      poids: rp>0?rp:((p.poids&&p.poids>0)?p.poids:200), tol:10, envoiPrevu:p.envoi||0,
+      poidsRecu: p.poidsRecu||0, rupture:!!p.rupture }; }); }
 
 /* --- État + rendu de la carte « La Centrale PDP » --- */
 const cpdp={ dispatch:{ supplier:"", parsed:null, fileName:"", bdc:null, bdcInfo:"", sent:false, err:"" },
-             decoupe:{ entity:"ROB", deliveryDate:"", parsed:null, fileName:"", sent:false, err:"" } };
+             decoupe:{ entity:"ROB", deliveryDate:"", parsed:null, fileName:"", blNumber:"", sent:false, err:"" } };
 function renderCPDPCard(){
   const box=document.getElementById("cpdp-card"); if(!box) return;
   const D=cpdp.dispatch, C=cpdp.decoupe;
@@ -931,7 +989,9 @@ function renderCPDPCard(){
         <div class="field"><label>Fichier — BL Ugalait ou fichier découpe (Excel/PDF)</label>
           <div class="drop ${C.parsed?'has':''}" onclick="document.getElementById('cpdpDecFile').click()">${C.parsed?('✓ '+esc(C.fileName)):'🧀 Charger le BL / la découpe (.xlsx / .pdf)'}</div>
           <input id="cpdpDecFile" type="file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="cpdpDecoupeFile(this.files[0])"/></div>
-        ${C.parsed?`<div class="parse-note">🧀 ${C.parsed.products.length} article(s)${C.parsed.supplier?(' · '+esc(C.parsed.supplier)):''} · à réceptionner / découper</div>`:''}
+        <div class="field"><label>N° de BL ${C.blNumber?'':'<span style="color:#e65100">(à vérifier / saisir)</span>'}</label>
+          <input id="cpdpBl" style="width:100%" value="${esc(C.blNumber||'')}" oninput="cpdp.decoupe.blNumber=this.value" placeholder="Ex: 41270 — détecté auto, sinon saisis-le"/></div>
+        ${C.parsed?`<div class="parse-note">🧀 ${C.parsed.products.length} article(s)${C.parsed.supplier?(' · '+esc(C.parsed.supplier)):''}${C.blNumber?(' · BL '+esc(C.blNumber)):' · <b style="color:#e65100">BL non détecté</b>'} · à réceptionner / découper</div>`:''}
         ${C.err?`<div class="err">${esc(C.err)}</div>`:''}
         <button class="btn btn-green btn-lg" onclick="cpdpSendDecoupe()" ${(!C.parsed||C.sent)?'disabled':''} style="margin-top:6px">${C.sent?'🎉 Envoyé':'🚀 Envoyer à l entrepôt'}</button>
       </div>
@@ -963,6 +1023,8 @@ async function cpdpDecoupeFile(file){ if(!file) return; cpdp.decoupe.err=""; cpd
       else { try{ cpdp.decoupe.parsed=parseDecoupeS37Rows(rows); }catch(e){ cpdp.decoupe.parsed=parseUgalaitPDFrows(rows); } }
     }
     else { const wb=XLSX.read(buf,{type:"array"}); wb.__name=file.name||""; cpdp.decoupe.parsed=parseDecoupeAnyExcel(wb); }
+    // N° BL : prérempli avec celui détecté (l'admin peut le corriger / le saisir s'il manque).
+    if(cpdp.decoupe.parsed && cpdp.decoupe.parsed.docNumber) cpdp.decoupe.blNumber=cpdp.decoupe.parsed.docNumber;
     cpdp.decoupe.sent=false;
   }catch(e){ cpdp.decoupe.parsed=null; cpdp.decoupe.err="Erreur : "+e.message; } renderCPDPCard(); }
 async function cpdpSendDecoupe(){
@@ -970,9 +1032,10 @@ async function cpdpSendDecoupe(){
   const entLabel=C.entity==="KBG"?"Kelbongoo":"Robespierre"; const products=decoupeProductsForApp(C.parsed,C.entity);
   const supLabel=(C.parsed.supplier?(C.parsed.supplier+" → "):"")+entLabel;
   const sid="decoupe_"+C.entity.toLowerCase()+"_"+Date.now();
-  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").set({ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:(C.parsed.docNumber||""), startedAt:Date.now(), products, createdBy:ME_EMAIL });
-    C.sent=true; C.err=""; renderCPDPCard(); alert("✓ BL "+entLabel+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+".");
-    setTimeout(()=>{ cpdp.decoupe={ entity:C.entity, deliveryDate:C.deliveryDate, parsed:null, fileName:"", sent:false, err:"" }; renderCPDPCard(); },1500);
+  const blNum=(C.blNumber||C.parsed.docNumber||"").toString().trim();
+  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").set({ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:blNum, startedAt:Date.now(), products, createdBy:ME_EMAIL });
+    C.sent=true; C.err=""; renderCPDPCard(); alert("✓ BL "+entLabel+(blNum?(" n°"+blNum):"")+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+".");
+    setTimeout(()=>{ cpdp.decoupe={ entity:C.entity, deliveryDate:C.deliveryDate, parsed:null, fileName:"", blNumber:"", sent:false, err:"" }; renderCPDPCard(); },1500);
   }catch(e){ C.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
 }
 function renderMulti(){
