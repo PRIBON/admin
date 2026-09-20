@@ -93,6 +93,7 @@
     <button class="tab active" data-tab="multi">📦 Chargement</button>
     <button class="tab" data-tab="g5">📥 Réception</button>
     <button class="tab" data-tab="centrale">🏬 Dispatch & Découpe</button>
+    <button class="tab" data-tab="inventaire">📋 Inventaire</button>
     <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
     <button class="tab" data-tab="msg">📢 Messages</button>
@@ -101,6 +102,7 @@
   <div id="tab-multi"></div>
   <div id="tab-g5" class="hidden"></div>
   <div id="tab-centrale" class="hidden"></div>
+  <div id="tab-inventaire" class="hidden"></div>
   <div id="tab-avoirs" class="hidden"></div>
   <div id="tab-suivi" class="hidden"></div>
   <div id="tab-msg" class="hidden"></div>
@@ -175,7 +177,7 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{} };
+const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{} };
 let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
@@ -255,6 +257,7 @@ function start(email){
     dbCentrale.ref("tracabilite").on("value",snap=>{ centraleState.tracabilite=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("centrale_reception").on("value",snap=>{ centraleState.reception=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("ecarts_suivi").on("value",snap=>{ centraleState.ecartsSuivi=snap.val()||{}; renderCentrale(); });
+    dbCentrale.ref("inventaire_vin").on("value",snap=>{ centraleState.inventaireVin=snap.val()||{}; renderInventaire(); });
     dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
   // Onglets
@@ -272,9 +275,10 @@ function start(email){
 }
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["multi","g5","centrale","avoirs","suivi","msg","fourn"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  ["multi","g5","centrale","inventaire","avoirs","suivi","msg","fourn"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
   if(t==="avoirs") renderAvoirs();
   if(t==="centrale") renderCentrale();
+  if(t==="inventaire") renderInventaire();
   if(t==="fourn") renderFournisseurs();
 }
 /* Appel Apps Script authentifié (idToken responsable). */
@@ -1632,6 +1636,108 @@ function sessionEcarts(sess){
 function ecartsTraite(sid){ return !!(centraleState.ecartsSuivi&&centraleState.ecartsSuivi[sid]&&centraleState.ecartsSuivi[sid].done); }
 function markEcartsTraite(sid){ if(!dbCentrale) return; dbCentrale.ref("ecarts_suivi/"+sid).set({done:true,at:firebase.database.ServerValue.TIMESTAMP,by:ME_EMAIL}).catch(e=>alert("Erreur : "+e.message)); }
 function unmarkEcartsTraite(sid){ if(!dbCentrale) return; dbCentrale.ref("ecarts_suivi/"+sid).remove().catch(e=>alert("Erreur : "+e.message)); }
+
+/* ==================== INVENTAIRE VIN (console) ==================== */
+// Données poussées par l'app « La Centrale » (module Inventaire vin) :
+//   inventaire_vin/<id> : { meta:{label,startedAt,dateKey,createdBy,operatorCode,closed}, lines:{<key>:{ean,designation,cartons,bottles,units}}, validated:{at,by} }
+// La console liste les inventaires du jour, montre le détail et génère le .txt (EAN / quantité) pour PROGMAG.
+let invVinDate = null; // null = aujourd'hui (défaut) ; "" = toutes ; "YYYY-MM-DD" = date précise
+
+function invVinSummary(v){
+  const L=Object.values((v&&v.lines)||{}); let u=0,r=0;
+  L.forEach(l=>{ const un=(l.units!=null?l.units:((l.cartons||0)*6+(l.bottles||0))); if(un>0)r++; u+=un; });
+  return { refs:r, units:u };
+}
+function invVinListAll(){
+  const all=centraleState.inventaireVin||{};
+  return Object.entries(all).map(([id,v])=>Object.assign({id},v)).filter(v=>v.meta)
+    .sort((a,b)=>((b.meta.startedAt||0)-(a.meta.startedAt||0)));
+}
+function invVinLines(v){
+  return Object.entries((v&&v.lines)||{}).map(([k,l])=>Object.assign({key:k},l))
+    .map(l=>Object.assign({},l,{ units:(l.units!=null?l.units:((l.cartons||0)*6+(l.bottles||0))) }))
+    .filter(l=>l.ean)
+    .sort((a,b)=>((a.createdAt||0)-(b.createdAt||0)));
+}
+// .txt réception PROGMAG : une ligne "EAN<TAB>quantité" par référence (unités = cartons*6 + vrac).
+function invVinTxt(v){
+  const out=[];
+  invVinLines(v).forEach(l=>{ if(!l.ean||!l.units) return; out.push(String(l.ean)+"\t"+String(l.units)); });
+  return out.join("\r\n");
+}
+function renderInventaire(){
+  const el=document.getElementById("tab-inventaire"); if(!el) return;
+  if(!dbCentrale){ el.innerHTML='<div class="muted">Connexion à la centrale indisponible.</div>'; return; }
+  const today=(function(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");})();
+  const filterDate = (invVinDate===null) ? today : invVinDate;
+  let list=invVinListAll();
+  if(filterDate) list=list.filter(v=>(v.meta.dateKey||"")===filterDate);
+  const card=(v)=>{ const s=invVinSummary(v);
+    const st = v.validated?{t:"✓ validé",c:"#2e7d32"}:(v.meta.closed?{t:"clôturé",c:"#5e35b1"}:{t:"en cours",c:"#e65100"});
+    return `<div class="rec valid" style="border-color:${st.c};border-width:2px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <div style="font-weight:800;font-size:15px">🍷 ${esc(v.meta.label||"Inventaire vin")}</div>
+        <span class="badge" style="background:${st.c}22;color:${st.c}">${st.t}</span></div>
+      <div style="font-size:12px;color:#666;margin:2px 0 6px">${esc(dateShort(v.meta.startedAt))} ${esc(heure(v.meta.startedAt))} · ${esc(v.meta.createdBy||("Code "+(v.meta.operatorCode||"?")))}</div>
+      <div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap">
+        <span>📋 <b>${s.refs}</b> réf.</span><span>🍾 <b>${s.units}</b> bouteille(s)</span></div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openInvVinDetail('${esc(v.id)}')">👁 Détail</button>
+        <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlInvVinTxt('${esc(v.id)}')">⬇️ .txt</button>
+        ${v.validated
+          ? `<button class="btn" style="background:#fff3e0;color:#e65100;padding:8px 12px;font-size:13px" onclick="unvalidateInvVin('${esc(v.id)}')">↩︎ Dévalider</button>`
+          : `<button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="validateInvVin('${esc(v.id)}')">✓ Valider &amp; .txt</button>`}
+      </div></div>`;
+  };
+  const sub=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:#7b1e3a;color:#fff">🍷 Vins</button>
+  </div>`;
+  el.innerHTML=sub+`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span><b>Date :</b></span><input type="date" value="${esc(filterDate)}" onchange="invVinDate=this.value;renderInventaire()"/>
+      <button class="btn" style="background:${invVinDate===null?'#1a4d2e':'#eef2f7'};color:${invVinDate===null?'#fff':'#333'};padding:8px 12px;font-size:13px" onclick="invVinDate=null;renderInventaire()">Aujourd'hui</button>
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="invVinDate='';renderInventaire()">Toutes</button>
+    </div>
+    <p class="muted" style="margin-top:0">Inventaires vin saisis à l'entrepôt (app <b>La Centrale</b> → module Inventaire vin). « Détail » = lignes EAN + quantités. « Valider &amp; .txt » génère le fichier réception (colonnes <b>EAN</b> / <b>quantité</b>) à intégrer dans <b>PROGMAG</b>.</p>
+    ${list.length?('<div class="live-grid">'+list.map(card).join("")+'</div>'):'<div class="muted">Aucun inventaire pour ce filtre.</div>'}`;
+}
+function openInvVinDetail(id){
+  const v=(centraleState.inventaireVin||{})[id]; if(!v) return;
+  const lines=invVinLines(v); const s=invVinSummary(v);
+  const rows=lines.map(l=>`<tr><td style="font-family:monospace">${esc(l.ean)}</td><td>${esc(l.designation||"")}</td><td style="text-align:center">${l.cartons||0}</td><td style="text-align:center">${l.bottles||0}</td><td style="text-align:center;font-weight:700">${l.units}</td></tr>`).join("");
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">🍷 ${esc(v.meta.label||"Inventaire vin")}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div class="muted" style="margin:4px 0 10px">${esc(dateShort(v.meta.startedAt))} ${esc(heure(v.meta.startedAt))} · ${esc(v.meta.createdBy||"")} · <b>${s.refs}</b> réf. · <b>${s.units}</b> bouteille(s)</div>
+    <div style="overflow:auto;max-height:60vh"><table><thead><tr><th>EAN</th><th>Désignation</th><th>Cartons</th><th>Vrac</th><th>Unités</th></tr></thead><tbody>${rows||'<tr><td colspan="5" style="color:#999">Aucune ligne.</td></tr>'}</tbody></table></div>
+    <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlInvVinTxt('${esc(id)}')">⬇️ Télécharger le .txt (EAN / quantité)</button>
+  </div>`;
+  back.onclick=(e)=>{ if(e.target===back) back.remove(); };
+  document.body.appendChild(back);
+}
+function dlInvVinTxt(id){
+  const v=(centraleState.inventaireVin||{})[id]; if(!v) return;
+  const txt=invVinTxt(v);
+  if(!txt){ alert("Aucune ligne avec quantité à exporter."); return; }
+  const d=new Date(v.meta.startedAt||Date.now());
+  const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");
+  const lab=String(v.meta.label||"VIN").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,20)||"VIN";
+  downloadTxt(yy+mm+dd+"_INVENTAIRE_"+lab+".txt", txt);
+}
+function validateInvVin(id){
+  if(!dbCentrale) return;
+  const v=(centraleState.inventaireVin||{})[id]; if(!v) return;
+  const s=invVinSummary(v);
+  if(!s.units){ alert("Cet inventaire n'a aucune quantité — rien à valider."); return; }
+  if(!confirm("Valider cet inventaire ("+s.refs+" réf. · "+s.units+" bouteilles) et générer le .txt pour PROGMAG ?")) return;
+  dbCentrale.ref("inventaire_vin/"+id+"/validated").set({ at:firebase.database.ServerValue.TIMESTAMP, by:ME_EMAIL })
+    .then(()=>{ dlInvVinTxt(id); })
+    .catch(e=>alert("Erreur : "+e.message));
+}
+function unvalidateInvVin(id){
+  if(!dbCentrale) return;
+  if(!confirm("Dévalider cet inventaire ?")) return;
+  dbCentrale.ref("inventaire_vin/"+id+"/validated").remove().catch(e=>alert("Erreur : "+e.message));
+}
 
 function renderCentrale(){
   const el=document.getElementById("tab-centrale"); if(!el) return;
