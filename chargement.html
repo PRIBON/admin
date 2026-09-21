@@ -94,6 +94,7 @@
     <button class="tab" data-tab="g5">📥 Réception</button>
     <button class="tab" data-tab="centrale">🏬 Dispatch & Découpe</button>
     <button class="tab" data-tab="inventaire">📋 Inventaire</button>
+    <button class="tab" data-tab="kbgpoids">🧀 Poids KBG</button>
     <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
     <button class="tab" data-tab="msg">📢 Messages</button>
@@ -103,6 +104,7 @@
   <div id="tab-g5" class="hidden"></div>
   <div id="tab-centrale" class="hidden"></div>
   <div id="tab-inventaire" class="hidden"></div>
+  <div id="tab-kbgpoids" class="hidden"></div>
   <div id="tab-avoirs" class="hidden"></div>
   <div id="tab-suivi" class="hidden"></div>
   <div id="tab-msg" class="hidden"></div>
@@ -112,7 +114,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.7.9";
+const APP_VERSION = "1.8.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -177,7 +179,7 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{} };
+const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{} };
 let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
@@ -258,6 +260,7 @@ function start(email){
     dbCentrale.ref("centrale_reception").on("value",snap=>{ centraleState.reception=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("ecarts_suivi").on("value",snap=>{ centraleState.ecartsSuivi=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("inventaire_vin").on("value",snap=>{ centraleState.inventaireVin=snap.val()||{}; renderInventaire(); });
+    dbCentrale.ref("config/kbg_poids").on("value",snap=>{ centraleState.kbgPoids=snap.val()||{}; renderKbgPoids(); });
     dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
   // Onglets
@@ -279,6 +282,7 @@ function switchTab(t){
   if(t==="avoirs") renderAvoirs();
   if(t==="centrale") renderCentrale();
   if(t==="inventaire") renderInventaire();
+  if(t==="kbgpoids") renderKbgPoids();
   if(t==="fourn") renderFournisseurs();
 }
 /* Appel Apps Script authentifié (idToken responsable). */
@@ -1681,6 +1685,52 @@ function invVinTxt(v){
   const out=[];
   invVinLines(v).forEach(l=>{ if(!l.ean||!l.units) return; out.push(String(l.ean)+"\t"+String(l.units)); });
   return out.join("\r\n");
+}
+/* ==================== POIDS PORTIONS KELBONGOO (console admin) ==================== */
+/* Édite les poids de portion Kelbongoo (grammes). Écrit dans config/kbg_poids sur la Centrale.
+   Clé = _kbgKey(nom) — même normalisation que l'app de découpe → l'app applique le poids aussitôt. */
+let _kbgPoidsRows=[];
+function kbgPoidsEffective(){
+  const map={}, order=[];
+  FROMAGE_KBG_REF.forEach(function(pair){ const name=pair[0], g=pair[1], k=_kbgKey(name); if(!(k in map)) order.push(k); map[k]={key:k,name:name,def:g,ovr:null}; });
+  const ov=centraleState.kbgPoids||{};
+  Object.keys(ov).forEach(function(k){ const g=Number(ov[k])||0; if(map[k]){ map[k].ovr=g; } else { map[k]={key:k,name:k,def:null,ovr:g}; order.push(k); } });
+  return order.map(function(k){ return map[k]; });
+}
+function renderKbgPoids(){
+  const el=document.getElementById("tab-kbgpoids"); if(!el) return;
+  if(!dbCentrale){ el.innerHTML='<p class="muted" style="margin-top:0">Connexion à la Centrale requise pour modifier les poids de portion.</p>'; return; }
+  _kbgPoidsRows=kbgPoidsEffective();
+  let html='<p class="muted" style="margin-top:0">Poids des <b>portions Kelbongoo</b> (en grammes). L\'app de découpe affiche la fourchette ±10 % et calcule le rendement à partir de ce poids. Une valeur modifiée ici est <b>prioritaire</b> sur la liste par défaut et s\'applique tout de suite à toutes les découpes.</p>';
+  html+='<div style="max-width:560px;margin-bottom:14px;padding:10px;border:1px solid #e0e0e0;border-radius:8px;background:#fafafa"><div style="font-weight:700;margin-bottom:6px">➕ Ajouter / corriger un fromage</div><div style="display:flex;gap:6px"><input id="kbgp-newname" placeholder="Nom du fromage" style="flex:2;padding:8px"><input id="kbgp-newg" type="number" min="0" placeholder="g" style="flex:1;padding:8px;width:70px"><button class="btn btn-green" onclick="kbgPoidsAdd()">Ajouter</button></div></div>';
+  html+='<table style="border-collapse:collapse;max-width:660px;width:100%"><thead><tr style="text-align:left;border-bottom:2px solid #ddd"><th style="padding:6px">Fromage</th><th style="padding:6px;width:90px">Défaut</th><th style="padding:6px;width:120px">Poids (g)</th><th style="padding:6px;width:100px"></th></tr></thead><tbody>';
+  _kbgPoidsRows.forEach(function(r,i){
+    const eff = r.ovr!=null?r.ovr:(r.def!=null?r.def:"");
+    html+='<tr style="border-bottom:1px solid #eee"><td style="padding:6px">'+esc(r.name)+(r.ovr!=null?' <span class="badge">modifié</span>':'')+'</td>'
+      +'<td style="padding:6px;color:#888">'+(r.def!=null?r.def+' g':'—')+'</td>'
+      +'<td style="padding:6px"><input id="kbgp-'+i+'" type="number" min="0" value="'+eff+'" style="width:80px;padding:6px"></td>'
+      +'<td style="padding:6px"><button class="btn" onclick="kbgPoidsSave('+i+')">💾</button>'+(r.ovr!=null?' <button class="btn" onclick="kbgPoidsReset('+i+')" title="Revenir au poids par défaut">↺</button>':'')+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+function kbgPoidsSave(i){
+  const r=_kbgPoidsRows[i]; if(!r||!dbCentrale) return;
+  const g=parseInt(document.getElementById("kbgp-"+i).value,10);
+  if(!(g>0)){ alert("Poids invalide."); return; }
+  dbCentrale.ref("config/kbg_poids/"+r.key).set(g).catch(function(e){ alert("Erreur : "+e.message); });
+}
+function kbgPoidsReset(i){
+  const r=_kbgPoidsRows[i]; if(!r||!dbCentrale) return;
+  dbCentrale.ref("config/kbg_poids/"+r.key).remove().catch(function(e){ alert("Erreur : "+e.message); });
+}
+function kbgPoidsAdd(){
+  if(!dbCentrale) return;
+  const name=(document.getElementById("kbgp-newname").value||"").trim();
+  const g=parseInt(document.getElementById("kbgp-newg").value,10);
+  if(!name||!(g>0)){ alert("Nom et poids requis."); return; }
+  const k=_kbgKey(name); if(!k){ alert("Nom invalide."); return; }
+  dbCentrale.ref("config/kbg_poids/"+k).set(g).then(function(){ const a=document.getElementById("kbgp-newname"); const b=document.getElementById("kbgp-newg"); if(a)a.value=""; if(b)b.value=""; }).catch(function(e){ alert("Erreur : "+e.message); });
 }
 function renderInventaire(){
   const el=document.getElementById("tab-inventaire"); if(!el) return;
