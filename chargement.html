@@ -78,7 +78,10 @@
 <body>
 <div class="header">
   <div><h1>📥 PRIBON — Console Responsable</h1><div class="sub">Suivi & chargement des BL · tous les magasins</div></div>
-  <div id="whoami" class="sub"></div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button id="btnRefresh" onclick="refreshActive(this)" title="Rafraîchir l'affichage sans se déconnecter" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer">⟳ Actualiser</button>
+    <div id="whoami" class="sub"></div>
+  </div>
 </div>
 
 <div id="gate">
@@ -94,7 +97,6 @@
     <button class="tab" data-tab="g5">📥 Réception</button>
     <button class="tab" data-tab="centrale">🏬 Dispatch & Découpe</button>
     <button class="tab" data-tab="inventaire">📋 Inventaire</button>
-    <button class="tab" data-tab="kbgpoids">🧀 Poids KBG</button>
     <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
     <button class="tab" data-tab="msg">📢 Messages</button>
@@ -114,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.8.0";
+const APP_VERSION = "1.8.1";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -282,8 +284,25 @@ function switchTab(t){
   if(t==="avoirs") renderAvoirs();
   if(t==="centrale") renderCentrale();
   if(t==="inventaire") renderInventaire();
-  if(t==="kbgpoids") renderKbgPoids();
   if(t==="fourn") renderFournisseurs();
+}
+/* Rafraîchit l'affichage de l'onglet courant SANS recharger la page (donc sans se reconnecter).
+   Les données Firebase sont déjà en direct ; ce bouton force un nouveau rendu si besoin. */
+function refreshActive(btn){
+  const active=document.querySelector(".tab.active");
+  const t=active?active.dataset.tab:"multi";
+  try{
+    if(t==="multi") renderMulti();
+    else if(t==="g5") renderG5();
+    else if(t==="centrale") renderCentrale();
+    else if(t==="inventaire") renderInventaire();
+    else if(t==="avoirs") renderAvoirs();
+    else if(t==="suivi") renderSuivi();
+    else if(t==="msg") renderMsg();
+    else if(t==="fourn") renderFournisseurs();
+    renderLoadStatus && renderLoadStatus();
+  }catch(e){ console.error("refreshActive", e); }
+  if(btn){ const old=btn.textContent; btn.textContent="✓ Actualisé"; setTimeout(()=>{ btn.textContent=old; }, 1200); }
 }
 /* Appel Apps Script authentifié (idToken responsable). */
 async function apiRP(action, extra){
@@ -1916,6 +1935,7 @@ function decoupeAgg(sess){
     const t=(r.kbgG||0)+(r.robG||0);
     return { entity:ent, kbgN:r.kbgN||0, kbgG:r.kbgG||0, robN:r.robN||0, robG:r.robG||0, robMeules:r.robMeules||0,
       rend:(r.rendement!=null?r.rendement:(t>0?Math.round((r.kbgG||0)/t*100):0)),
+      rendPortions:(r.rendementPortions!=null?r.rendementPortions:null), kbgTheo:r.kbgTheo||0,
       lines:(r.lines||[]), by:r.by||sess.meta.createdBy||"", updatedAt:r.updatedAt||0,
       done:(r.done!=null?r.done:0), total:(sess.meta.products||[]).length, hasData:((r.kbgN||0)+(r.robN||0)+(r.robMeules||0))>0 };
   }
@@ -1931,13 +1951,19 @@ function decoupeAgg(sess){
     kbgN+=k;kbgG+=kg;robN+=rr;robG+=rg;robMeules+=rm;
   });
   const t=kbgG+robG; const rend=t>0?Math.round(kbgG/t*100):0;
-  return { entity:ent, kbgN,kbgG:Math.round(kbgG),robN,robG:Math.round(robG),robMeules,rend,lines,by:sess.meta.createdBy||"",updatedAt:0,done,total:products.length,hasData:(kbgN+robN+robMeules)>0 };
+  return { entity:ent, kbgN,kbgG:Math.round(kbgG),robN,robG:Math.round(robG),robMeules,rend,rendPortions:null,kbgTheo:0,lines,by:sess.meta.createdBy||"",updatedAt:0,done,total:products.length,hasData:(kbgN+robN+robMeules)>0 };
 }
 function decoupeSessions(){
   const out=[];
   Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{ if(s&&s.meta&&s.meta.startedAt) out.push(Object.assign({id:sid},s)); });
   out.sort((a,b)=>(b.meta.startedAt||0)-(a.meta.startedAt||0));
   return out;
+}
+// Supprime une session de découpe (ex. ouvertures multiples par erreur côté opérateur).
+function deleteDecoupeSession(sid, label){
+  if(!dbCentrale) return;
+  if(!confirm("Supprimer la découpe « "+(label||"Découpe")+" » de l'historique ?\n\nDéfinitif. À n'utiliser que pour une découpe vide ou ouverte par erreur.")) return;
+  dbCentrale.ref("decoupe/"+sid).remove().catch(e=>alert("Erreur : "+e.message));
 }
 /* ===== Traçabilité fromage — correction du lieu par l'admin ===== */
 // Toutes les étiquettes de traçabilité (decoupe/<sid>/tracabilite + tracabilite/<jour>).
@@ -1960,13 +1986,22 @@ function jourFromEntry(e){
   return "";
 }
 function renderTracaAdmin(el, bar){
-  const list=tracaAllEntries();
-  const rows=list.map(e=>{
-    const jour=jourFromEntry(e); const mag=String(e.magasin||"").toUpperCase();
+  if(window.tracaFilter===undefined) window.tracaFilter="all";
+  const flt=window.tracaFilter;
+  let list=tracaAllEntries();
+  if(flt==="KBG"||flt==="ROB") list=list.filter(e=>String(e.magasin||"").toUpperCase()===flt);
+  // Clé de jour (date de découpe si dispo, sinon date de la photo) pour ranger proprement.
+  const dayKey=(e)=>{ if(e.decoupeDate) return String(e.decoupeDate);
+    if(e.at){ const d=new Date(e.at); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+    return "0000-00-00"; };
+  const groups={};
+  list.forEach(e=>{ const k=dayKey(e); (groups[k]=groups[k]||[]).push(e); });
+  const days=Object.keys(groups).sort((a,b)=>b.localeCompare(a)); // du plus récent au plus ancien
+  const entryCard=(e)=>{ const mag=String(e.magasin||"").toUpperCase();
     return `<div class="rec valid" style="border-color:#e0c48a">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
         <div style="font-weight:800;font-size:14px">🧀 ${esc(e.nom||"(sans nom)")}</div>
-        <div style="font-size:12px;color:#999">${esc(jour)}${e.by?(" · "+esc(e.by)):""}</div></div>
+        <div style="font-size:12px;color:#999">${esc(heure(e.at))}${e.by?(" · "+esc(e.by)):""}</div></div>
       <div style="font-size:12px;color:#666;margin:2px 0 8px">
         ${e.lot?("Lot "+esc(e.lot)):"(lot ?)"}${e.bl?(" · BL "+esc(e.bl)):""}${e.dlc?(" · DLC "+esc(frDateShort_(e.dlc))):""}${e.photoUrl?(' · <a href="'+esc(e.photoUrl)+'" target="_blank" rel="noreferrer">📷</a>'):""}</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1976,13 +2011,23 @@ function renderTracaAdmin(el, bar){
           <option value="ROB" ${mag==="ROB"?"selected":""}>Pribon Robespierre</option>
         </select>
         <span class="badge" style="background:${mag==="KBG"?"#e3f2fd":"#f3e5f5"};color:${mag==="KBG"?"#1565c0":"#6a1b9a"}">${esc(mag||"?")}</span>
-      </div></div>`;
-  }).join("");
+      </div></div>`; };
+  const dayBlock=(k)=>{
+    const items=groups[k].slice().sort((a,b)=>{ const ma=String(a.magasin||"").toUpperCase(), mb=String(b.magasin||"").toUpperCase(); if(ma!==mb) return ma.localeCompare(mb); return String(a.nom||"").localeCompare(String(b.nom||""),"fr"); });
+    const kbg=items.filter(e=>String(e.magasin||"").toUpperCase()==="KBG").length, rob=items.filter(e=>String(e.magasin||"").toUpperCase()==="ROB").length;
+    const jlabel=(frDateShort_(k)!==k)?frDateShort_(k):k;
+    return `<div style="margin:16px 0 6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:2px solid #e0c48a;padding-bottom:4px">
+        <div style="font-size:16px;font-weight:900;color:#8a5a00">📅 ${esc(jlabel)}</div>
+        <div style="font-size:12px;color:#777">${items.length} étiquette(s)${kbg?(' · '+kbg+' Kelbongoo'):''}${rob?(' · '+rob+' Robespierre'):''}</div>
+      </div>
+      <div class="live-grid">${items.map(entryCard).join("")}</div>`; };
+  const fbtn=(v,lbl)=>`<button class="btn" style="padding:8px 12px;font-size:13px;background:${flt===v?'#8a5a00':'#eef2f7'};color:${flt===v?'#fff':'#333'}" onclick="window.tracaFilter='${v}';renderCentrale()">${lbl}</button>`;
   el.innerHTML=bar+`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <p class="muted" style="margin:0;flex:1;min-width:220px">Corrige le <b>lieu de vente</b> d'une étiquette si erroné (ex. KBG → Robespierre). Effet immédiat sur l'app et le suivi. « Resynchroniser » réécrit le tableau lots du Sheet dédié.</p>
+      <p class="muted" style="margin:0;flex:1;min-width:220px">Étiquettes rangées par <b>date de découpe</b> puis <b>lieu de vente</b> (un même fromage peut être pris en photo à chaque découpe). Corrige le lieu si erroné ; « Resynchroniser » réécrit le tableau lots du Sheet dédié.</p>
       <button class="btn btn-green" style="padding:10px 14px;font-size:13px;white-space:nowrap" onclick="resyncTracaLots(this)">⟳ Resynchroniser le tableau lots</button>
     </div>
-    <div style="margin-top:12px">${list.length?('<div class="live-grid">'+rows+'</div>'):'<div class="muted">Aucune étiquette de traçabilité pour l\'instant.</div>'}</div>`;
+    <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;align-items:center">${fbtn("all","Tous")}${fbtn("KBG","Kelbongoo")}${fbtn("ROB","Robespierre")}<span style="font-size:12px;color:#999">${list.length} étiquette(s) au total</span></div>
+    ${days.length?days.map(dayBlock).join(""):'<div class="muted">Aucune étiquette de traçabilité pour l\'instant.</div>'}`;
 }
 function changeTracaLieu(ref,val){
   if(!dbCentrale) return;
@@ -2007,12 +2052,13 @@ function renderDecoupeHisto(el, bar){
   let list=decoupeSessions();
   if(dpDecoupeSearch){ const q=norm(dpDecoupeSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)||norm(s.meta.docNumber||"").includes(q)); }
   if(dpDecoupeDate){ list=list.filter(s=>{ const d=new Date(s.meta.startedAt||0); const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); return iso===dpDecoupeDate; }); }
-  const card=(s)=>{ const a=decoupeAgg(s); const isRob=a.entity==="ROB"; const rendOk=a.rend>=85; const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
+  const card=(s)=>{ const a=decoupeAgg(s); const isRob=a.entity==="ROB"; const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
+    const rShown=(a.rendPortions!=null?a.rendPortions:a.rend); const rendOk=rShown>=85;
     const metrics = isRob
       ? `<span class="badge" style="background:#f3e5f5;color:#6a1b9a">Robespierre <b>${a.robMeules}</b> meule(s)/colis · <b>${a.robN}</b> morceaux${kg>0?(' · ≈ '+kg+' kg'):''}</span>`
-      : `<span class="badge" style="background:#e3f2fd;color:#1565c0">Kelbongoo <b>${a.kbgN}</b> pc · ${a.kbgG} g</span>
-         <span class="badge" style="background:#f3e5f5;color:#6a1b9a">→ Robespierre <b>${a.robN}</b> pc · ${a.robG} g</span>
-         <span style="font-weight:800;color:${rendOk?'#2e7d32':'#e65100'}">Rendement ${a.rend}%</span>`;
+      : `<span class="badge" style="background:#e3f2fd;color:#1565c0">Kelbongoo <b>${a.kbgN}</b> portions${a.kbgTheo>0?(' / '+a.kbgTheo+' théo.'):''}</span>
+         <span class="badge" style="background:#f3e5f5;color:#6a1b9a">→ Montreuil <b>${kg}</b> kg</span>
+         <span style="font-weight:800;color:${rendOk?'#2e7d32':'#e65100'}">Rendement ${rShown}%</span>`;
     return `<div class="rec valid" style="border-color:#e0c48a">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
         <div style="font-weight:800;font-size:15px">🧀 ${esc(s.meta.supplier||'Découpe')} <span class="badge" style="background:${isRob?'#f3e5f5':'#e3f2fd'};color:${isRob?'#6a1b9a':'#1565c0'}">${isRob?'Montreuil':'Kelbongoo'}</span></div>
@@ -2026,6 +2072,7 @@ function renderDecoupeHisto(el, bar){
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDecoupeDetail('${esc(s.id)}')">👁 Détail par fromage</button>
         <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlDecoupeTxt('${esc(s.id)}')">⬇️ .txt</button>
+        <button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="deleteDecoupeSession('${esc(s.id)}','${esc((s.meta.supplier||'Découpe').replace(/'/g,''))}')">🗑 Supprimer</button>
       </div></div>`; };
   el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique des découpes fromage envoyées à l'app (quantités découpées, poids, rendement Kelbongoo).</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
