@@ -112,7 +112,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.7.8";
+const APP_VERSION = "1.7.9";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -1035,9 +1035,26 @@ async function cpdpSendDecoupe(){
   const C=cpdp.decoupe; if(!C.parsed) return; if(!dbCentrale){ C.err="Connexion centrale indisponible."; renderCPDPCard(); return; }
   const entLabel=C.entity==="KBG"?"Kelbongoo":"Robespierre"; const products=decoupeProductsForApp(C.parsed,C.entity);
   const supLabel=(C.parsed.supplier?(C.parsed.supplier+" → "):"")+entLabel;
-  const sid="decoupe_"+C.entity.toLowerCase()+"_"+Date.now();
   const blNum=(C.blNumber||C.parsed.docNumber||"").toString().trim();
-  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").set({ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:blNum, startedAt:Date.now(), products, createdBy:ME_EMAIL });
+  // Rapprochement découpe libre ↔ BL : si un n° BL est présent, on clé la session sur bl_<entité>_<num>
+  // (même clé que l'opérateur en découpe du jour) et on .update pour ne pas écraser sa découpe déjà en cours.
+  const sid = blNum ? ("bl_"+C.entity.toLowerCase()+"_"+blNum.replace(/[^a-zA-Z0-9]/g,"")) : ("decoupe_"+C.entity.toLowerCase()+"_"+Date.now());
+  // FUSION : si l'opérateur a déjà ajouté des fromages (découpe libre), on garde ses ajouts et on
+  // fusionne les fromages du BL par désignation normalisée (même clé que frKey côté app).
+  // Le BL est prioritaire sur SES fromages (poids reçu, quantités) ; les extras de l'opérateur sont conservés.
+  const frNK = (d)=>String(d==null?"":d).normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+  let mergedProducts = products;
+  try{
+    const exSnap = await dbCentrale.ref("decoupe/"+sid+"/meta/products").once("value");
+    const existing = exSnap.val();
+    if(Array.isArray(existing) && existing.length){
+      const byKey={}, order=[];
+      existing.forEach(p=>{ if(p&&p.designation){ const k=frNK(p.designation); if(!(k in byKey)) order.push(k); byKey[k]=p; } });
+      products.forEach(p=>{ if(p&&p.designation){ const k=frNK(p.designation); if(!(k in byKey)) order.push(k); byKey[k]=Object.assign({}, byKey[k]||{}, p); } });
+      mergedProducts = order.map(k=>byKey[k]);
+    }
+  }catch(_){}
+  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").update({ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:blNum, startedAt:Date.now(), products:mergedProducts, createdBy:ME_EMAIL });
     C.sent=true; C.err=""; renderCPDPCard(); alert("✓ BL "+entLabel+(blNum?(" n°"+blNum):"")+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+".");
     setTimeout(()=>{ cpdp.decoupe={ entity:C.entity, deliveryDate:C.deliveryDate, parsed:null, fileName:"", blNumber:"", sent:false, err:"" }; renderCPDPCard(); },1500);
   }catch(e){ C.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
