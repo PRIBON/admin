@@ -1885,12 +1885,30 @@ function renderCentrale(){
         <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openCentraleDetail('${esc(s.id)}')">👁 Détail</button>
         <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlCentraleTxt('${esc(s.id)}')">⬇️ .txt</button>
       </div></div>`; };
-  el.innerHTML=bar+`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+  // Regroupement par JOURNÉE (aujourd'hui déplié, autres jours repliés ; mois en cours par défaut).
+  const todayIso=isoDayKey(Date.now()); const curMonth=todayIso.slice(0,7);
+  const groups={}; list.forEach(s=>{ const k=isoDayKey(s.meta.startedAt); (groups[k]=groups[k]||[]).push(s); });
+  const allDays=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  const shownDays = dpHistoDate ? allDays.filter(k=>k===dpHistoDate) : allDays.filter(k=>k.slice(0,7)===curMonth);
+  const olderCount = allDays.length - shownDays.length;
+  const dayBlock=(k)=>{ const sess=groups[k].slice().sort((a,b)=>(b.meta.startedAt||0)-(a.meta.startedAt||0));
+    const nEc=sess.reduce((n,s)=>n+(sessionEcarts(s).length>0?1:0),0);
+    const open=(k===todayIso)?' open':'';
+    return `<details${open} style="margin:10px 0;border:1px solid #d7e0d7;border-radius:10px;padding:8px 12px;background:#fcfdfc">
+        <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:15px;font-weight:900;color:#1a4d2e">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${sess.length} dispatch(s)</span></span>
+          ${nEc?('<span class="badge warn">⚠ '+nEc+' avec écart(s)</span>'):'<span class="badge ok">conformes</span>'}
+        </summary>
+        <div class="live-grid" style="margin-top:10px">${sess.map(card).join("")}</div>
+      </details>`; };
+  const olderNote = (!dpHistoDate && olderCount>0) ? `<div class="muted" style="margin:6px 0 12px;font-size:12px">➕ ${olderCount} jour(s) de mois précédents masqués — utilise le filtre <b>Date</b> ci-dessus pour les afficher.</div>` : '';
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique dispatch, <b>par journée</b> (aujourd'hui ouvert, les autres à déplier). Par défaut le <b>mois en cours</b> ; les mois précédents via le filtre Date.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <input placeholder="🔎 fournisseur, dispatcheur…" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpHistoDate)}" onchange="dpHistoDate=this.value;renderCentrale()"/>
       <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpHistoDate='';dpHistoSearch='';renderCentrale()">✕</button>
-    </div>
-    ${list.length?('<div class="live-grid">'+list.map(card).join("")+'</div>'):'<div class="muted">Aucun dispatch dans l\'historique.</div>'}`;
+    </div>${olderNote}
+    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucun dispatch '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>'}`;
 }
 function openCentraleDetail(sid){
   const s=(centraleState.dispatch||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s);
@@ -2051,8 +2069,9 @@ async function resyncTracaLots(btn){
   if(btn){ btn.disabled=false; btn.textContent="⟳ Resynchroniser le tableau lots"; }
 }
 
-// Clé de jour (ISO) d'une session de découpe.
-function decoupeDayKeyC(s){ const d=new Date((s&&s.meta&&s.meta.startedAt)||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+// Clé de jour ISO (yyyy-mm-dd) à partir d'un timestamp, et pour une session de découpe.
+function isoDayKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function decoupeDayKeyC(s){ return isoDayKey((s&&s.meta&&s.meta.startedAt)||0); }
 // Agrégat CONSOLIDÉ d'une journée : fusionne toutes les sessions du jour (KBG + ROB) par fromage.
 function dayDecoupeAggC(sessions){
   const kbgMap={}, robMap={}; let kbgN=0,kbgG=0,kbgTheo=0,kbgMontG=0,robMeules=0,robN=0,robG=0;
@@ -2148,9 +2167,13 @@ function renderDecoupeHisto(el, bar){
         <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlDecoupeTxt('${esc(s.id)}')">⬇️ .txt</button>
         <button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="deleteDecoupeSession('${esc(s.id)}','${esc((s.meta.supplier||'Découpe').replace(/'/g,''))}')">🗑 Supprimer</button>
       </div></div>`; };
-  // Regroupement par JOURNÉE : une carte consolidée par jour (toutes les sessions), puis le détail par session.
+  // Regroupement par JOURNÉE. Aujourd'hui déplié, les autres jours repliés. Par défaut : mois en cours ;
+  // les mois précédents se consultent via le filtre Date (calendrier).
+  const todayIso=isoDayKey(Date.now()); const curMonth=todayIso.slice(0,7);
   const groups={}; list.forEach(s=>{ const k=decoupeDayKeyC(s); (groups[k]=groups[k]||[]).push(s); });
-  const dayKeys=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  const allDays=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
+  const shownDays = dpDecoupeDate ? allDays.filter(k=>k===dpDecoupeDate) : allDays.filter(k=>k.slice(0,7)===curMonth);
+  const olderCount = allDays.length - shownDays.length;
   const dayBlock=(k)=>{ const sess=groups[k]; const ag=dayDecoupeAggC(sess);
     const rShown=(ag.rendPortions!=null?ag.rendPortions:0); const rendOk=rShown>=85;
     const kg=ag.robG>0?(Math.round(ag.robG/1000*10)/10):0;
@@ -2158,25 +2181,27 @@ function renderDecoupeHisto(el, bar){
     if(ag.hasKbg) sum.push(`<span class="badge" style="background:#e3f2fd;color:#1565c0">Kelbongoo <b>${ag.kbgN}</b> portions${ag.kbgTheo>0?(' / '+ag.kbgTheo+' théo.'):''}</span>`+(ag.rendPortions!=null?(' <span style="font-weight:800;color:'+(rendOk?'#2e7d32':'#e65100')+'">Rendement '+rShown+'%</span>'):''));
     if(ag.hasRob) sum.push(`<span class="badge" style="background:#f3e5f5;color:#6a1b9a">Montreuil <b>${ag.robMeules}</b> meule(s)/colis · <b>${ag.robN}</b> morceaux${kg>0?(' · ≈ '+kg+' kg'):''}</span>`);
     const sentBadge = sess.some(s=>s.recap&&s.recap.daySentAt) ? '<span class="badge ok">✓ récap envoyé</span>' : '<span class="badge warn">récap non envoyé</span>';
-    return `<div style="margin:18px 0 6px;border-bottom:2px solid #e0c48a;padding-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <div style="font-size:16px;font-weight:900;color:#8a5a00">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${sess.length} découpe(s)</span></div>
+    const open = (k===todayIso)?' open':'';
+    return `<details${open} style="margin:10px 0;border:1px solid #e0c48a;border-radius:10px;padding:8px 12px;background:#fffdf7">
+        <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:15px;font-weight:900;color:#8a5a00">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${sess.length} découpe(s)</span></span>
           ${sentBadge}
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">${sum.join(" ")||'<span class="muted" style="font-size:12px">Aucune découpe saisie.</span>'}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        </summary>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">${sum.join(" ")||'<span class="muted" style="font-size:12px">Aucune découpe saisie.</span>'}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
           <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDecoupeDayDetail('${k}')">👁 Détail de la journée (tous les fromages)</button>
           <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlDecoupeDayTxt('${k}')">⬇️ .txt du jour</button>
         </div>
-      </div>
-      <div class="live-grid">${sess.map(card).join("")}</div>`; };
-  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique des découpes fromage, <b>regroupées par journée</b>. « Détail de la journée » liste chaque fromage (Kelbongoo + Montreuil). Le détail par découpe reste accessible sous chaque journée.</p>
+        <div class="live-grid">${sess.map(card).join("")}</div>
+      </details>`; };
+  const olderNote = (!dpDecoupeDate && olderCount>0) ? `<div class="muted" style="margin:6px 0 12px;font-size:12px">➕ ${olderCount} jour(s) de mois précédents masqués — utilise le filtre <b>Date</b> ci-dessus pour les afficher.</div>` : '';
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique découpe, <b>par journée</b> (aujourd'hui ouvert, les autres jours à déplier). Par défaut le <b>mois en cours</b> ; les mois précédents via le filtre Date.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <input placeholder="🔎 fournisseur, opérateur, n° BL…" style="flex:1;min-width:180px" value="${esc(dpDecoupeSearch)}" oninput="dpDecoupeSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpDecoupeDate)}" onchange="dpDecoupeDate=this.value;renderCentrale()"/>
       <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpDecoupeDate='';dpDecoupeSearch='';renderCentrale()">✕</button>
-    </div>
-    ${dayKeys.length?dayKeys.map(dayBlock).join(""):'<div class="muted">Aucune découpe dans l\'historique.</div>'}`;
+    </div>${olderNote}
+    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucune découpe '+(dpDecoupeDate?'à cette date':'ce mois-ci')+'.</div>'}`;
 }
 function openDecoupeDetail(sid){
   const s=(centraleState.decoupe||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s); const a=decoupeAgg(sess); const isRob=a.entity==="ROB";
