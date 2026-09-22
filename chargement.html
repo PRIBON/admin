@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.8.1";
+const APP_VERSION = "1.9.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -191,6 +191,16 @@ let FOURNS=[];           // répertoire fournisseurs (nom + email litiges)
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function norm(s){ return (s||"").toString().normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim(); }
 function toNum(s){ if(s==null) return 0; const n=parseFloat(String(s).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
+// Extraction EAN depuis un code scanné, y compris QR/DataMatrix GS1 (AI (01) + GTIN-14 + lot/série).
+// Ex. 0103463310025489986733 -> 3463310025489 ; un EAN classique est renvoyé tel quel.
+function extractEan(raw){
+  let s=String(raw==null?"":raw).replace(/\D/g,"");
+  if(s.indexOf("01")===0){
+    if(s.length>=16){ let g=s.substr(2,14); return (g.length===14&&g[0]==="0")?g.slice(1):g; }
+    if(s.length===15) return s.substr(2);
+  }
+  return s;
+}
 /* --- écarts / avoirs (v1.2) --- */
 const MOTIF_LABELS={ mauvaise_qte:"Mauvaise quantité", casse_fournisseur:"Casse fournisseur", auto_conso:"Auto-consommation", casse_salarie:"Casse (salarié)", delotage:"Délotage", perime_perte:"Périmé / perte" };
 function motifLabel(k){ return MOTIF_LABELS[k]||k||"écart"; }
@@ -980,14 +990,16 @@ function decoupeProductsForApp(parsed, entity){
 
 /* --- État + rendu de la carte « La Centrale PDP » --- */
 const cpdp={ dispatch:{ supplier:"", parsed:null, fileName:"", bdc:null, bdcInfo:"", sent:false, err:"" },
-             decoupe:{ entity:"ROB", deliveryDate:"", parsed:null, fileName:"", blNumber:"", sent:false, err:"" } };
+             decoupe:{ entity:"ROB", deliveryDate:"", parsed:null, fileName:"", blNumber:"", sent:false, err:"" },
+             vin:{ date:"", parsed:null, fileName:"", suppliers:[], selected:{}, sent:false, err:"" } };
 function renderCPDPCard(){
   const box=document.getElementById("cpdp-card"); if(!box) return;
-  const D=cpdp.dispatch, C=cpdp.decoupe;
+  const D=cpdp.dispatch, C=cpdp.decoupe, V=cpdp.vin;
   const dTot=D.parsed?D.parsed.products.reduce((a,p)=>a+Object.values(p.stores||{}).reduce((x,y)=>x+(y||0),0),0):0;
+  const vSelCount=Object.values(V.selected||{}).filter(Boolean).length;
   box.innerHTML=`<div class="store-card" style="border:2px solid #1a4d2e;background:#f4f9f5;grid-column:1/-1">
     <h3>🏬 La Centrale PDP <span class="badge info">entrepôt · Porte de Pantin</span></h3>
-    <div class="muted" style="margin:-4px 0 6px">Chargé ici, poussé vers l'app tactile « La Centrale PDP » (Dispatch palette + Découpe fromage).</div>
+    <div class="muted" style="margin:-4px 0 6px">Chargé ici, poussé vers l'app tactile « La Centrale PDP » (Dispatch palette + Découpe fromage + Inventaire vin ciblé).</div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
       <!-- Dispatch -->
       <div class="store-card" style="background:#fff">
@@ -1022,8 +1034,83 @@ function renderCPDPCard(){
         ${C.err?`<div class="err">${esc(C.err)}</div>`:''}
         <button class="btn btn-green btn-lg" onclick="cpdpSendDecoupe()" ${(!C.parsed||C.sent)?'disabled':''} style="margin-top:6px">${C.sent?'🎉 Envoyé':'🚀 Envoyer à l entrepôt'}</button>
       </div>
+      <!-- Vin — Inventaire ciblé -->
+      <div class="store-card" style="background:#fff">
+        <h3 style="font-size:15px">🍷 Vin — Inventaire ciblé</h3>
+        <div class="muted" style="margin:-4px 0 6px;font-size:12px">Charge l'export G5 (xlsx), choisis le jour et les fournisseurs à inventorier. Chaque fournisseur devient un inventaire ciblé côté entrepôt.</div>
+        <div class="field"><label>Jour de l'inventaire</label>
+          <input type="date" style="width:100%" value="${esc(V.date||'')}" onchange="cpdp.vin.date=this.value"/></div>
+        <div class="field"><label>Export G5 (Excel)</label>
+          <div class="drop ${V.parsed?'has':''}" style="border-color:#7b1e3a;background:${V.parsed?'#fbeef2':'#fdf5f8'}" onclick="document.getElementById('cpdpVinFile').click()">${V.parsed?('✓ '+esc(V.fileName)):'🍷 Charger l\'export vin (.xlsx)'}</div>
+          <input id="cpdpVinFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="cpdpVinFile(this.files[0])"/></div>
+        ${V.parsed?`<div class="parse-note">🍷 ${V.parsed.rows.length} vin(s) · ${V.suppliers.length} fournisseur(s)</div>
+          <div class="field"><label>Fournisseurs à inventorier (${vSelCount} sélectionné(s))</label>
+            <div style="display:flex;gap:6px;margin-bottom:6px">
+              <button class="btn" style="background:#eef2f7;padding:5px 10px;font-size:12px" onclick="cpdpVinAll(true)">Tout cocher</button>
+              <button class="btn" style="background:#eef2f7;padding:5px 10px;font-size:12px" onclick="cpdpVinAll(false)">Tout décocher</button>
+            </div>
+            <div style="max-height:230px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:6px">
+              ${V.suppliers.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:13px;font-weight:400;text-transform:none;letter-spacing:0;color:#222;cursor:pointer">
+                <input type="checkbox" ${V.selected[s.key]?'checked':''} onchange="cpdp.vin.selected['${esc(s.key)}']=this.checked;renderCPDPCard()" style="width:auto;padding:0"/>
+                <span>${esc(s.label)} <span class="badge info">${s.count}</span></span></label>`).join("")}
+            </div>
+          </div>`:''}
+        ${V.err?`<div class="err">${esc(V.err)}</div>`:''}
+        <button class="btn btn-green btn-lg" style="background:#7b1e3a" onclick="cpdpSendVin()" ${(!V.parsed||vSelCount===0||V.sent)?'disabled':''}>${V.sent?'🎉 Envoyé(s)':'🚀 Lancer l\'inventaire ciblé'}</button>
+      </div>
     </div>
   </div>`;
+}
+// Parse l'export G5 vin : colonnes Article (code), Désignation, Fournisseur (ex "F029 / MELLOT").
+function parseVinExportC(workbook){
+  const ws=workbook.Sheets[workbook.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+  const N=(s)=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
+  let h=-1,hd=null;
+  for(let i=0;i<Math.min(rows.length,15);i++){ const r=rows[i].map(N);
+    if(r.some(c=>c==="article"||c==="code article"||c==="code") && r.some(c=>c.includes("fournisseur"))){ h=i; hd=rows[i]; break; } }
+  if(h===-1) throw new Error("En-têtes introuvables (Article + Fournisseur).");
+  const col=(cands)=>{ for(const cnd of cands){ const i=hd.findIndex(x=>N(x)===cnd); if(i>=0) return i; } for(const cnd of cands){ const i=hd.findIndex(x=>N(x).includes(cnd)); if(i>=0) return i; } return -1; };
+  const iCode=col(["article","code article","code","ean","gencod"]);
+  const iDes=col(["designation","libelle","produit","nom"]);
+  const iFour=col(["fournisseur","frs"]);
+  if(iCode<0||iFour<0) throw new Error("Colonnes Article/Fournisseur manquantes.");
+  const rowsOut=[]; const supMap={};
+  for(let i=h+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue;
+    const code=String(r[iCode]||"").trim(); const des=iDes>=0?String(r[iDes]||"").trim():"";
+    let four=String(r[iFour]||"").trim(); if(!code&&!des) continue; if(!four) continue;
+    // Regroupe par NOM (partie après le "/"), en fusionnant les doublons F029 / K029.
+    const parts=four.split("/"); const name=(parts.length>1?parts.slice(1).join("/"):four).trim();
+    const key=N(name).replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")||"frs";
+    rowsOut.push({ code, designation:des, fournisseur:name, fkey:key });
+    if(!supMap[key]) supMap[key]={ key, label:name, count:0 }; supMap[key].count++;
+  }
+  const suppliers=Object.values(supMap).sort((a,b)=>b.count-a.count);
+  return { rows:rowsOut, suppliers };
+}
+async function cpdpVinFile(file){ if(!file) return; cpdp.vin.err=""; cpdp.vin.fileName=file.name||"export vin";
+  try{ const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"}); const p=parseVinExportC(wb);
+    cpdp.vin.parsed=p; cpdp.vin.suppliers=p.suppliers; cpdp.vin.selected={}; cpdp.vin.sent=false; }
+  catch(e){ cpdp.vin.parsed=null; cpdp.vin.err="Erreur : "+e.message; } renderCPDPCard(); }
+function cpdpVinAll(v){ (cpdp.vin.suppliers||[]).forEach(s=>{ cpdp.vin.selected[s.key]=!!v; }); renderCPDPCard(); }
+async function cpdpSendVin(){
+  const V=cpdp.vin; if(!V.parsed){ return; }
+  if(!dbCentrale){ V.err="Connexion centrale indisponible."; renderCPDPCard(); return; }
+  const day=V.date|| (new Date()).toISOString().slice(0,10);
+  const chosen=(V.suppliers||[]).filter(s=>V.selected[s.key]);
+  if(!chosen.length){ V.err="Choisis au moins un fournisseur."; renderCPDPCard(); return; }
+  try{
+    for(const s of chosen){
+      const ref=V.parsed.rows.filter(r=>r.fkey===s.key).map(r=>({ code:r.code, designation:r.designation }));
+      const id="vincible_"+day.replace(/-/g,"")+"_"+s.key+"_"+Date.now().toString().slice(-5);
+      await dbCentrale.ref("inventaire_vin/"+id+"/meta").set({
+        label:"Ciblé — "+s.label, startedAt:Date.now(), dateKey:day, createdBy:ME_EMAIL,
+        cible:true, fournisseur:s.label, ref:ref });
+    }
+    V.sent=true; V.err=""; renderCPDPCard();
+    alert("✓ "+chosen.length+" inventaire(s) ciblé(s) envoyé(s) à l'app La Centrale pour le "+day+".");
+    setTimeout(()=>{ cpdp.vin={ date:V.date, parsed:null, fileName:"", suppliers:[], selected:{}, sent:false, err:"" }; renderCPDPCard(); },1500);
+  }catch(e){ V.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
 }
 async function cpdpDispatchFile(file){ if(!file) return; cpdp.dispatch.err=""; cpdp.dispatch.fileName=file.name||"dispatch";
   try{ const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"}); cpdp.dispatch.parsed=parseDispatchExcel(wb); cpdp.dispatch.sent=false; }
@@ -1696,14 +1783,17 @@ function invVinListAll(){
 }
 function invVinLines(v){
   return Object.entries((v&&v.lines)||{}).map(([k,l])=>Object.assign({key:k},l))
-    .map(l=>Object.assign({},l,{ units:(l.units!=null?l.units:((l.cartons||0)*6+(l.bottles||0))) }))
-    .filter(l=>l.ean)
+    // Décodage GS1 : les anciens scans QR contiennent le code complet (01…+lot) → on ré-extrait l'EAN-13.
+    .map(l=>Object.assign({},l,{ ean: extractEan(l.ean), code:(l.code||""), units:(l.units!=null?l.units:((l.cartons||0)*6+(l.bottles||0))) }))
+    .filter(l=>l.ean||l.code)
     .sort((a,b)=>((a.createdAt||0)-(b.createdAt||0)));
 }
-// .txt réception PROGMAG : une ligne "EAN<TAB>quantité" par référence (unités = cartons*6 + vrac).
+// .txt réception PROGMAG : "Code;quantité" (séparateur ; ASCII, fin de ligne CRLF).
+// Code = EAN scanné si présent, sinon code article (lignes ciblées). En inventaire ciblé,
+// les vins mis explicitement à 0 (counted) sont aussi exportés (code;0).
 function invVinTxt(v){
   const out=[];
-  invVinLines(v).forEach(l=>{ if(!l.ean||!l.units) return; out.push(String(l.ean)+"\t"+String(l.units)); });
+  invVinLines(v).forEach(l=>{ const c=l.ean||l.code; if(!c) return; if(!(l.units>0||l.counted)) return; out.push(String(c)+";"+String(l.units||0)); });
   return out.join("\r\n");
 }
 /* ==================== POIDS PORTIONS KELBONGOO (console admin) ==================== */
