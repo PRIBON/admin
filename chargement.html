@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.9.1";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -1028,8 +1028,8 @@ function renderCPDPCard(){
         <div class="field"><label>Fichier — BL Ugalait ou fichier découpe (Excel/PDF)</label>
           <div class="drop ${C.parsed?'has':''}" onclick="document.getElementById('cpdpDecFile').click()">${C.parsed?('✓ '+esc(C.fileName)):'🧀 Charger le BL / la découpe (.xlsx / .pdf)'}</div>
           <input id="cpdpDecFile" type="file" accept=".xlsx,.xls,.pdf" style="display:none" onchange="cpdpDecoupeFile(this.files[0])"/></div>
-        <div class="field"><label>N° de BL ${C.blNumber?'':'<span style="color:#e65100">(à vérifier / saisir)</span>'}</label>
-          <input id="cpdpBl" style="width:100%" value="${esc(C.blNumber||'')}" oninput="cpdp.decoupe.blNumber=this.value" placeholder="Ex: 41270 — détecté auto, sinon saisis-le"/></div>
+        <div class="field"><label>N° de BL <span style="color:#c62828">* obligatoire</span></label>
+          <input id="cpdpBl" style="width:100%;${C.blNumber?'':'border:2px solid #e53935'}" value="${esc(C.blNumber||'')}" oninput="cpdp.decoupe.blNumber=this.value;this.style.border=this.value.trim()?'':'2px solid #e53935'" placeholder="Ex: 41270 — détecté auto, sinon saisis-le"/></div>
         ${C.parsed?`<div class="parse-note">🧀 ${C.parsed.products.length} article(s)${C.parsed.supplier?(' · '+esc(C.parsed.supplier)):''}${C.blNumber?(' · BL '+esc(C.blNumber)):' · <b style="color:#e65100">BL non détecté</b>'} · à réceptionner / découper</div>`:''}
         ${C.err?`<div class="err">${esc(C.err)}</div>`:''}
         <button class="btn btn-green btn-lg" onclick="cpdpSendDecoupe()" ${(!C.parsed||C.sent)?'disabled':''} style="margin-top:6px">${C.sent?'🎉 Envoyé':'🚀 Envoyer à l entrepôt'}</button>
@@ -1144,11 +1144,21 @@ async function cpdpDecoupeFile(file){ if(!file) return; cpdp.decoupe.err=""; cpd
 async function cpdpSendDecoupe(){
   const C=cpdp.decoupe; if(!C.parsed) return; if(!dbCentrale){ C.err="Connexion centrale indisponible."; renderCPDPCard(); return; }
   const entLabel=C.entity==="KBG"?"Kelbongoo":"Robespierre"; const products=decoupeProductsForApp(C.parsed,C.entity);
-  const supLabel=(C.parsed.supplier?(C.parsed.supplier+" → "):"")+entLabel;
   const blNum=(C.blNumber||C.parsed.docNumber||"").toString().trim();
-  // Rapprochement découpe libre ↔ BL : si un n° BL est présent, on clé la session sur bl_<entité>_<num>
-  // (même clé que l'opérateur en découpe du jour) et on .update pour ne pas écraser sa découpe déjà en cours.
-  const sid = blNum ? ("bl_"+C.entity.toLowerCase()+"_"+blNum.replace(/[^a-zA-Z0-9]/g,"")) : ("decoupe_"+C.entity.toLowerCase()+"_"+Date.now());
+  // N° de BL OBLIGATOIRE : c'est lui qui relie le BL du responsable à la découpe de l'opérateur.
+  if(!blNum){ C.err="⚠️ N° de BL obligatoire — saisis-le avant d'envoyer (il sert à relier le BL à la découpe de l'entrepôt)."; renderCPDPCard(); try{ document.getElementById("cpdpBl").focus(); }catch(_){} return; }
+  const supLabel=(C.parsed.supplier?(C.parsed.supplier+" → "):"")+entLabel+" · BL "+blNum;
+  // Rapprochement découpe ↔ BL : clé bl_<entité>_<num> (même clé que l'opérateur sur la tablette).
+  // Si une découpe de ce BL existe déjà sous un autre identifiant (BL saisi après coup, ancienne version), on la reprend.
+  const blKey=blNum.replace(/[^a-zA-Z0-9]/g,"");
+  let sid = "bl_"+C.entity.toLowerCase()+"_"+blKey;
+  const allDec=centraleState.decoupe||{};
+  if(!(allDec[sid]&&allDec[sid].meta)){
+    const found=Object.entries(allDec).find(([k,s])=>s&&s.meta&&s.meta.startedAt&&String(s.meta.docNumber||"").replace(/[^a-zA-Z0-9]/g,"")===blKey&&String(s.meta.entity||"").toUpperCase()===C.entity);
+    if(found) sid=found[0];
+  }
+  const existingMeta=(allDec[sid]&&allDec[sid].meta)||null;
+  const alreadyStarted=!!(existingMeta&&existingMeta.startedAt);
   // FUSION : si l'opérateur a déjà ajouté des fromages (découpe libre), on garde ses ajouts et on
   // fusionne les fromages du BL par désignation normalisée (même clé que frKey côté app).
   // Le BL est prioritaire sur SES fromages (poids reçu, quantités) ; les extras de l'opérateur sont conservés.
@@ -1164,8 +1174,15 @@ async function cpdpSendDecoupe(){
       mergedProducts = order.map(k=>byKey[k]);
     }
   }catch(_){}
-  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").update({ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:blNum, startedAt:Date.now(), products:mergedProducts, createdBy:ME_EMAIL });
-    C.sent=true; C.err=""; renderCPDPCard(); alert("✓ BL "+entLabel+(blNum?(" n°"+blNum):"")+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+".");
+  // Découpe déjà commencée : on GARDE sa date de départ et son opérateur (l'historique reste daté du jour de découpe),
+  // on ajoute « chargé par le responsable » + les fromages du BL.
+  const patch={ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:blNum, products:mergedProducts,
+                loadedBy:ME_EMAIL, loadedAt:Date.now(), source:"console", libre:false };
+  if(!alreadyStarted){ patch.startedAt=Date.now(); patch.createdBy=ME_EMAIL; }
+  try{ await dbCentrale.ref("decoupe/"+sid+"/meta").update(patch);
+    C.sent=true; C.err=""; renderCPDPCard();
+    alert("✓ BL "+entLabel+" n°"+blNum+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+"."
+      +(alreadyStarted?("\n\n🔗 Découpe déjà commencée par l'entrepôt ("+dateShort(existingMeta.startedAt)+") : BL rattaché, liste mise à jour ("+mergedProducts.length+" fromages). Les saisies déjà faites sont conservées."):""));
     setTimeout(()=>{ cpdp.decoupe={ entity:C.entity, deliveryDate:C.deliveryDate, parsed:null, fileName:"", blNumber:"", sent:false, err:"" }; renderCPDPCard(); },1500);
   }catch(e){ C.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
 }
@@ -1649,7 +1666,9 @@ function renderSuivi(){
     if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=dispatchStats(sess); const sendTs=s.meta.startedAt||0;
     if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"dispatch", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
   if(suiviType==='tous'||suiviType==='decoupe') Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{
-    if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=dispatchStats(sess); const sendTs=s.meta.startedAt||0;
+    if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=decoupeStatsC(sess);
+    // Classée au jour de la DERNIÈRE découpe saisie (sinon au jour de création) → ce qui a été découpé aujourd'hui apparaît aujourd'hui.
+    const sendTs=stx.lastCutAt||s.meta.startedAt||0;
     if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"decoupe", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
   // Regroupement par date d'envoi
   const byDay={};
@@ -1668,7 +1687,9 @@ function renderSuivi(){
           <div style="font-size:12px;color:#1a4d2e;font-weight:700">${lab} · 👤 ${esc(s.meta.createdBy||'—')}${stx.operators.length?(' · '+esc(stx.operators.join(', '))):''}</div></div>
           <span class="badge ${draft?'warn':'ok'}">${draft?'🟡 En cours':'✅ Terminé'}</span></div>
         <div class="pbar"><div class="pfill" style="width:${pct}%"></div></div>
-        <div style="font-size:12px;color:#666;margin-top:4px">${stx.done}/${stx.total} (${pct}%) · démarré ${esc(heure(it.sendTs))}${it.type==="decoupe"?' · 👁 cliquer pour le détail':''}</div></div>`;
+        ${it.type==="decoupe"?decoupeInfoLine(s,stx):''}
+        <div style="font-size:12px;color:#666;margin-top:4px">${stx.done}/${stx.total} (${pct}%) · ${it.type==="decoupe"?('créée le '+esc(dateShort(s.meta.startedAt))+' '+esc(heure(s.meta.startedAt))):('démarré '+esc(heure(it.sendTs)))}${it.type==="decoupe"?' · 👁 cliquer pour le détail':''}</div>
+        ${it.type==="decoupe"?`<div style="margin-top:6px"><button class="btn" style="background:#fdecea;color:#c62828;padding:5px 10px;font-size:12px" onclick="event.stopPropagation();deleteDecoupeSession('${esc(s.id)}','${esc((s.meta.supplier||'Découpe').replace(/'/g,''))}')">🗑 Supprimer${stx.saisis===0?' (vide)':''}</button></div>`:''}</div>`;
     }
     const s=it.store||{}; const storeLabel=s.label||"";
     if(it.kind==="attente"){ const d=it.doc;
@@ -1704,7 +1725,7 @@ function renderSuivi(){
   }).join("");
 
   const fbtn=(v,lab)=>`<button class="btn" style="padding:7px 12px;font-size:13px;background:${suiviType===v?'#1a4d2e':'#eef2f7'};color:${suiviType===v?'#fff':'#333'}" onclick="suiviType='${v}';renderSuivi()">${lab}</button>`;
-  const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('decoupe','🧀 Découpe')}</div>`;
+  const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('decoupe','🧀 Découpe')}${(suiviType==='tous'||suiviType==='decoupe')&&emptyDecoupeSids().length?`<button class="btn" style="padding:7px 12px;font-size:13px;background:#fdecea;color:#c62828;margin-left:auto" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}</div>`;
   el.innerHTML=filterBar+`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} en cours — vue par <b>date d'envoi</b>, temps réel.</p>${html||'<div class="muted">Rien à suivre pour ce filtre.</div>'}`;
   el.dataset.rendered="1";
 }
@@ -2039,30 +2060,73 @@ function unmarkCentrale(sid){
 // quand le récap n'est pas encore écrit (les fromages n'apparaissaient pas).
 function decoupeProductKey(p, idx){ const d=norm((p&&p.designation)||"").replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""); return d?("d_"+d):("l_"+idx); }
 // Agrège une session de découpe : quantités KBG/ROB, poids, rendement, détail par fromage.
+// Calculé TOUJOURS depuis l'état live (state) + liste des fromages (meta.products) → même calcul que la tablette.
+// L'historique est donc à jour même si le récap n'a pas été réécrit (BL chargé après coup, tablette hors ligne…).
+function decDayOfC(ts){ return ts?isoDayKey(ts):""; }
 function decoupeAgg(sess){
-  const ent=((sess.recap&&sess.recap.entity)||sess.meta.entity||"").toUpperCase();
-  const r=sess.recap;
-  if(r && (r.kbgN!=null||r.robN!=null||r.robMeules!=null)){
-    const t=(r.kbgG||0)+(r.robG||0);
-    return { entity:ent, kbgN:r.kbgN||0, kbgG:r.kbgG||0, robN:r.robN||0, robG:r.robG||0, robMeules:r.robMeules||0,
-      rend:(r.rendement!=null?r.rendement:(t>0?Math.round((r.kbgG||0)/t*100):0)),
-      rendPortions:(r.rendementPortions!=null?r.rendementPortions:null), kbgTheo:r.kbgTheo||0,
-      lines:(r.lines||[]), by:r.by||sess.meta.createdBy||"", updatedAt:r.updatedAt||0,
-      done:(r.done!=null?r.done:0), total:(sess.meta.products||[]).length, hasData:((r.kbgN||0)+(r.robN||0)+(r.robMeules||0))>0 };
-  }
+  const ent=((sess.meta&&sess.meta.entity)||(sess.recap&&sess.recap.entity)||"").toUpperCase();
   const products=(sess.meta&&sess.meta.products)||[]; const stt=sess.state||{};
-  let kbgN=0,kbgG=0,robN=0,robG=0,robMeules=0,done=0; const lines=[];
+  const sessDay=decDayOfC((sess.meta&&sess.meta.startedAt)||0);
+  let kbgN=0,kbgG=0,robN=0,robG=0,robMeules=0,kbgTheo=0,done=0; const lines=[];
   products.forEach((p,idx)=>{ const st=stt[decoupeProductKey(p,idx)]||{};
-    let k=0,kg=0,rr=0,rg=0,rm=0; const pieces=st.pieces||[];
-    pieces.forEach(pc=>{ if(pc.dest==="KBG"){k++;kg+=(pc.w||0);}else{rr++;rg+=(pc.w||0);} });
-    if(st.sticker){ const n=st.stickerCount||0; const w=(st.stickerWeight!=null&&st.stickerWeight!=="")?Number(st.stickerWeight):((p.poids||200)*n); if((st.magasin||"KBG")==="KBG"){k+=n;kg+=w;}else{rr+=n;rg+=w;} }
-    if(st.rob){ const m=Number(st.rob.meules)||0, mc=Number(st.rob.morceaux)||0; const pu=(st.rob.poidsUnit!=null&&st.rob.poidsUnit!=="")?Number(st.rob.poidsUnit):(Number(p.poidsUnit)||0); rm+=m; rr+=mc; rg+=m*pu*1000; }
+    const rp=kbgRefPoids(p.designation); const w=rp>0?rp:(p.poids||200); const recuKg=Number(p.poidsRecu)||0;
+    let k=0,kg=0,rr=0,rg=0,rm=0,theo=0,rend=null;
+    (st.pieces||[]).forEach(pc=>{ if(pc.dest==="KBG"){k++;kg+=(pc.w||0);}else{rr++;rg+=(pc.w||0);} });
+    if(st.sticker){ const n=st.stickerCount||0; const g=(st.stickerWeight!=null&&st.stickerWeight!=="")?Number(st.stickerWeight):(w*n); if((st.magasin||"KBG")==="KBG"){k+=n;kg+=g;}else{rr+=n;rg+=g;} }
+    if(st.rob){ const m=Number(st.rob.meules)||0, mc=Number(st.rob.morceaux)||0; const pu=(st.rob.poidsUnit!=null&&st.rob.poidsUnit!=="")?Number(st.rob.poidsUnit):(Number(p.poidsUnit)||0);
+      const ptKg=(st.poidsDecoupe!=null&&st.poidsDecoupe!=="")?Number(st.poidsDecoupe):0; rm+=m; rr+=mc; rg+=(ptKg>0?ptKg*1000:m*pu*1000); }
+    else if(st.poidsDecoupe!=null&&st.poidsDecoupe!==""&&Number(st.poidsDecoupe)>0){ rg+=Number(st.poidsDecoupe)*1000; }
+    const hasKbg=(st.portionsKbg!=null&&st.portionsKbg!=="")||(st.kgMontreuil!=null&&st.kgMontreuil!=="");
+    if(!st.rob && !st.sticker && hasKbg){ const np=Number(st.portionsKbg)||0, kgM=Number(st.kgMontreuil)||0;
+      const kgK=recuKg>0?Math.max(0,recuKg-kgM):(np*w/1000); k+=np; kg+=kgK*1000; rg+=kgM*1000;
+      if(recuKg>0&&w>0){ theo=Math.round(Math.max(0,Math.round((recuKg-kgM)*100)/100)/(w/1000)); rend=theo>0?Math.round(np/theo*100):null; } }
     if(st.done) done++;
-    if(k+rr+rm>0) lines.push({ designation:p.designation, kbgN:k, kbgTarget:p.kbgTarget||0, robN:rr, kbgG:Math.round(kg), robG:Math.round(rg), robMeules:rm, robUnit:(st.rob&&st.rob.unit)||"meule" });
-    kbgN+=k;kbgG+=kg;robN+=rr;robG+=rg;robMeules+=rm;
+    if(k+rr+rm>0||rg>0){ const cutAt=st.firstAt||st.at||0;
+      lines.push({ designation:p.designation, kbgN:k, kbgTheo:theo, rend, kbgTarget:p.kbgTarget||0, robN:rr, kbgG:Math.round(kg), robG:Math.round(rg), robMeules:rm, robUnit:(st.rob&&st.rob.unit)||"meule", poidsRecu:recuKg, cutAt, cutDay:decDayOfC(cutAt)||sessDay }); }
+    kbgN+=k;kbgG+=kg;robN+=rr;robG+=rg;robMeules+=rm;kbgTheo+=theo;
   });
-  const t=kbgG+robG; const rend=t>0?Math.round(kbgG/t*100):0;
-  return { entity:ent, kbgN,kbgG:Math.round(kbgG),robN,robG:Math.round(robG),robMeules,rend,rendPortions:null,kbgTheo:0,lines,by:sess.meta.createdBy||"",updatedAt:0,done,total:products.length,hasData:(kbgN+robN+robMeules)>0 };
+  const t=kbgG+robG; const rend=t>0?Math.round(kbgG/t*100):0; const r=sess.recap||{};
+  const cutDays=[...new Set(lines.map(l=>l.cutDay).filter(Boolean))].sort();
+  return { entity:ent, kbgN,kbgG:Math.round(kbgG),robN,robG:Math.round(robG),robMeules:Math.round(robMeules*100)/100,rend,
+    rendPortions:(kbgTheo>0?Math.round(kbgN/kbgTheo*100):null),kbgTheo,lines,cutDays,
+    by:r.by||sess.meta.createdBy||"",updatedAt:r.updatedAt||0,done,total:products.length,hasData:lines.length>0 };
+}
+// Stats live d'une découpe (clé par désignation, comme la tablette) — remplace dispatchStats qui lisait la mauvaise clé (toujours 0/x).
+function decoupeStatsC(sess){
+  const products=(sess.meta&&sess.meta.products)||[]; const stt=sess.state||{};
+  let done=0,saisis=0,lastCutAt=0; const ops={};
+  Object.values(stt).forEach(st=>{ if(!st||typeof st!=="object") return; if(st.at&&st.at>lastCutAt) lastCutAt=st.at;
+    if(st.portionsKbg||st.kgMontreuil||st.poidsDecoupe||st.done||(st.rob&&(st.rob.meules||st.rob.morceaux))||(st.pieces&&st.pieces.length)||st.sticker) saisis++;
+    if(st.doneBy) ops[st.doneBy]=1; });
+  products.forEach((p,idx)=>{ const st=stt[decoupeProductKey(p,idx)]; if(st&&st.done) done++; });
+  return { total:products.length, done, saisis, lastCutAt, operators:Object.keys(ops), durationMs:0 };
+}
+// Ligne d'info : BL, chargé par le responsable, date(s) de découpe.
+function decoupeInfoLine(s,stx){
+  const m=s.meta||{}; const a=decoupeAgg(Object.assign({id:s.id},s)); const parts=[];
+  if(m.docNumber&&!String(m.supplier||"").includes(m.docNumber)) parts.push("BL "+esc(m.docNumber));
+  if(m.loadedBy) parts.push("📦 BL chargé par le responsable ("+esc(m.loadedBy)+(m.loadedAt?(" · "+esc(dateShort(m.loadedAt))+" "+esc(heure(m.loadedAt))):"")+")");
+  else if(m.docNumber) parts.push('<span style="color:#e65100">BL pas encore chargé dans la console</span>');
+  if(a.cutDays.length) parts.push("🔪 découpé le "+a.cutDays.map(d=>{ const p=d.split("-"); return p[2]+"/"+p[1]; }).join(", "));
+  else parts.push('<span style="color:#c62828">aucun fromage saisi</span>');
+  return `<div style="font-size:12px;color:#555;margin-top:4px">${parts.join(" · ")}</div>`;
+}
+// Découpes vides (aucun fromage saisi) — « parasites » à nettoyer.
+function emptyDecoupeSids(){
+  return Object.entries(centraleState.decoupe||{}).filter(([sid,s])=>{
+    if(!s) return false; if(!s.meta||!s.meta.startedAt) return true;
+    const stx=decoupeStatsC({meta:s.meta,state:s.state||{}});
+    const hasTraca=s.tracabilite&&Object.keys(s.tracabilite).length;
+    // BL chargé par le responsable pas encore découpé : on le garde (il attend l'entrepôt), sauf s'il a plus de 7 jours.
+    const waitingBl=!!(s.meta.loadedBy||(!s.meta.libre&&(s.meta.products||[]).length))&&(Date.now()-s.meta.startedAt)<7*86400000;
+    return stx.saisis===0 && !hasTraca && !waitingBl;
+  }).map(([sid])=>sid);
+}
+function purgeEmptyDecoupes(){
+  if(!dbCentrale) return; const ids=emptyDecoupeSids(); if(!ids.length) return;
+  if(!confirm("Supprimer "+ids.length+" découpe(s) VIDE(S) (aucun fromage saisi) ?\n\nLes BL chargés de moins de 7 jours et pas encore découpés sont gardés.")) return;
+  const up={}; ids.forEach(id=>{ up["decoupe/"+id]=null; });
+  dbCentrale.ref().update(up).catch(e=>alert("Erreur : "+e.message));
 }
 function decoupeSessions(){
   const out=[];
@@ -2162,12 +2226,15 @@ async function resyncTracaLots(btn){
 // Clé de jour ISO (yyyy-mm-dd) à partir d'un timestamp, et pour une session de découpe.
 function isoDayKey(ts){ const d=new Date(ts||0); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function decoupeDayKeyC(s){ return isoDayKey((s&&s.meta&&s.meta.startedAt)||0); }
+// Jours de DÉCOUPE d'une session (date saisie de chaque fromage) ; à défaut le jour de création.
+function dayFrC(k){ const p=String(k||"").split("-"); return p.length===3?(p[2]+"/"+p[1]+"/"+p[0]):String(k||""); }
+function decoupeDaysC(s){ const a=decoupeAgg(s); return a.cutDays.length?a.cutDays:[decoupeDayKeyC(s)]; }
 // Agrégat CONSOLIDÉ d'une journée : fusionne toutes les sessions du jour (KBG + ROB) par fromage.
-function dayDecoupeAggC(sessions){
+function dayDecoupeAggC(sessions, dayKey){
   const kbgMap={}, robMap={}; let kbgN=0,kbgG=0,kbgTheo=0,kbgMontG=0,robMeules=0,robN=0,robG=0;
   (sessions||[]).forEach(s=>{ const a=decoupeAgg(s); const ent=(a.entity||"").toUpperCase();
     const routeRob = ent==="ROB" ? true : (ent==="KBG" ? false : null);
-    (a.lines||[]).forEach(l=>{ const key=norm(l.designation||"")||"?";
+    (a.lines||[]).filter(l=>!dayKey||(l.cutDay||decoupeDayKeyC(s))===dayKey).forEach(l=>{ const key=norm(l.designation||"")||"?";
       const isRob = routeRob!=null ? routeRob : (((l.kbgN||0)===0) && (((l.robN||0)>0) || ((l.robMeules||0)>0)));
       if(isRob){ const m=robMap[key]||(robMap[key]={designation:l.designation||"",robMeules:0,robN:0,robG:0,robUnit:l.robUnit||"meule"});
         m.robMeules+=(l.robMeules||0); m.robN+=(l.robN||0); m.robG+=(l.robG||0); robMeules+=(l.robMeules||0); robN+=(l.robN||0); robG+=(l.robG||0); }
@@ -2182,10 +2249,10 @@ function dayDecoupeAggC(sessions){
   return { kbgLines, robLines, kbgN, kbgG, kbgTheo, kbgMontG, robMeules, robN, robG,
            rendPortions:(kbgTheo>0?Math.round(kbgN/kbgTheo*100):null), hasKbg:kbgLines.length>0, hasRob:robLines.length>0 };
 }
-function decoupeSessionsOfDay(dayKey){ return decoupeSessions().filter(s=>decoupeDayKeyC(s)===dayKey); }
+function decoupeSessionsOfDay(dayKey){ return decoupeSessions().filter(s=>decoupeDaysC(s).includes(dayKey)); }
 // Détail consolidé d'une journée : chaque fromage (KBG et ROB) de toutes les sessions du jour.
 function openDecoupeDayDetail(dayKey){
-  const sess=decoupeSessionsOfDay(dayKey); if(!sess.length) return; const ag=dayDecoupeAggC(sess);
+  const sess=decoupeSessionsOfDay(dayKey); if(!sess.length) return; const ag=dayDecoupeAggC(sess, dayKey);
   const kg=ag.robG>0?(Math.round(ag.robG/1000*10)/10):0;
   let body="";
   if(ag.hasKbg){
@@ -2204,7 +2271,7 @@ function openDecoupeDayDetail(dayKey){
   const sentBy=sess.map(s=>s.recap&&s.recap.daySentAt?(s.recap.daySentBy||""):null).filter(Boolean)[0];
   const back=document.createElement("div"); back.className="modal-back";
   back.innerHTML=`<div class="modal-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">Découpe du ${esc(dateShort(sess[0].meta.startedAt))}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">Découpe du ${esc(dayFrC(dayKey))}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <div class="muted" style="margin:4px 0 10px">${sess.length} découpe(s) ce jour · ${sentBy?("récap envoyé par "+esc(sentBy)):"récap pas encore envoyé"}</div>
     ${body}
     <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlDecoupeDayTxt('${dayKey}')">⬇️ Télécharger le .txt du jour</button>
@@ -2213,9 +2280,9 @@ function openDecoupeDayDetail(dayKey){
   document.body.appendChild(back);
 }
 function dlDecoupeDayTxt(dayKey){
-  const sess=decoupeSessionsOfDay(dayKey); if(!sess.length) return; const ag=dayDecoupeAggC(sess);
+  const sess=decoupeSessionsOfDay(dayKey); if(!sess.length) return; const ag=dayDecoupeAggC(sess, dayKey);
   const kg=ag.robG>0?(Math.round(ag.robG/1000*10)/10):0;
-  let txt="LA CENTRALE PDP — Récap découpe du jour "+dateShort(sess[0].meta.startedAt)+"\n"+sess.length+" découpe(s)\n";
+  let txt="LA CENTRALE PDP — Récap découpe du jour "+dayFrC(dayKey)+"\n"+sess.length+" découpe(s)\n";
   if(ag.hasKbg){
     txt+="\n== KELBONGOO =="+"\nRendement : "+(ag.rendPortions!=null?ag.rendPortions+"%":"—")+" · "+ag.kbgN+" portions"+(ag.kbgTheo>0?(" / "+ag.kbgTheo+" théo."):"")+"\n";
     txt+="Fromage\tPortions\tThéo\tRend\tHors gabarit (kg)\n";
@@ -2226,7 +2293,7 @@ function dlDecoupeDayTxt(dayKey){
     txt+="Fromage\tMeules/colis\tMorceaux\tPoids approx (kg)\n";
     ag.robLines.forEach(l=>{ txt+=(l.designation||"")+"\t"+l.robMeules+" "+(l.robUnit==="colis"?"colis":"meule")+"\t"+l.robN+"\t"+(l.robG>0?Math.round(l.robG/1000*10)/10:"")+"\n"; });
   }
-  const d=new Date(sess[0].meta.startedAt||Date.now());
+  const d=new Date(dayKey+"T12:00:00");
   const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");
   downloadTxt(yy+mm+dd+"_DECOUPE_JOUR.txt", txt);
 }
@@ -2247,7 +2314,8 @@ function renderDecoupeHisto(el, bar){
         <div style="font-weight:800;font-size:15px">🧀 ${esc(s.meta.supplier||'Découpe')} <span class="badge" style="background:${isRob?'#f3e5f5':'#e3f2fd'};color:${isRob?'#6a1b9a':'#1565c0'}">${isRob?'Montreuil':'Kelbongoo'}</span></div>
         <div style="font-size:12px;color:#999">${esc(dateShort(s.meta.startedAt))} ${esc(heure(s.meta.startedAt))}</div></div>
       <div style="font-size:12px;color:#666;margin:2px 0 6px">👤 ${esc(a.by||s.meta.createdBy||'—')}${s.meta.docNumber?(' · BL '+esc(s.meta.docNumber)):''}${s.meta.deliveryDate?(' · récep. prévue '+esc(s.meta.deliveryDate)):''}</div>
-      <div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap;align-items:center">
+      ${decoupeInfoLine(s)}
+      <div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap;align-items:center;margin-top:6px">
         ${metrics}
         <span style="color:#888">${a.done}/${a.total} fromages</span>
       </div>
@@ -2260,11 +2328,11 @@ function renderDecoupeHisto(el, bar){
   // Regroupement par JOURNÉE. Aujourd'hui déplié, les autres jours repliés. Par défaut : mois en cours ;
   // les mois précédents se consultent via le filtre Date (calendrier).
   const todayIso=isoDayKey(Date.now()); const curMonth=todayIso.slice(0,7);
-  const groups={}; list.forEach(s=>{ const k=decoupeDayKeyC(s); (groups[k]=groups[k]||[]).push(s); });
+  const groups={}; list.forEach(s=>{ decoupeDaysC(s).forEach(k=>{ (groups[k]=groups[k]||[]).push(s); }); });
   const allDays=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
   const shownDays = dpDecoupeDate ? allDays.filter(k=>k===dpDecoupeDate) : allDays.filter(k=>k.slice(0,7)===curMonth);
   const olderCount = allDays.length - shownDays.length;
-  const dayBlock=(k)=>{ const sess=groups[k]; const ag=dayDecoupeAggC(sess);
+  const dayBlock=(k)=>{ const sess=groups[k]; const ag=dayDecoupeAggC(sess, k);
     const rShown=(ag.rendPortions!=null?ag.rendPortions:0); const rendOk=rShown>=85;
     const kg=ag.robG>0?(Math.round(ag.robG/1000*10)/10):0;
     const sum=[];
@@ -2274,7 +2342,7 @@ function renderDecoupeHisto(el, bar){
     const open = (k===todayIso)?' open':'';
     return `<details${open} style="margin:10px 0;border:1px solid #e0c48a;border-radius:10px;padding:8px 12px;background:#fffdf7">
         <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:15px;font-weight:900;color:#8a5a00">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${sess.length} découpe(s)</span></span>
+          <span style="font-size:15px;font-weight:900;color:#8a5a00">📅 Découpé le ${esc(dayFrC(k))} <span style="font-size:12px;color:#777;font-weight:600">· ${sess.length} découpe(s)</span></span>
           ${sentBadge}
         </summary>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0">${sum.join(" ")||'<span class="muted" style="font-size:12px">Aucune découpe saisie.</span>'}</div>
@@ -2289,7 +2357,7 @@ function renderDecoupeHisto(el, bar){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <input placeholder="🔎 fournisseur, opérateur, n° BL…" style="flex:1;min-width:180px" value="${esc(dpDecoupeSearch)}" oninput="dpDecoupeSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpDecoupeDate)}" onchange="dpDecoupeDate=this.value;renderCentrale()"/>
-      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpDecoupeDate='';dpDecoupeSearch='';renderCentrale()">✕</button>
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpDecoupeDate='';dpDecoupeSearch='';renderCentrale()">✕</button>${emptyDecoupeSids().length?`<button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}
     </div>${olderNote}
     ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucune découpe '+(dpDecoupeDate?'à cette date':'ce mois-ci')+'.</div>'}`;
 }
@@ -2297,21 +2365,21 @@ function openDecoupeDetail(sid){
   const s=(centraleState.decoupe||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s); const a=decoupeAgg(sess); const isRob=a.entity==="ROB";
   const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
   const head=isRob
-    ? `<tr><th>Fromage</th><th>Découpé</th><th>Morceaux</th><th>Poids approx.</th></tr>`
-    : `<tr><th>Fromage</th><th>KBG pc</th><th>KBG poids</th><th>→ ROB pc</th><th>ROB poids</th></tr>`;
+    ? `<tr><th>Fromage</th><th>Découpé</th><th>Morceaux</th><th>Poids approx.</th><th>Découpé le</th></tr>`
+    : `<tr><th>Fromage</th><th>KBG pc</th><th>KBG poids</th><th>→ ROB pc</th><th>ROB poids</th><th>Découpé le</th></tr>`;
   const rows=(a.lines||[]).map(l=>{ const lkg=(l.robG||0)>0?(Math.round((l.robG||0)/1000*10)/10+' kg'):'—';
     return isRob
-      ? `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.robMeules||0} ${l.robUnit==='colis'?'colis':'meule(s)'}</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${lkg}</td></tr>`
-      : `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.kbgN||0}${l.kbgTarget>0?(' / '+l.kbgTarget):''}</td><td style="text-align:center">${Math.round(l.kbgG||0)} g</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${Math.round(l.robG||0)} g</td></tr>`;
+      ? `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.robMeules||0} ${l.robUnit==='colis'?'colis':'meule(s)'}</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${lkg}</td><td style="text-align:center">${esc(dayFrC(l.cutDay))}</td></tr>`
+      : `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.kbgN||0}${l.kbgTarget>0?(' / '+l.kbgTarget):''}</td><td style="text-align:center">${Math.round(l.kbgG||0)} g</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${Math.round(l.robG||0)} g</td><td style="text-align:center">${esc(dayFrC(l.cutDay))}</td></tr>`;
   }).join("");
-  const colspan=isRob?4:5;
+  const colspan=isRob?5:6;
   const summary=isRob
     ? `${a.robMeules} meule(s)/colis · ${a.robN} morceaux${kg>0?(' · ≈ '+kg+' kg'):''}`
     : `Rendement <b>${a.rend}%</b> · KBG ${a.kbgN} pc / ROB ${a.robN} pc`;
   const back=document.createElement("div"); back.className="modal-back";
   back.innerHTML=`<div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">Découpe ${isRob?'Montreuil':'Kelbongoo'} · ${esc(sess.meta.supplier||'')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
-    <div class="muted" style="margin:4px 0 10px">${esc(dateShort(sess.meta.startedAt))} · ${esc(a.by||sess.meta.createdBy||'—')} · ${summary}</div>
+    <div class="muted" style="margin:4px 0 10px">Créée le ${esc(dateShort(sess.meta.startedAt))} · ${esc(a.by||sess.meta.createdBy||'—')} · ${summary}</div>${decoupeInfoLine(sess)}
     <div style="overflow:auto;max-height:60vh"><table><thead>${head}</thead><tbody>${rows||('<tr><td colspan="'+colspan+'" style="color:#999">Aucune découpe saisie.</td></tr>')}</tbody></table></div>
     <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlDecoupeTxt('${esc(sid)}')">⬇️ Télécharger le .txt</button>
   </div>`;
