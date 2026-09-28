@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.1";
+const APP_VERSION = "1.9.3";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -360,15 +360,30 @@ function parseTXT(text){
 }
 function parsePDFLines(rowLines){
   const out=[]; let supplier=""; let docNumber="";
-  const lineRe=/^(\d{2,7})\s+(.*\S)\s+(\d{8,13})\s+(\d+)\s+[\d.,]+\s+[\d.,]+\s*$/;
+  // Vitafrais : Code | Désignation+Marque | COLIS livrés | PCB (pièces/colis) | EAN | Qté(total) | Poids | [PU HT]
+  //   -> cdt = PCB (colisage) ; qteCmd = colis livrés ; attendu = Qté totale (pièces) = colis × PCB.
+  const reColis=/^(\d{2,7})\s+(.*\S)\s+(\d+)\s+(\d+)\s+(\d{8,13})\s+(\d+)\s+[\d.,]+(?:\s+[\d.,]+)?\s*$/;
+  const reSimple=/^(\d{2,7})\s+(.*\S)\s+(\d{8,13})\s+(\d+)\s+[\d.,]+\s+[\d.,]+\s*$/;
+  const clean=(s)=> String(s).replace(/\s*(BIO|DEM)\s*$/i,"").trim();
   for(const L of rowLines){
     if(!supplier&&/VITAFRAIS/i.test(L)) supplier="VITAFRAIS";
     const mBL=L.match(/n[°º]\s*BL\s*:?\s*(\d+)/i); if(mBL) docNumber=mBL[1];
     if(/^(Palette|Colis \d|Poids|Total|Distribution|Page|Commande|BIO :|DEM :)/i.test(L)) continue;
-    const m=L.match(lineRe); if(!m) continue;
-    let des=m[2].replace(/\s+\d+\s+\d+\s*$/,"").replace(/\s+\d+\s*$/,""); // retire colis + PCB (ou l'un des deux)
-    des=des.replace(/\s*(BIO|DEM)\s*$/i,"").trim();                        // retire le label de fin (même collé : "150gBIO")
-    out.push({ article:m[1], ean:m[3].replace(/^0+(?=\d)/,""), designation:des, marque:"", attendu:parseInt(m[4],10), categorie:"Autres" });
+    let m=L.match(reColis);
+    if(m){
+      const colis=parseInt(m[3],10), pcb=parseInt(m[4],10), qte=parseInt(m[6],10);
+      const cdt = pcb>0 ? pcb : null;
+      let qteCmd = colis>0 ? colis : (cdt?Math.round(qte/cdt):qte);
+      if(cdt && colis*pcb!==qte && qte%pcb===0) qteCmd=qte/pcb;   // cohérence colis × PCB = Qté
+      out.push({ article:m[1], ean:m[5].replace(/^0+(?=\d)/,""), designation:clean(m[2]), marque:"",
+                 cdt, qteCmd, unit: cdt?"colis":"piece", attendu:qte, categorie:"Autres" });
+      continue;
+    }
+    m=L.match(reSimple);
+    if(m){
+      let des=m[2].replace(/\s+\d+\s+\d+\s*$/,"").replace(/\s+\d+\s*$/,"");
+      out.push({ article:m[1], ean:m[3].replace(/^0+(?=\d)/,""), designation:clean(des), marque:"", attendu:parseInt(m[4],10), categorie:"Autres" });
+    }
   }
   return { docNumber, supplier, lines:out };
 }
@@ -617,24 +632,58 @@ function detectG5Key(parsed){
 // Clé de ligne identique à l'app vendeur (pour retrouver la quantité réelle).
 function lineKeyOf(l,idx){ const a=(l.article||"").toString().trim(); return a?("a_"+a.replace(/[.#$/\[\]]/g,"_")):("i_"+idx); }
 // Construit le .txt G5.
-// - code = colonne "Code" de la commande (l.code) si présent, sinon EAN/article (ancien mode).
-// - quantité exprimée dans l'unité de la commande :
-//     colis (l.cdt) -> pièces_reçues / cdt ; poids variable -> poids saisi ; sinon pièces.
-
-  
+// RÈGLE COLISAGE (décidée le 28/09/2026) :
+//  - la quantité G5 est exprimée en COLIS ;
+//  - par défaut on écrit la quantité THÉORIQUE (comme si tout avait été reçu) pour ÉVITER LES VIRGULES ;
+//  - on n'ajuste QUE si l'écart tombe pile sur un nombre entier de colis (multiple du colisage) :
+//      la quantité reste alors un entier de colis, donc pas de stock à virgule ;
+//  - sinon (écart non multiple du colisage) on laisse la quantité théorique : l'écart reste
+//      signalé EN ROUGE sur la console G5, l'opérateur fait l'ajustement de stock à la main.
+//  - poids variable -> poids réellement saisi ; colisage 1 (ou absent) -> quantité réelle (déjà entière).
+function g5QtyColis(l, st){
+  st = st || {};
+  const cdt = (l.cdt && l.cdt>0) ? l.cdt : 1;
+  const theoColis = (l.qteCmd!=null) ? Number(l.qteCmd) : ((l.attendu!=null)? Number(l.attendu)/cdt : 0);
+  const attenduPieces = (l.attendu!=null) ? Number(l.attendu) : theoColis*cdt;
+  // pièces réellement en stock (apte vente) selon le pointage vendeur
+  let reelPieces;
+  if(st.status==='nonrecu') reelPieces=0;
+  else if(st.status==='ecart') reelPieces=(st.aptevente!=null?Number(st.aptevente):(st.reel!=null?Number(st.reel):attenduPieces));
+  else if(st.status==='surplus') reelPieces=(st.reel!=null?Number(st.reel):attenduPieces);
+  else if(st.status==='conforme') reelPieces=(st.reel!=null?Number(st.reel):attenduPieces);
+  else reelPieces=attenduPieces; // non pointé -> comme si tout reçu (théorique)
+  const diffPieces = reelPieces - attenduPieces;
+  let qtyColis = theoColis;
+  // ajustement UNIQUEMENT si l'écart est un multiple entier du colisage (=> reste entier)
+  if(cdt>0 && diffPieces % cdt === 0){ qtyColis = theoColis + (diffPieces/cdt); }
+  if(qtyColis<0) qtyColis=0;
+  return qtyColis;
+}
  function buildG5Txt(rec, doc){
   const key=(doc&&doc.g5Key)||'ean';
   const active=((doc&&doc.lines)?doc.lines:[]).filter(l=>!l.nonLivre);
   const out=[];
+  const usedKeys=new Set();
   if(active.length){
     // Cas normal : on itère les lignes du document (commande/BL rapprochés)
     active.forEach((l,i)=>{
-      const st=(rec.lines||{})[lineKeyOf(l,i)]||{};
+      const lk=lineKeyOf(l,i); usedKeys.add(lk);
+      const st=(rec.lines||{})[lk]||{};
       let qty;
-      if(st.status==='nonrecu'){ qty=0; }                                              // pas reçu -> 0
-      else if(l.poidsVariable){ qty=(st.poids!=null&&st.poids!=="")?st.poids:(l.qteCmd!=null?l.qteCmd:l.attendu); } // poids réel
-      else { qty=(l.qteCmd!=null?l.qteCmd:l.attendu); }                                // quantité NORMALE
+      if(l.poidsVariable){ qty=(st.poids!=null&&st.poids!=="")?st.poids:(l.qteCmd!=null?l.qteCmd:l.attendu); } // poids réel (kg)
+      else { qty=g5QtyColis(l, st); }                                                  // quantité en colis (règle colisage)
       const code=l.code||(key==='article'?(l.article||l.ean||''):(l.ean||l.article||''));
+      if(!code||qty==null||qty==="") return;
+      out.push(code+"\t"+String(qty).replace(".",","));
+    });
+    // Produits AJOUTÉS hors BL (reçus en plus) : présents dans la réception mais pas dans le document.
+    Object.entries(rec.lines||{}).forEach(([lk,s])=>{
+      if(usedKeys.has(lk) || !s || s.nonLivre || !s.status) return;
+      let qty;
+      if(s.poids!=null&&s.poids!=="") qty=s.poids;
+      else if(s.status==='nonrecu') qty=0;
+      else qty=g5QtyColis(s, s); // pas de cdt => colisage 1 => quantité réelle entière
+      const code=s.code||s.ean||s.article||'';
       if(!code||qty==null||qty==="") return;
       out.push(code+"\t"+String(qty).replace(".",","));
     });
@@ -643,9 +692,9 @@ function lineKeyOf(l,idx){ const a=(l.article||"").toString().trim(); return a?(
     Object.values(rec.lines||{}).forEach(s=>{
       if(s.nonLivre) return;
       let qty;
-      if(s.status==='nonrecu'){ qty=0; }
-      else if(s.poids!=null&&s.poids!==""){ qty=s.poids; }
-      else { qty=(s.attendu!=null?s.attendu:null); }
+      if(s.poids!=null&&s.poids!=="") qty=s.poids;
+      else if(s.status==='nonrecu') qty=0;
+      else qty=g5QtyColis(s, s);
       const code=s.code||s.ean||s.article||'';
       if(!code||qty==null||qty==="") return;
       out.push(code+"\t"+String(qty).replace(".",","));
@@ -704,8 +753,9 @@ function mergeOrderAndBL(order, bl){
     const blLine=bi>=0 ? blLines[bi] : null;
     if(bi>=0) used.add(bi); else unmatched++;
 
-    // La commande reste la source de vérité pour code G5, attendu et CDT.
-    // Le BL apporte article/EAN/désignation si disponibles.
+    // La commande reste la source de vérité pour code G5 et attendu.
+    // Le CDT (colisage) vient de la commande si présent, SINON du BL (ex. BL Vitafrais : colonne PCB).
+    const cdtEff = (ol.cdt!=null) ? ol.cdt : (blLine && blLine.cdt!=null ? blLine.cdt : null);
     merged.push({
       article: blLine?.article || ol.ref || ol.article || ol.code || "",
       code: ol.code || blLine?.code || "",
@@ -713,9 +763,9 @@ function mergeOrderAndBL(order, bl){
       ref: ol.ref || blLine?.article || "",
       designation: ol.designation || blLine?.designation || "",
       marque: blLine?.marque || ol.marque || "",
-      cdt: ol.cdt || null,
-      qteCmd: ol.qteCmd != null ? ol.qteCmd : null,
-      unit: ol.unit || (ol.cdt?"colis":"piece"),
+      cdt: cdtEff,
+      qteCmd: (ol.qteCmd!=null) ? ol.qteCmd : (blLine && blLine.qteCmd!=null ? blLine.qteCmd : null),
+      unit: ol.unit || (blLine&&blLine.unit) || (cdtEff?"colis":"piece"),
       attendu: Number(ol.attendu)||0,
       poidsVariable: !!(ol.poidsVariable || blLine?.poidsVariable),
       categorie: blLine?.categorie || ol.categorie || "Autres",
