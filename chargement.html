@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.3";
+const APP_VERSION = "1.9.4";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -1366,11 +1366,20 @@ function renderG5(){
           ${ec?`<button class="btn" style="background:#e53935;color:#fff;padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">⚠ Voir les écarts</button>`:''}
           <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">👁 Afficher</button>
           <button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="markG5('${s.code}','${r.id}')">✓ Validé sur G5</button>
+          <button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="deleteRecG5('${s.code}','${r.id}')" title="Supprimer cette réception (résidu / test)">🗑 Supprimer</button>
         </div></div>`;
     }).join("");
     return `<div class="store-card"><h3>${esc(s.label)} <span class="badge info">${recs.length}</span></h3>${rows}</div>`;
   }).join("");
-  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Réceptions validées par les vendeurs, à saisir dans G5. « Afficher » = détail + photos + <b>.txt G5</b>. « Validé sur G5 » → passe dans les Archives (bouton ci-dessus).</p><div class="live-grid">${html}</div>`;
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Réceptions validées par les vendeurs, à saisir dans G5. « Afficher » = détail + photos + <b>.txt G5</b>. « Validé sur G5 » → passe dans les Archives. « 🗑 Supprimer » → efface définitivement (résidus / tests).</p><div class="live-grid">${html}</div>`;
+}
+async function deleteRecG5(code,id){
+  const st=state[code]; const r=st&&st.receptions?st.receptions[id]:null;
+  const label=r?((r.supplier||'?')+' · '+(r.docNumber||'')):id;
+  if(!confirm("Supprimer définitivement cette réception ?\n\n"+label+"\n\n(À utiliser pour les résidus / tests. Action irréversible.)")) return;
+  const db=dbByStore[code]; if(!db) return;
+  try{ await db.ref("receptions/"+id).remove(); }
+  catch(e){ alert("Erreur : "+e.message); }
 }
 async function markG5(code,id){
   if(!confirm("Confirmer : cette réception a bien été saisie sur G5 ?\n\nElle passera dans « Réceptions archivées ».")) return;
