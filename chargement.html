@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.4";
+const APP_VERSION = "1.9.5";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -2054,6 +2054,7 @@ function renderCentrale(){
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openCentraleDetail('${esc(s.id)}')">👁 Détail</button>
         <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlCentraleTxt('${esc(s.id)}')">⬇️ .txt</button>
+        <button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="deleteDispatch('${esc(s.id)}')" title="Supprimer ce dispatch chargé">🗑 Supprimer</button>
       </div></div>`; };
   // Regroupement par JOURNÉE (aujourd'hui déplié, autres jours repliés ; mois en cours par défaut).
   const todayIso=isoDayKey(Date.now()); const curMonth=todayIso.slice(0,7);
@@ -2096,6 +2097,14 @@ function openCentraleDetail(sid){
   </div>`;
   back.onclick=(e)=>{ if(e.target===back) back.remove(); };
   document.body.appendChild(back);
+}
+async function deleteDispatch(sid){
+  const s=(centraleState.dispatch||{})[sid];
+  const lbl=(s&&s.meta)?((s.meta.supplier||'?')+' · '+dateShort(s.meta.startedAt)):sid;
+  if(!confirm("Supprimer ce dispatch chargé ?\n\n"+lbl+"\n\nIl disparaîtra de l'historique, du Suivi live et de « La Centrale PDP » (tablette). Action définitive.")) return;
+  if(!dbCentrale){ alert("Connexion CENTRALE indisponible."); return; }
+  try{ await dbCentrale.ref("dispatch/"+sid).remove(); }
+  catch(e){ alert("Erreur : "+e.message); }
 }
 function dlCentraleTxt(sid){
   const s=(centraleState.dispatch||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s);
