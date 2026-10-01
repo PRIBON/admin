@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.7";
+const APP_VERSION = "1.9.8";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -223,9 +223,15 @@ function showUpdateBar(latest){
   const b=document.createElement("button"); b.textContent="Mettre à jour"; b.onclick=()=>reloadToLatest(latest);
   d.appendChild(b); document.body.appendChild(d);
 }
+// La console a SA PROPRE version (1.9.x) : elle ne peut pas se comparer à get-version (Apps Script),
+// qui porte la version des apps magasin (1.3.x) → le bandeau ne s'affichait jamais.
+// Ici : on relit le fichier publié sur GitHub Pages (sans cache) et on compare son APP_VERSION.
 function checkVersion(){
-  fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"get-version"})})
-    .then(r=>r.json()).then(j=>{ if(j&&j.version&&isNewer(APP_VERSION,j.version)) showUpdateBar(j.version); }).catch(()=>{});
+  const u=location.origin+location.pathname+"?nocache="+Date.now();
+  fetch(u,{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{
+    const m=t&&t.match(/const APP_VERSION\s*=\s*"([\d.]+)"/);
+    if(m && isNewer(APP_VERSION,m[1])) showUpdateBar(m[1]);
+  }).catch(()=>{});
 }
 
 /* ============================ AUTH ============================ */
@@ -241,7 +247,7 @@ function onCredential(resp){
 window.onload=function(){
   if(OAUTH_CLIENT_ID.indexOf("__")!==-1){ document.getElementById("gateErr").textContent="Renseigne OAUTH_CLIENT_ID et APPS_SCRIPT_URL en haut du fichier."; return; }
   document.querySelector(".header .sub").textContent="Suivi & chargement BL + commande · tous les magasins · v"+APP_VERSION;
-  checkVersion(); setInterval(checkVersion, 10*60*1000);
+  checkVersion(); setInterval(checkVersion, 5*60*1000); window.addEventListener("focus", checkVersion);
   const t=setInterval(()=>{ if(window.google&&google.accounts&&google.accounts.id){ clearInterval(t);
     google.accounts.id.initialize({client_id:OAUTH_CLIENT_ID,callback:onCredential});
     google.accounts.id.renderButton(document.getElementById("gbtn"),{theme:"filled_blue",size:"large",text:"signin_with"});
