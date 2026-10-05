@@ -95,7 +95,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="multi">📦 Chargement</button>
     <button class="tab" data-tab="g5">📥 Réception</button>
-    <button class="tab" data-tab="centrale">🏬 Dispatch & Découpe</button>
+    <button class="tab" data-tab="centrale">🏬 Dispatch &amp; Picking · Découpe</button>
     <button class="tab" data-tab="inventaire">📋 Inventaire</button>
     <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
     <button class="tab" data-tab="suivi">📡 Suivi live</button>
@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.8";
+const APP_VERSION = "1.9.9";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -181,7 +181,7 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{} };
+const centraleState={ dispatch:{}, picking:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{} };
 let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
@@ -274,6 +274,7 @@ function start(email){
     const appC=firebase.initializeApp(CENTRALE_FIREBASE_CONFIG,"CENTRALE");
     dbCentrale=firebase.database(appC);
     dbCentrale.ref("dispatch").on("value",snap=>{ centraleState.dispatch=snap.val()||{}; renderCentrale(); renderSuivi(); });
+    dbCentrale.ref("picking").on("value",snap=>{ centraleState.picking=snap.val()||{}; renderCentrale(); renderSuivi(); });
     dbCentrale.ref("decoupe").on("value",snap=>{ centraleState.decoupe=snap.val()||{}; renderCentrale(); renderSuivi(); });
     dbCentrale.ref("tracabilite").on("value",snap=>{ centraleState.tracabilite=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("centrale_reception").on("value",snap=>{ centraleState.reception=snap.val()||{}; renderCentrale(); });
@@ -1073,20 +1074,42 @@ function decoupeProductsForApp(parsed, entity){
 
 /* --- État + rendu de la carte « La Centrale PDP » --- */
 const cpdp={ dispatch:{ supplier:"", parsed:null, fileName:"", bdc:null, bdcInfo:"", sent:false, err:"" },
+             mode:"dispatch",   // carte « Dispatch & Picking » : dispatch | picking
+             picking:{ parsed:null, fileName:"", store:"", sent:false, err:"" },
              decoupe:{ entity:"ROB", deliveryDate:"", parsed:null, fileName:"", blNumber:"", sent:false, err:"" },
              vin:{ date:"", parsed:null, fileName:"", suppliers:[], selected:{}, sent:false, err:"" } };
 function renderCPDPCard(){
   const box=document.getElementById("cpdp-card"); if(!box) return;
-  const D=cpdp.dispatch, C=cpdp.decoupe, V=cpdp.vin;
+  const D=cpdp.dispatch, C=cpdp.decoupe, V=cpdp.vin, P=cpdp.picking, isPk=cpdp.mode==="picking";
+  const pkSup=P.parsed?new Set(P.parsed.products.map(p=>p.supName||p.supCode)).size:0, pkTot=P.parsed?P.parsed.products.reduce((a,p)=>a+(p.qty||0),0):0;
   const dTot=D.parsed?D.parsed.products.reduce((a,p)=>a+Object.values(p.stores||{}).reduce((x,y)=>x+(y||0),0),0):0;
   const vSelCount=Object.values(V.selected||{}).filter(Boolean).length;
   box.innerHTML=`<div class="store-card" style="border:2px solid #1a4d2e;background:#f4f9f5;grid-column:1/-1">
     <h3>🏬 La Centrale PDP <span class="badge info">entrepôt · Porte de Pantin</span></h3>
-    <div class="muted" style="margin:-4px 0 6px">Chargé ici, poussé vers l'app tactile « La Centrale PDP » (Dispatch palette + Découpe fromage + Inventaire vin ciblé).</div>
+    <div class="muted" style="margin:-4px 0 6px">Chargé ici, poussé vers l'app tactile « La Centrale PDP » (Dispatch &amp; Picking + Découpe fromage + Inventaire vin ciblé).</div>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
-      <!-- Dispatch -->
-      <div class="store-card" style="background:#fff">
-        <h3 style="font-size:15px">🚚 Dispatch palette</h3>
+      <!-- Dispatch & Picking -->
+      <div class="store-card" style="background:#fff;border-top:5px solid ${isPk?PICKING_COLOR:'#1a4d2e'}">
+        <h3 style="font-size:15px">🚚 Dispatch &amp; Picking</h3>
+        <div style="display:flex;gap:6px;margin:0 0 10px">
+          <button class="btn" style="flex:1;padding:8px;font-size:13px;background:${!isPk?'#1a4d2e':'#eef2f7'};color:${!isPk?'#fff':'#333'}" onclick="cpdp.mode='dispatch';renderCPDPCard()">🚚 Dispatch palette</button>
+          <button class="btn" style="flex:1;padding:8px;font-size:13px;background:${isPk?PICKING_COLOR:'#eef2f7'};color:${isPk?'#fff':'#333'}" onclick="cpdp.mode='picking';renderCPDPCard()">🛒 Picking</button>
+        </div>
+        ${isPk?`
+        <div class="muted" style="margin:-4px 0 8px;font-size:12px">Commande magasin préparée depuis le <b>stock</b> de l'entrepôt. 1 picking = 1 magasin. Sur la tablette : classé par fournisseur, scan Zebra.</div>
+        <div class="field"><label>Commande magasin (Excel « Commande à la Centrale »)</label>
+          <div class="drop ${P.parsed?'has':''}" style="border-color:${PICKING_COLOR};background:${P.parsed?'#dbeafb':PICKING_BG}" onclick="document.getElementById('cpdpPkFile').click()">${P.parsed?('✓ '+esc(P.fileName)):'🛒 Charger la commande (.xlsx)'}</div>
+          <input id="cpdpPkFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="cpdpPickingFile(this.files[0])"/></div>
+        <div class="field"><label>Magasin destinataire <span style="color:#c62828">*</span></label>
+          <select style="width:100%;${P.store?'':'border:2px solid #e53935'}" onchange="cpdp.picking.store=this.value;renderCPDPCard()">
+            <option value="">— choisir —</option>
+            ${PICKING_STORES.map(x=>`<option value="${x.code}" ${P.store===x.code?'selected':''}>${x.code} : ${esc(x.label)}</option>`).join('')}
+          </select>
+          ${P.parsed&&P.parsed.store?`<div class="muted" style="font-size:11px;margin-top:3px">Détecté dans le fichier : ${esc(P.parsed.store)} (modifiable)</div>`:''}</div>
+        ${P.parsed?`<div class="parse-note" style="background:${PICKING_BG};color:#0d2b5c">🛒 Commande <b>${esc(P.parsed.orderNum||'—')}</b>${P.parsed.orderDate?(' du '+esc(P.parsed.orderDate)):''} · ${P.parsed.products.length} produit(s) · ${pkSup} fournisseur(s) · ${pkTot} u.</div>`:''}
+        ${P.err?`<div class="err">${esc(P.err)}</div>`:''}
+        <button class="btn btn-lg" onclick="cpdpSendPicking()" ${(!P.parsed||P.sent||!P.store)?'disabled':''} style="margin-top:6px;background:${PICKING_COLOR};color:#fff">${P.sent?'🎉 Picking envoyé':'🚀 Envoyer le picking'}</button>
+        `:`
         <div class="field"><label>Fournisseur</label><input id="cpdpSup" style="width:100%" value="${esc(D.supplier)}" oninput="cpdp.dispatch.supplier=this.value" placeholder="Ex: SBV, GABORIT…"/></div>
         <div class="field"><label>Fichier dispatch (Excel)</label>
           <div class="drop ${D.parsed?'has':''}" onclick="document.getElementById('cpdpDispFile').click()">${D.parsed?('✓ '+esc(D.fileName)):'📄 Charger le dispatch (.xlsx)'}</div>
@@ -1097,6 +1120,7 @@ function renderCPDPCard(){
         ${D.parsed?`<div class="parse-note">📦 ${D.parsed.products.length} produit(s) · ${D.parsed.storeColumns.length} magasin(s) · ${dTot} u.${D.bdc?(' · colisage '+D.bdc.count+' réf.'):''}</div>`:''}
         ${D.err?`<div class="err">${esc(D.err)}</div>`:''}
         <button class="btn btn-green btn-lg" onclick="cpdpSendDispatch()" ${(!D.parsed||D.sent)?'disabled':''} style="margin-top:6px">${D.sent?'🎉 Dispatch envoyé':'🚀 Envoyer le dispatch'}</button>
+        `}
       </div>
       <!-- Découpe / BL Ugalait -->
       <div class="store-card" style="background:#fff">
@@ -1195,6 +1219,135 @@ async function cpdpSendVin(){
     setTimeout(()=>{ cpdp.vin={ date:V.date, parsed:null, fileName:"", suppliers:[], selected:{}, sent:false, err:"" }; renderCPDPCard(); },1500);
   }catch(e){ V.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
 }
+/* ==================== PICKING (v1.9.9) ====================
+   Commande magasin préparée depuis le STOCK de l'entrepôt PDP (≠ dispatch = palette fournisseur éclatée).
+   Fichier type « CDE MONTREUIL BOISSON BRUT.xlsx » (Commande à la Centrale N°… : Code | Ref Fourn. |
+   Désignation | PUN HT | Qté | Fournisseur). 1 picking = 1 magasin (choisi dans la console).
+   Poussé vers dbCentrale → nœud picking/<sid>/{meta, state, closed}. Couleur : BLEU. */
+const PICKING_COLOR="#1565c0", PICKING_BG="#e3f2fd";
+const PICKING_STORES=[ {code:"ROB",label:"Pribon Robespierre"}, {code:"TOL",label:"Pribon Tolbiac"}, {code:"BIC",label:"Pribon Bichat"} ];
+// Correspondance code fournisseur → nom (Table fournisseurs G5, 176 codes).
+const PICKING_FOURN={"F111":"ABIOCOM","F101":"ACCENT BIO","F010":"ACTIBIO","F072":"AGIDRA","K039":"ALAIN MATHIAS","F039":"ALAIN MATHIAS","F050":"ALTERBIO","F058":"AQUIBIO","F006":"ARCADIE","K146":"ARCHIPEL","F053":"ASSIETTE BLEUE","F001":"ATELIERS BIO DE PROVENCE","F052":"ATMA GOLDEN TEMPLE FRANCE","F047":"AVRIL","F063":"AZADE","F091":"BAPBAP","F074":"BARTHE SCEA","F054":"BARTHOLUS","F118":"BELLEDONNE","F066":"BELVAS","F082":"BERHGMAN","K065":"BETTEND","F065":"BETTEND APICULTEUR RECOLTANT","F090":"BIO ALIZE","F041":"BIODIS","F092":"BIODYSSEE","F024":"BOCCA SACS","F005":"BODIN","KO03":"BODIN","K005":"BODIN","F040":"BRUEL RUNGIS","F114":"BRUT DE PAIN","F076":"CAFE CAPUCH","F011":"CAFÉ DAGOBERT","F131":"CAP TERRE","K038":"CARREL","F012":"CERECO","F013":"CODEFA","F130":"COMPTOIR D'AILLEURS","K130":"COMPTOIR D'AILLEURS","F049":"COMPTOIR DES LYS","F102":"CONFIT DE PROVENCE","F057":"CRUARD BOUDINEL","K145":"DECK ET DONOHUE","F033":"DELON OU ODEON","F112":"DEMARNE","F120":"DILISCO","F007":"ECODIS","F014":"EKIBIO","F132":"EVEA","F051":"FORT & VERT","F888":"FOUR TEST","F004":"FRDP","K075":"FRELIN","F075":"FRELIN JACQUES","F117":"FROMAVILLE","F035":"FRUITS","F030":"GABORIT","KO06":"GABORIT","K030":"GABORIT","K128":"GO NUTS","F128":"GO NUTS","F103":"GPH","F108":"GRAVIER","F084":"GRILLEAU","F015":"GUAYAPI","F037":"GUINTRANDY","K037":"GUINTRANDY","F119":"HACHETTE","K143":"HAUTES GOHARDES","F059":"IBB","F087":"IDEEL GARDEN","F122":"INTERFORUM","F069":"ISTRENN PASSION","F098":"JARDIN GAIA","F104":"JARDIN GAIA","F038":"JEFF CARREL","F046":"J.M. RIMBERT","F032":"JURAFLORE","F016":"KAMBIO","F097":"KARINE ET JEFF","K135":"KEDELAI","KO01":"KEDELAI","F017":"KERAMIS","F089":"KOKOPELLI","F106":"KRUZ","KO05":"KSF SAFA","K139":"KURA","F077":"KYUKE","F045":"LA CREMERIE PARISIENNE","F031":"LA GALOTIERE","K031":"LA GALOTIERE","K144":"LA PARISIENNE","F073":"LA SAUGE","F078":"LE GROS BIO","F034":"LEGUMERIE","F036":"LEGUMES AMBIANT","F081":"LE VIEUX POINTET","F116":"LOU PRUNEL","KO02":"MAISADOUR","K134":"MAISADOUR","F085":"MAISON BIO SAIN","F124":"MAISON DELAMARRE","F129":"MAISON HAVAS","F071":"MARKAL","F029":"MELLOT","K029":"MELLOT","F126":"MILPAS","126":"MILPAS","K093":"MONGESTINE","F093":"MONGESTINE","K147":"MORTIER","F083":"MOULIN DES MOINES","K136":"MR MUESLI","F109":"NATESCIENCE","F008":"NUTRITION & SANTE","F088":"ON SEME TOUS","F018":"PATIBIO","F079":"PATRICK BOUMARD","PDP":"PDP","K137":"PEPIN LA BALLE","F002":"PHARMACIE DELPECH","F080":"PODER","F105":"POPOTE","028":"PORC BIO DU CENTRE","F123":"PRIBON TOLBIAC","F003":"PRIM BIO","F099":"PROBON","PROBON":"PROBON","F055":"PRONADIS","F100":"PROSAIN FAVRICHON","F019":"PURAL (CLIENT 30200)","F094":"RELAIS VERT","F107":"RICARDELLE DE LAUTREC","K107":"RICARDELLE DE LAUTREC","K046":"RIMBERT","F028":"ROCHEBLIN","K026":"SAFA KING SEE FOOD","F095":"SAINT CYRGUES","F043":"SAPORIT","F061":"SAS BLANC","F062":"SAS CHB - COCHONS DE MARZAN","K127":"SAVAGE ROASTERS","F127":"SAVAGE ROASTERS","F086":"SAVARY","K113":"SBV","KO04":"SBV","F113":"SBV","F020":"SENFAS","F023":"SICABA","F121":"SODIS UD","F009":"SOLE MIO","F044":"SOVINTEX","F042":"STURM","F115":"SUPERNATURAL","F133":"SYMBIOSE","K140":"SYMPLES","F021":"TEMACO","F070":"TERRE DE CHANVRE","F056":"TERRE DE MIEL","F125":"TERRE ET FOURCHETTE","F067":"UGALAIT","K138":"UMA","F068":"UNION FRUITIERES BIO COMTOISES","K141":"VAILLANT GRANDES VIGNES","F025":"VENDEUR FL","K142":"VIGNEAU CHEVREAU","K096":"VILLA NORIA","F096":"VILLA NORIA","K060":"VINCENT COUCHE","F060":"VINCENT COUCHE","F022":"VITAFRAIS","F064":"VITAGERMINE","F110":"VITAL+","F027":"VITAMONT","F048":"WALLO WASH"};
+function pickingSupName(code){
+  const c=String(code||"").trim().toUpperCase(); if(!c) return "";
+  return PICKING_FOURN[c] || PICKING_FOURN[c.replace(/^([A-Z])O/,"$10")] || PICKING_FOURN[c.replace(/^([A-Z])0/,"$1O")] || c;
+}
+function pickingStoreFromText(t){
+  const n=normColC(t);
+  if(/montreuil|robespierre/.test(n)) return "ROB";
+  if(/tolbiac/.test(n)) return "TOL";
+  if(/bichat/.test(n)) return "BIC";
+  return "";
+}
+function pickingNum(v){ if(v==null||v==="") return 0; const n=parseFloat(String(v).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
+function parsePickingExcel(workbook){
+  const sheet=workbook.Sheets[workbook.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:true}); // raw : EAN sans notation 3.77E+12
+  let orderNum="", orderDate="", store="";
+  // En-tête : N° de commande, date, magasin.
+  for(const r of rows){
+    const cells=r.map(c=>String(c==null?"":c).trim());
+    const c0=normColC(cells[0]);
+    if(/commande.*centrale/.test(c0)){ const rest=cells.slice(1).filter(Boolean); if(!orderNum&&rest[0]) orderNum=rest[0]; if(!store) rest.forEach(x=>{ if(!store) store=pickingStoreFromText(x); }); }
+    else if(c0==="le" && !orderDate){ const v=r.slice(1).find(x=>x!==""&&x!=null); orderDate=(typeof v==="number")?XLSX.SSF.format("dd/mm/yyyy",v):String(v||""); }
+    else if(!store && /^pribon\s*-/.test(c0)){ store=pickingStoreFromText(cells[0]); }
+  }
+  // Colonnes (1re ligne d'en-tête « Code … Désignation … Qté … Fournisseur »).
+  let hIdx=-1, col={};
+  for(let i=0;i<Math.min(rows.length,40);i++){
+    const n=rows[i].map(c=>normColC(c));
+    if(n.some(c=>c==="designation"||c==="libelle") && n.some(c=>/^qte|^quantite/.test(c))){ hIdx=i;
+      n.forEach((c,j)=>{ if(c==="code"||c==="code article"||c==="ean") col.code=(col.code===undefined?j:col.code);
+        else if(c.startsWith("ref")) col.ref=j; else if(c==="designation"||c==="libelle") col.des=j;
+        else if(c.startsWith("pu")) col.pu=j; else if(/^qte|^quantite/.test(c)) col.qty=j; else if(c.startsWith("fournisseur")||c==="frs") col.sup=j; });
+      break; }
+  }
+  if(hIdx===-1||col.des===undefined||col.qty===undefined) throw new Error("Format non reconnu : colonnes Désignation / Qté introuvables.");
+  const products=[], seen={};
+  for(let i=hIdx+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue;
+    const des=String(r[col.des]||"").trim(); if(!des || normColC(des)==="designation") continue; // en-tête répété (saut de page)
+    const qty=Math.round(pickingNum(r[col.qty])); if(qty<=0) continue;
+    const rawE=col.code!==undefined?r[col.code]:""; const ean=(typeof rawE==="number"?String(Math.round(rawE)):String(rawE)).replace(/\s/g,"").replace(/\.0+$/,"");
+    const supCode=String(col.sup!==undefined?r[col.sup]:"").trim().toUpperCase();
+    let k=ean?("e_"+ean.replace(/[^0-9A-Za-z]/g,"")):("i_"+i); if(seen[k]) k=k+"_"+i; seen[k]=1;
+    products.push({ k, ean, ref:String(col.ref!==undefined?r[col.ref]:"").trim(), designation:des, pu:pickingNum(col.pu!==undefined?r[col.pu]:0), qty, supCode, supName:pickingSupName(supCode) });
+  }
+  if(!products.length) throw new Error("Aucune ligne produit (Qté > 0) trouvée.");
+  return { orderNum, orderDate, store, products };
+}
+async function cpdpPickingFile(file){ if(!file) return; const P=cpdp.picking; P.err=""; P.fileName=file.name||"picking";
+  try{ const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"}); P.parsed=parsePickingExcel(wb); P.sent=false;
+    if(P.parsed.store) P.store=P.parsed.store; }
+  catch(e){ P.parsed=null; P.err="Erreur : "+e.message; } renderCPDPCard(); }
+async function cpdpSendPicking(){
+  const P=cpdp.picking; if(!P.parsed) return;
+  if(!P.store){ P.err="Choisis le magasin destinataire."; renderCPDPCard(); return; }
+  if(!dbCentrale){ P.err="Connexion centrale indisponible."; renderCPDPCard(); return; }
+  const st=PICKING_STORES.find(x=>x.code===P.store)||{code:P.store,label:P.store};
+  const num=String(P.parsed.orderNum||"").replace(/[^a-zA-Z0-9]/g,"");
+  const sid="pk_"+st.code.toLowerCase()+"_"+(num||Date.now());
+  const ex=(centraleState.picking||{})[sid];
+  if(ex&&ex.meta){ const x=pickingStatsC(ex);
+    if(!confirm("Ce picking existe déjà ("+st.label+" · commande "+(P.parsed.orderNum||"")+" · "+x.done+"/"+x.total+" pointés"+(ex.closed?" · CLÔTURÉ":"")+").\n\nLe REMPLACER (le pointage existant sera effacé) ?")) return;
+    try{ await dbCentrale.ref("picking/"+sid).remove(); }catch(e){} }
+  const nbSup=new Set(P.parsed.products.map(p=>p.supName||p.supCode)).size;
+  try{ await dbCentrale.ref("picking/"+sid+"/meta").set({ kind:"picking", orderNum:P.parsed.orderNum||"", orderDate:P.parsed.orderDate||"", storeCode:st.code, storeLabel:st.label,
+      fileName:P.fileName||"", products:P.parsed.products, nbSup, startedAt:Date.now(), createdBy:ME_EMAIL });
+    P.sent=true; P.err=""; renderCPDPCard();
+    alert("✓ Picking « "+st.label+" » (commande "+(P.parsed.orderNum||"—")+", "+P.parsed.products.length+" produits, "+nbSup+" fournisseurs) envoyé à La Centrale PDP.");
+    setTimeout(()=>{ cpdp.picking={ parsed:null, fileName:"", store:"", sent:false, err:"" }; renderCPDPCard(); },1500);
+  }catch(e){ P.err="Erreur d'envoi : "+e.message; renderCPDPCard(); }
+}
+// Stats d'un picking (même logique que la tablette).
+function pickingStatsC(p){
+  const prods=(p&&p.meta&&p.meta.products)||[]; const st=(p&&p.state)||{};
+  let done=0, ok=0, short=0, qty=0, picked=0; const ops={}; let first=0,last=0;
+  prods.forEach(x=>{ const s=st[x.k]; qty+=Number(x.qty)||0;
+    if(s&&s.done){ done++; const pq=Number(s.picked)||0; picked+=pq; if(pq>=(Number(x.qty)||0)) ok++; else short++;
+      if(s.doneBy&&!s.auto) ops[s.doneBy]=1; if(s.doneAt&&!s.auto){ if(!first||s.doneAt<first) first=s.doneAt; if(s.doneAt>last) last=s.doneAt; } } });
+  return { total:prods.length, done, ok, short, qty, picked, operators:Object.keys(ops), durationMs:(first&&last)?(last-first):0 };
+}
+function pickingBadge(){ return `<span style="background:${PICKING_COLOR};color:#fff;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:800">🛒 PICKING</span>`; }
+function dispatchBadge(){ return `<span style="background:#1a4d2e;color:#fff;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:800">🚚 DISPATCH</span>`; }
+function pickingHistoCard(s){ const x=pickingStatsC(s); const m=s.meta||{};
+  return `<div class="rec valid" style="border-left:6px solid ${PICKING_COLOR};background:#f7fbff">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+      <div style="font-weight:800;font-size:15px">${pickingBadge()} ${esc(m.storeLabel||m.storeCode||'?')}</div>
+      <div style="font-size:12px;color:#999">${esc(dateShort(m.startedAt))} ${esc(heure(m.startedAt))}</div></div>
+    <div style="font-size:12px;color:#666;margin:2px 0 6px">Commande <b>${esc(m.orderNum||'—')}</b>${m.orderDate?(' du '+esc(m.orderDate)):''} · ${m.nbSup||'?'} fournisseur(s) · 👤 ${esc(m.createdBy||'—')}${x.operators.length?(' · '+esc(x.operators.join(', '))):''}</div>
+    <div style="display:flex;gap:12px;font-size:12px;flex-wrap:wrap">
+      <span>📦 <b>${x.done}/${x.total}</b></span><span>⏱ ${fmtDurMs(x.durationMs)}</span>
+      ${x.short?`<span style="color:#e65100;font-weight:700">⚠ ${x.short} manque(s)</span>`:(x.done?'<span style="color:#2e7d32">complet</span>':'')}
+      ${s.closed?`<span class="badge ok">✓ clôturé ${esc(heure(s.closed.at))}</span>`:'<span class="badge warn">en cours</span>'}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="padding:8px 12px;font-size:13px;background:${PICKING_COLOR}" onclick="openPickingDetail('${esc(s.id)}')">👁 Détail</button>
+      <button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="deletePicking('${esc(s.id)}')">🗑 Supprimer</button>
+    </div></div>`; }
+function openPickingDetail(sid){
+  const s=(centraleState.picking||{})[sid]; if(!s||!s.meta) return; const m=s.meta, st=s.state||{};
+  const groups={}; (m.products||[]).forEach(p=>{ const n=p.supName||p.supCode||"?"; (groups[n]=groups[n]||[]).push(p); });
+  const rows=Object.keys(groups).sort((a,b)=>a.localeCompare(b,"fr")).map(g=>
+    `<tr><td colspan="6" style="background:${PICKING_BG};font-weight:800;color:#0d2b5c">🏷️ ${esc(g)}</td></tr>`+groups[g].map(p=>{ const x=st[p.k]||{}; const pq=x.done?(Number(x.picked)||0):null; const ec=pq==null?null:pq-(Number(p.qty)||0);
+      return `<tr${ec!=null&&ec<0?' style="background:#fff3e0"':''}><td style="font-family:monospace">${esc(p.ean||'')}</td><td>${esc(p.designation||'')}</td><td>${p.qty}</td><td><b>${pq==null?'—':pq}</b></td><td style="${ec?'color:#c62828;font-weight:700':''}">${ec==null?'non pointé':(ec>0?'+':'')+ec}</td><td style="font-size:12px">${esc(x.doneBy||'')}</td></tr>`; }).join("")).join("");
+  const x=pickingStatsC(s);
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box" style="border-top:6px solid ${PICKING_COLOR}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">${pickingBadge()} ${esc(m.storeLabel||'')} · commande ${esc(m.orderNum||'—')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div class="muted" style="margin:4px 0 10px">Chargé le ${esc(dateShort(m.startedAt))} ${esc(heure(m.startedAt))} par ${esc(m.createdBy||'—')} · ${x.done}/${x.total} pointés · ${x.picked}/${x.qty} u.${x.short?(' · <b style="color:#e65100">'+x.short+' manque(s)</b>'):''}${s.closed?(' · ✓ clôturé par '+esc(s.closed.by||'')+' à '+esc(heure(s.closed.at))):''}</div>
+    <div style="overflow:auto;max-height:60vh"><table><thead><tr><th>Code</th><th>Désignation</th><th>Commandé</th><th>Mis palette</th><th>Écart</th><th>Par</th></tr></thead><tbody>${rows}</tbody></table></div>
+  </div>`;
+  back.onclick=(e)=>{ if(e.target===back) back.remove(); };
+  document.body.appendChild(back);
+}
+async function deletePicking(sid){
+  const s=(centraleState.picking||{})[sid];
+  const lbl=(s&&s.meta)?((s.meta.storeLabel||'?')+' · commande '+(s.meta.orderNum||'—')+' · '+dateShort(s.meta.startedAt)):sid;
+  if(!confirm("Supprimer ce picking ?\n\n"+lbl+"\n\nIl disparaîtra de l'historique, du Suivi live et de « La Centrale PDP » (tablette). Action définitive.")) return;
+  if(!dbCentrale){ alert("Connexion CENTRALE indisponible."); return; }
+  try{ await dbCentrale.ref("picking/"+sid).remove(); }catch(e){ alert("Erreur : "+e.message); }
+}
+
 async function cpdpDispatchFile(file){ if(!file) return; cpdp.dispatch.err=""; cpdp.dispatch.fileName=file.name||"dispatch";
   try{ const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"}); cpdp.dispatch.parsed=parseDispatchExcel(wb); cpdp.dispatch.sent=false; }
   catch(e){ cpdp.dispatch.parsed=null; cpdp.dispatch.err="Erreur : "+e.message; } renderCPDPCard(); }
@@ -1501,8 +1654,8 @@ function renderMsg(){
   const ready=readyStores();
   if(!msgStore && ready.length) msgStore=ready[0].code;
   if(!el.dataset.built){
-    const opts='<option value="CENTRALE:dispatch">🚚 Entrepôt — Dispatch palette</option><option value="CENTRALE:decoupe">🧀 Entrepôt — Découpe fromage</option>'+ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
-    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux <b>vendeurs d'un magasin</b> ou aux <b>opérateurs de l'entrepôt</b> — au choix <b>Dispatch palette</b> ou <b>Découpe fromage</b>. Il s'affiche tant qu'il est valable.</p>
+    const opts='<option value="CENTRALE:dispatch">🚚 Entrepôt — Dispatch &amp; Picking</option><option value="CENTRALE:decoupe">🧀 Entrepôt — Découpe fromage</option>'+ready.map(s=>`<option value="${s.code}">${esc(s.label)}</option>`).join("");
+    el.innerHTML=`<p class="muted" style="margin-top:0">Envoie un message aux <b>vendeurs d'un magasin</b> ou aux <b>opérateurs de l'entrepôt</b> — au choix <b>Dispatch &amp; Picking</b> ou <b>Découpe fromage</b>. Il s'affiche tant qu'il est valable.</p>
       <div class="card">
         <div class="field"><label>Magasin</label><select id="msgStoreSel" style="width:100%" onchange="msgStore=this.value;renderMsgList()">${opts}</select></div>
         <div class="field"><label>Message</label><textarea id="msgText" rows="4" style="width:100%" placeholder="Ex : Vous n'aurez pas les yaourts X aujourd'hui, c'est normal."></textarea></div>
@@ -1562,7 +1715,7 @@ async function sendBroadcast(){
     if(isCentrale) payload.target=target;
     await ref.set(payload);
     document.getElementById("msgText").value="";
-    const label=isCentrale?("entrepôt · "+(target==="dispatch"?"Dispatch palette":target==="decoupe"?"Découpe fromage":"tous")):((STORES.find(x=>x.code===code)||{}).label||code);
+    const label=isCentrale?("entrepôt · "+(target==="dispatch"?"Dispatch & Picking":target==="decoupe"?"Découpe fromage":"tous")):((STORES.find(x=>x.code===code)||{}).label||code);
     out.innerHTML='<div class="ok">✓ Message envoyé à '+esc(label)+'.</div>';
   }catch(e){ out.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
   btn.disabled=false; btn.textContent="Envoyer le message";
@@ -1736,14 +1889,15 @@ async function liveDelete(kind, a, b){
   if(kind==="recDraft") return deleteReception(a,b);      // réception en cours
   if(kind==="rec") return deleteRecG5(a,b);               // réception validée
   if(kind==="dispatch") return deleteDispatch(a);
+  if(kind==="picking") return deletePicking(a);
   if(kind==="decoupe") return deleteDecoupeSession(a,b);
 }
 // Suivi live : supprimer TOUT un jour (popup de confirmation)
 let liveDayItems={};
 async function liveDeleteDay(k){
   const list=liveDayItems[k]||[]; if(!list.length) return;
-  const n={doc:0,rec:0,dispatch:0,decoupe:0}; list.forEach(x=>{ if(x.kind==="doc")n.doc++; else if(x.kind.startsWith("rec"))n.rec++; else n[x.kind]++; });
-  const det=[n.doc?n.doc+" document(s) envoyé(s)":"", n.rec?n.rec+" réception(s)":"", n.dispatch?n.dispatch+" dispatch":"", n.decoupe?n.decoupe+" découpe(s)":""].filter(Boolean).join(" · ");
+  const n={doc:0,rec:0,dispatch:0,picking:0,decoupe:0}; list.forEach(x=>{ if(x.kind==="doc")n.doc++; else if(x.kind.startsWith("rec"))n.rec++; else n[x.kind]++; });
+  const det=[n.doc?n.doc+" document(s) envoyé(s)":"", n.rec?n.rec+" réception(s)":"", n.dispatch?n.dispatch+" dispatch":"", n.picking?n.picking+" picking":"", n.decoupe?n.decoupe+" découpe(s)":""].filter(Boolean).join(" · ");
   if(!confirm("⚠️ SUPPRIMER TOUT le "+k.split("-").reverse().join("/")+" ?\n\n"+list.length+" élément(s) : "+det+"\n\nAction DÉFINITIVE (Firebase). Confirmer ?")) return;
   let err=0;
   for(const x of list){
@@ -1751,6 +1905,7 @@ async function liveDeleteDay(k){
       if(x.kind==="doc"){ await dbByStore[x.a].ref("documents/"+x.b).remove(); }
       else if(x.kind==="rec"||x.kind==="recDraft"){ await dbByStore[x.a].ref("receptions/"+x.b).remove(); }
       else if(x.kind==="dispatch"){ await dbCentrale.ref("dispatch/"+x.a).remove(); }
+      else if(x.kind==="picking"){ await dbCentrale.ref("picking/"+x.a).remove(); }
       else if(x.kind==="decoupe"){ await dbCentrale.ref("decoupe/"+x.a).remove(); }
     }catch(e){ err++; }
   }
@@ -1787,6 +1942,9 @@ function renderSuivi(){
   if(suiviType==='tous'||suiviType==='dispatch') Object.entries(centraleState.dispatch||{}).forEach(([sid,s])=>{
     if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=dispatchStats(sess); const sendTs=s.meta.startedAt||0;
     if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"dispatch", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
+  if(suiviType==='tous'||suiviType==='picking') Object.entries(centraleState.picking||{}).forEach(([sid,s])=>{
+    if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}, closed:s.closed||null}; const stx=pickingStatsC(s); const sendTs=s.meta.startedAt||0;
+    if((now-sendTs)<WINDOW || !s.closed){ if(!s.closed) totalDraft++; items.push({type:"picking", sess, stats:stx, sendTs, kind: s.closed?"valid":"encours"}); } });
   if(suiviType==='tous'||suiviType==='decoupe') Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{
     if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=decoupeStatsC(sess);
     // Classée au jour de la DERNIÈRE découpe saisie (sinon au jour de création) → ce qui a été découpé aujourd'hui apparaît aujourd'hui.
@@ -1798,6 +1956,17 @@ function renderSuivi(){
   const dayKeys=Object.keys(byDay).sort((a,b)=>(byDay[b].ts||0)-(byDay[a].ts||0));
 
   const card=(it)=>{
+    if(it.type==="picking"){
+      const s=it.sess, stx=it.stats, draft=it.kind==="encours"; const pct=stx.total?Math.round(stx.done/stx.total*100):0;
+      return `<div class="rec ${draft?'draft':'valid'}" style="cursor:pointer;border-left:6px solid ${PICKING_COLOR}" onclick="openPickingDetail('${esc(s.id)}')" title="Voir le détail de ce picking">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
+          <div><div style="font-weight:800;font-size:14px">${pickingBadge()} ${esc(s.meta.storeLabel||s.meta.storeCode||'?')}</div>
+          <div style="font-size:12px;color:${PICKING_COLOR};font-weight:700">Picking · commande ${esc(s.meta.orderNum||'—')} · 👤 ${esc(s.meta.createdBy||'—')}${stx.operators.length?(' · '+esc(stx.operators.join(', '))):''}</div></div>
+          <span class="badge ${draft?'warn':'ok'}">${draft?'🟡 En cours':'✅ Clôturé'}</span></div>
+        <div class="pbar"><div class="pfill" style="width:${pct}%;background:${PICKING_COLOR}"></div></div>
+        <div style="font-size:12px;color:#666;margin-top:4px">${stx.done}/${stx.total} (${pct}%) · ${s.meta.nbSup||'?'} fournisseur(s) · chargé ${esc(heure(it.sendTs))}${stx.short?` · <b style="color:#e65100">⚠ ${stx.short} manque(s)</b>`:''} · 👁 cliquer pour le détail</div>
+        <div style="margin-top:6px"><button class="btn" style="background:#fdecea;color:#c62828;padding:5px 10px;font-size:12px" onclick="event.stopPropagation();liveDelete('picking','${esc(s.id)}')">🗑 Supprimer</button></div></div>`;
+    }
     if(it.type==="dispatch"||it.type==="decoupe"){
       const s=it.sess, stx=it.stats, draft=it.kind==="encours";
       const icon=it.type==="dispatch"?"🚚":"🧀", lab=it.type==="dispatch"?"Dispatch palette":"Découpe fromage";
@@ -1805,7 +1974,7 @@ function renderSuivi(){
       const clickable=it.type==="decoupe"?` style="cursor:pointer" onclick="openDecoupeDetail('${esc(s.id)}')" title="Voir le détail de cette découpe"`:"";
       return `<div class="rec ${draft?'draft':'valid'}"${clickable}>
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
-          <div><div style="font-weight:800;font-size:14px">${icon} ${esc(s.meta.supplier||lab)}</div>
+          <div><div style="font-weight:800;font-size:14px">${it.type==="dispatch"?dispatchBadge():icon} ${esc(s.meta.supplier||lab)}</div>
           <div style="font-size:12px;color:#1a4d2e;font-weight:700">${lab} · 👤 ${esc(s.meta.createdBy||'—')}${stx.operators.length?(' · '+esc(stx.operators.join(', '))):''}</div></div>
           <span class="badge ${draft?'warn':'ok'}">${draft?'🟡 En cours':'✅ Terminé'}</span></div>
         <div class="pbar"><div class="pfill" style="width:${pct}%"></div></div>
@@ -1849,6 +2018,7 @@ function renderSuivi(){
     // éléments supprimables de ce jour (pour « Tout supprimer »)
     liveDayItems[k]=day.list.map(it=>{
       if(it.type==="dispatch") return {kind:"dispatch",a:it.sess.id};
+      if(it.type==="picking") return {kind:"picking",a:it.sess.id};
       if(it.type==="decoupe") return {kind:"decoupe",a:it.sess.id};
       if(it.kind==="attente") return it.docId?{kind:"doc",a:it.store.code,b:it.docId}:null;
       return it.rec?{kind:it.kind==="encours"?"recDraft":"rec",a:it.store.code,b:it.rec.id}:null;
@@ -1866,7 +2036,7 @@ function renderSuivi(){
   }).join("");
 
   const fbtn=(v,lab)=>`<button class="btn" style="padding:7px 12px;font-size:13px;background:${suiviType===v?'#1a4d2e':'#eef2f7'};color:${suiviType===v?'#fff':'#333'}" onclick="suiviType='${v}';renderSuivi()">${lab}</button>`;
-  const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('decoupe','🧀 Découpe')}${(suiviType==='tous'||suiviType==='decoupe')&&emptyDecoupeSids().length?`<button class="btn" style="padding:7px 12px;font-size:13px;background:#fdecea;color:#c62828;margin-left:auto" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}</div>`;
+  const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('picking','🛒 Picking')}${fbtn('decoupe','🧀 Découpe')}${(suiviType==='tous'||suiviType==='decoupe')&&emptyDecoupeSids().length?`<button class="btn" style="padding:7px 12px;font-size:13px;background:#fdecea;color:#c62828;margin-left:auto" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}</div>`;
   el.innerHTML=filterBar+`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} en cours — vue par <b>date d'envoi</b>, temps réel.</p>${html||'<div class="muted">Rien à suivre pour ce filtre.</div>'}`;
   el.dataset.rendered="1";
 }
@@ -2085,7 +2255,7 @@ function renderCentrale(){
   const view=centraleView||"ecarts";
   const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
-    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique dispatch</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique Dispatch &amp; Picking</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='decoupe'?'#8a5a00':'#eef2f7'};color:${view==='decoupe'?'#fff':'#333'}" onclick="centraleView='decoupe';renderCentrale()">🧀 Historique découpe</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='traca'?'#8a5a00':'#eef2f7'};color:${view==='traca'?'#fff':'#333'}" onclick="centraleView='traca';renderCentrale()">🏷️ Traçabilité</button>
   </div>`;
@@ -2122,10 +2292,14 @@ function renderCentrale(){
   let list=sessions.slice();
   if(dpHistoSearch){ const q=norm(dpHistoSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)); }
   if(dpHistoDate){ list=list.filter(s=>{ const d=new Date(s.meta.startedAt||0); const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); return iso===dpHistoDate; }); }
-  const card=(s)=>{ const st=dispatchStats(s); const ec=sessionEcarts(s).length;
-    return `<div class="rec valid">
+  // PICKING (même historique, couleur bleue)
+  let pkList=Object.entries(centraleState.picking||{}).filter(([k,p])=>p&&p.meta).map(([k,p])=>Object.assign({id:k},p));
+  if(dpHistoSearch){ const q=norm(dpHistoSearch); pkList=pkList.filter(p=>norm(p.meta.storeLabel).includes(q)||norm(p.meta.storeCode).includes(q)||norm(p.meta.orderNum).includes(q)||norm(p.meta.createdBy).includes(q)||norm("picking").includes(q)); }
+  if(dpHistoDate){ pkList=pkList.filter(p=>isoDayKey(p.meta.startedAt)===dpHistoDate); }
+  const card=(s)=>{ if(s.__pk) return pickingHistoCard(s); const st=dispatchStats(s); const ec=sessionEcarts(s).length;
+    return `<div class="rec valid" style="border-left:6px solid #1a4d2e">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-        <div style="font-weight:800;font-size:15px">${esc(s.meta.supplier||'?')}</div>
+        <div style="font-weight:800;font-size:15px">${dispatchBadge()} ${esc(s.meta.supplier||'?')}</div>
         <div style="font-size:12px;color:#999">${esc(dateShort(s.meta.startedAt))} ${esc(heure(s.meta.startedAt))}</div></div>
       <div style="font-size:12px;color:#666;margin:2px 0 6px">👤 ${esc(s.meta.createdBy||'—')}${st.operators.length?(' · '+esc(st.operators.join(', '))):''}</div>
       <div style="display:flex;gap:12px;font-size:12px;flex-wrap:wrap">
@@ -2141,27 +2315,29 @@ function renderCentrale(){
   // Regroupement par JOURNÉE (aujourd'hui déplié, autres jours repliés ; mois en cours par défaut).
   const todayIso=isoDayKey(Date.now()); const curMonth=todayIso.slice(0,7);
   const groups={}; list.forEach(s=>{ const k=isoDayKey(s.meta.startedAt); (groups[k]=groups[k]||[]).push(s); });
+  pkList.forEach(p=>{ p.__pk=true; const k=isoDayKey(p.meta.startedAt); (groups[k]=groups[k]||[]).push(p); });
   const allDays=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
   const shownDays = dpHistoDate ? allDays.filter(k=>k===dpHistoDate) : allDays.filter(k=>k.slice(0,7)===curMonth);
   const olderCount = allDays.length - shownDays.length;
   const dayBlock=(k)=>{ const sess=groups[k].slice().sort((a,b)=>(b.meta.startedAt||0)-(a.meta.startedAt||0));
-    const nEc=sess.reduce((n,s)=>n+(sessionEcarts(s).length>0?1:0),0);
+    const nEc=sess.reduce((n,s)=>n+(s.__pk?(pickingStatsC(s).short>0?1:0):(sessionEcarts(s).length>0?1:0)),0);
+    const nPk=sess.filter(s=>s.__pk).length, nDp=sess.length-nPk;
     const open=(k===todayIso)?' open':'';
     return `<details${open} style="margin:10px 0;border:1px solid #d7e0d7;border-radius:10px;padding:8px 12px;background:#fcfdfc">
         <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:15px;font-weight:900;color:#1a4d2e">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${sess.length} dispatch(s)</span></span>
+          <span style="font-size:15px;font-weight:900;color:#1a4d2e">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${nDp} dispatch · <span style="color:${PICKING_COLOR}">${nPk} picking</span></span></span>
           ${nEc?('<span class="badge warn">⚠ '+nEc+' avec écart(s)</span>'):'<span class="badge ok">conformes</span>'}
         </summary>
         <div class="live-grid" style="margin-top:10px">${sess.map(card).join("")}</div>
       </details>`; };
   const olderNote = (!dpHistoDate && olderCount>0) ? `<div class="muted" style="margin:6px 0 12px;font-size:12px">➕ ${olderCount} jour(s) de mois précédents masqués — utilise le filtre <b>Date</b> ci-dessus pour les afficher.</div>` : '';
-  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique dispatch, <b>par journée</b> (aujourd'hui ouvert, les autres à déplier). Par défaut le <b>mois en cours</b> ; les mois précédents via le filtre Date.</p>
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique <b style="color:#1a4d2e">🚚 dispatch</b> &amp; <b style="color:${PICKING_COLOR}">🛒 picking</b>, <b>par journée</b> (aujourd'hui ouvert, les autres à déplier). Par défaut le <b>mois en cours</b> ; les mois précédents via le filtre Date.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-      <input placeholder="🔎 fournisseur, dispatcheur…" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
+      <input placeholder="🔎 fournisseur, magasin, n° commande…" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpHistoDate)}" onchange="dpHistoDate=this.value;renderCentrale()"/>
       <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpHistoDate='';dpHistoSearch='';renderCentrale()">✕</button>
     </div>${olderNote}
-    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucun dispatch '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>'}`;
+    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucun dispatch / picking '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>'}`;
 }
 function openCentraleDetail(sid){
   const s=(centraleState.dispatch||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s);
