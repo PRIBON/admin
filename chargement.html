@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.9";
+const APP_VERSION = "1.9.10";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -1322,6 +1322,8 @@ function pickingHistoCard(s){ const x=pickingStatsC(s); const m=s.meta||{};
     </div>
     <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
       <button class="btn btn-primary" style="padding:8px 12px;font-size:13px;background:${PICKING_COLOR}" onclick="openPickingDetail('${esc(s.id)}')">👁 Détail</button>
+      <button class="btn" style="background:#e8f5e9;color:#1b5e20;padding:8px 12px;font-size:13px" onclick="dlPickingXlsx('${esc(s.id)}')">📊 Excel</button>
+      <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlPickingTxt('${esc(s.id)}')">⬇️ .txt G5</button>
       <button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="deletePicking('${esc(s.id)}')">🗑 Supprimer</button>
     </div></div>`; }
 function openPickingDetail(sid){
@@ -1336,9 +1338,54 @@ function openPickingDetail(sid){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">${pickingBadge()} ${esc(m.storeLabel||'')} · commande ${esc(m.orderNum||'—')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <div class="muted" style="margin:4px 0 10px">Chargé le ${esc(dateShort(m.startedAt))} ${esc(heure(m.startedAt))} par ${esc(m.createdBy||'—')} · ${x.done}/${x.total} pointés · ${x.picked}/${x.qty} u.${x.short?(' · <b style="color:#e65100">'+x.short+' manque(s)</b>'):''}${s.closed?(' · ✓ clôturé par '+esc(s.closed.by||'')+' à '+esc(heure(s.closed.at))):''}</div>
     <div style="overflow:auto;max-height:60vh"><table><thead><tr><th>Code</th><th>Désignation</th><th>Commandé</th><th>Mis palette</th><th>Écart</th><th>Par</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-green btn-lg" style="flex:1" onclick="dlPickingXlsx('${esc(sid)}')">📊 Export Excel</button>
+      <button class="btn btn-lg" style="flex:1;background:#eef2f7" onclick="dlPickingTxt('${esc(sid)}')">⬇️ .txt G5 (EAN + quantité)</button>
+    </div>
   </div>`;
   back.onclick=(e)=>{ if(e.target===back) back.remove(); };
   document.body.appendChild(back);
+}
+/* ---- Exports picking (v1.9.10) ---- */
+function pickingExportLines(s){
+  const m=s.meta||{}, st=s.state||{};
+  return (m.products||[]).map(p=>{ const x=st[p.k]||{}; const picked=x.done?(Number(x.picked)||0):0;
+    return { supplier:p.supName||p.supCode||"", supCode:p.supCode||"", ean:p.ean||"", designation:p.designation||"", qty:Number(p.qty)||0, picked,
+      ecart:picked-(Number(p.qty)||0), done:!!x.done, by:x.doneBy||"", at:x.doneAt||0 }; })
+    .sort((a,b)=>a.supplier.localeCompare(b.supplier,"fr")||a.designation.localeCompare(b.designation,"fr"));
+}
+function pickingFileBase(s){
+  const m=s.meta||{}; const d=new Date((s.closed&&s.closed.at)||m.startedAt||Date.now());
+  const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");
+  return yy+mm+dd+"_PICKING_"+(m.storeCode||"MAG")+"_"+String(m.orderNum||"").replace(/[^a-zA-Z0-9-]/g,"");
+}
+// Excel : mêmes colonnes que le récap (détail + mail), classé par fournisseur. Onglet « Infos » = en-tête du picking.
+function dlPickingXlsx(sid){
+  const s=(centraleState.picking||{})[sid]; if(!s||!s.meta) return; const m=s.meta; const x=pickingStatsC(s);
+  const L=pickingExportLines(s);
+  const rows=[["Fournisseur","Code fourn.","Code (EAN)","Désignation","Commandé","Mis palette","Écart","Statut","Préparé par","Validé le"]]
+    .concat(L.map(l=>[l.supplier,l.supCode,l.ean,l.designation,l.qty,l.picked,l.ecart,
+      !l.done?"Non pointé":(l.ecart<0?"Manque":(l.ecart>0?"Surplus":"OK")), l.by, l.at?new Date(l.at).toLocaleString("fr-FR"):""]));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"]=[{wch:22},{wch:10},{wch:15},{wch:46},{wch:10},{wch:11},{wch:7},{wch:11},{wch:18},{wch:18}];
+  ws["!autofilter"]={ref:"A1:J"+rows.length};
+  const info=XLSX.utils.aoa_to_sheet([
+    ["Picking", m.orderNum||""],["Date commande", m.orderDate||""],["Magasin", (m.storeCode||"")+" — "+(m.storeLabel||"")],
+    ["Chargé le", m.startedAt?new Date(m.startedAt).toLocaleString("fr-FR"):""],["Chargé par", m.createdBy||""],
+    ["Clôturé le", s.closed&&s.closed.at?new Date(s.closed.at).toLocaleString("fr-FR"):"en cours"],["Clôturé par", (s.closed&&s.closed.by)||""],
+    ["Lignes", x.total],["OK", x.ok],["Manques", x.short],["Unités commandées", x.qty],["Unités mises palette", x.picked]]);
+  info["!cols"]=[{wch:20},{wch:40}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Picking"); XLSX.utils.book_append_sheet(wb,info,"Infos");
+  XLSX.writeFile(wb, pickingFileBase(s)+".xlsx");
+}
+// .txt G5 (comme la réception) : EAN <tab> quantité mise sur la palette. Lignes manquantes / non pointées = 0.
+function pickingTxt(s){
+  return pickingExportLines(s).filter(l=>l.ean).map(l=>l.ean+"\t"+String(l.picked).replace(".",",")).join("\r\n");
+}
+function dlPickingTxt(sid){
+  const s=(centraleState.picking||{})[sid]; if(!s||!s.meta) return;
+  if(!s.closed && !confirm("Ce picking n'est pas encore clôturé : le .txt contiendra le pointage actuel (non pointés = 0). Continuer ?")) return;
+  downloadTxt(pickingFileBase(s)+".txt", pickingTxt(s));
 }
 async function deletePicking(sid){
   const s=(centraleState.picking||{})[sid];
@@ -1928,28 +1975,28 @@ function renderSuivi(){
       if(!rs.length){ items.push({type:"reception", store:s, sendTs, kind:"attente", doc:d, docId:id}); return; }
       rs.forEach(r=>{ const draft=r.status!=="validated";
         if(draft){ totalDraft++; items.push({type:"reception", store:s, sendTs, kind:"encours", doc:d, rec:r, dupValidated:hasValid}); }
-        else if((now-sendTs)<WINDOW || !sendTs){ items.push({type:"reception", store:s, sendTs, kind:"valid", doc:d, rec:r}); }
+        /* v1.9.10 : Suivi live = uniquement le LIVE → réceptions validées masquées (voir l'onglet Réception) */
       });
     });
     // Réceptions sans document rattaché (héritage / doc supprimé)
     Object.entries(recs).forEach(([id,r])=>{ if(r.docId&&docs[r.docId]) return;
       const draft=r.status!=="validated"; const sendTs=r.createdAt||r.validatedAt||0;
       if(draft){ totalDraft++; items.push({type:"reception", store:s, sendTs, kind:"encours", rec:{id,...r}, orphan:true}); }
-      else if((now-sendTs)<WINDOW){ items.push({type:"reception", store:s, sendTs, kind:"valid", rec:{id,...r}, orphan:true}); }
+      /* validée → plus dans le live */
     });
   });
   // Sessions CENTRALE (dispatch + découpe) en live
   if(suiviType==='tous'||suiviType==='dispatch') Object.entries(centraleState.dispatch||{}).forEach(([sid,s])=>{
     if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=dispatchStats(sess); const sendTs=s.meta.startedAt||0;
-    if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"dispatch", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
+    if(stx.done<stx.total){ totalDraft++; items.push({type:"dispatch", sess, stats:stx, sendTs, kind:"encours"}); } });
   if(suiviType==='tous'||suiviType==='picking') Object.entries(centraleState.picking||{}).forEach(([sid,s])=>{
     if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}, closed:s.closed||null}; const stx=pickingStatsC(s); const sendTs=s.meta.startedAt||0;
-    if((now-sendTs)<WINDOW || !s.closed){ if(!s.closed) totalDraft++; items.push({type:"picking", sess, stats:stx, sendTs, kind: s.closed?"valid":"encours"}); } });
+    if(!s.closed){ totalDraft++; items.push({type:"picking", sess, stats:stx, sendTs, kind:"encours"}); } });
   if(suiviType==='tous'||suiviType==='decoupe') Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{
     if(!s||!s.meta) return; const sess={id:sid, meta:s.meta, state:s.state||{}}; const stx=decoupeStatsC(sess);
     // Classée au jour de la DERNIÈRE découpe saisie (sinon au jour de création) → ce qui a été découpé aujourd'hui apparaît aujourd'hui.
     const sendTs=stx.lastCutAt||s.meta.startedAt||0;
-    if((now-sendTs)<WINDOW || stx.done<stx.total){ if(stx.done<stx.total) totalDraft++; items.push({type:"decoupe", sess, stats:stx, sendTs, kind: stx.done<stx.total?"encours":"valid"}); } });
+    if(stx.done<stx.total){ totalDraft++; items.push({type:"decoupe", sess, stats:stx, sendTs, kind:"encours"}); } });
   // Regroupement par date d'envoi
   const byDay={};
   items.forEach(it=>{ const k=it.sendTs?dayKeyTs(it.sendTs):"0"; (byDay[k]=byDay[k]||{ts:it.sendTs||0, list:[]}); byDay[k].list.push(it); });
@@ -2028,7 +2075,7 @@ function renderSuivi(){
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none" onclick="toggleLiveDay('${k}')">
         <span style="font-size:14px;color:#1a4d2e;width:16px">${open?'▼':'▶'}</span>
         <div style="flex:1"><h3 style="margin:0;font-size:15px;color:#1a4d2e;text-transform:capitalize">📅 ${esc(dayLabel(day.ts))} <span style="font-weight:600;color:#888;font-size:13px">(${day.list.length})</span></h3>
-          <div class="muted" style="font-size:12px">📤 ${nAtt} envoyé(s) en attente · 🟡 ${nEnc} en cours · ✅ ${nVal} réceptionné(s)</div></div>
+          <div class="muted" style="font-size:12px">📤 ${nAtt} envoyé(s) en attente · 🟡 ${nEnc} en cours</div></div>
         ${liveDayItems[k].length?`<button class="btn" style="background:#fdecea;color:#c62828;padding:6px 10px;font-size:12px" onclick="event.stopPropagation();liveDeleteDay('${k}')">🗑 Tout supprimer</button>`:''}
       </div>
       ${open?`<div class="live-grid" style="padding:0 12px 12px">${day.list.map(card).join("")}</div>`:''}
@@ -2037,7 +2084,7 @@ function renderSuivi(){
 
   const fbtn=(v,lab)=>`<button class="btn" style="padding:7px 12px;font-size:13px;background:${suiviType===v?'#1a4d2e':'#eef2f7'};color:${suiviType===v?'#fff':'#333'}" onclick="suiviType='${v}';renderSuivi()">${lab}</button>`;
   const filterBar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${fbtn('tous','Tout')}${fbtn('reception','📥 Réception')}${fbtn('dispatch','🚚 Dispatch')}${fbtn('picking','🛒 Picking')}${fbtn('decoupe','🧀 Découpe')}${(suiviType==='tous'||suiviType==='decoupe')&&emptyDecoupeSids().length?`<button class="btn" style="padding:7px 12px;font-size:13px;background:#fdecea;color:#c62828;margin-left:auto" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}</div>`;
-  el.innerHTML=filterBar+`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} en cours — vue par <b>date d'envoi</b>, temps réel.</p>${html||'<div class="muted">Rien à suivre pour ce filtre.</div>'}`;
+  el.innerHTML=filterBar+`<p class="muted" style="margin-top:0"><span class="badge info"><span class="dot"></span> LIVE</span> ${readyStores().length} magasin(s) connecté(s) · ${totalDraft} en cours — vue par <b>date d'envoi</b>, temps réel. <b>Uniquement ce qui est en cours</b> : ce qui est terminé, réceptionné ou clôturé est dans les historiques.</p>${html||'<div class="muted">Rien à suivre pour ce filtre.</div>'}`;
   el.dataset.rendered="1";
 }
 /* ==================== ONGLET COMMANDE À LA CENTRALE ==================== */
@@ -2255,7 +2302,8 @@ function renderCentrale(){
   const view=centraleView||"ecarts";
   const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
-    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🕓 Historique Dispatch &amp; Picking</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🚚 Historique dispatch</button>
+    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='picking'?PICKING_COLOR:'#eef2f7'};color:${view==='picking'?'#fff':'#333'}" onclick="centraleView='picking';renderCentrale()">🛒 Historique picking</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='decoupe'?'#8a5a00':'#eef2f7'};color:${view==='decoupe'?'#fff':'#333'}" onclick="centraleView='decoupe';renderCentrale()">🧀 Historique découpe</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='traca'?'#8a5a00':'#eef2f7'};color:${view==='traca'?'#fff':'#333'}" onclick="centraleView='traca';renderCentrale()">🏷️ Traçabilité</button>
   </div>`;
@@ -2296,6 +2344,9 @@ function renderCentrale(){
   let pkList=Object.entries(centraleState.picking||{}).filter(([k,p])=>p&&p.meta).map(([k,p])=>Object.assign({id:k},p));
   if(dpHistoSearch){ const q=norm(dpHistoSearch); pkList=pkList.filter(p=>norm(p.meta.storeLabel).includes(q)||norm(p.meta.storeCode).includes(q)||norm(p.meta.orderNum).includes(q)||norm(p.meta.createdBy).includes(q)||norm("picking").includes(q)); }
   if(dpHistoDate){ pkList=pkList.filter(p=>isoDayKey(p.meta.startedAt)===dpHistoDate); }
+  // v1.9.10 : historiques SÉPARÉS (dispatch / picking)
+  const isPkView = view==="picking";
+  if(isPkView) list=[]; else pkList=[];
   const card=(s)=>{ if(s.__pk) return pickingHistoCard(s); const st=dispatchStats(s); const ec=sessionEcarts(s).length;
     return `<div class="rec valid" style="border-left:6px solid #1a4d2e">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
@@ -2325,19 +2376,19 @@ function renderCentrale(){
     const open=(k===todayIso)?' open':'';
     return `<details${open} style="margin:10px 0;border:1px solid #d7e0d7;border-radius:10px;padding:8px 12px;background:#fcfdfc">
         <summary style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <span style="font-size:15px;font-weight:900;color:#1a4d2e">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${nDp} dispatch · <span style="color:${PICKING_COLOR}">${nPk} picking</span></span></span>
+          <span style="font-size:15px;font-weight:900;color:#1a4d2e">📅 ${esc(dateShort(sess[0].meta.startedAt))} <span style="font-size:12px;color:#777;font-weight:600">· ${isPkView?('<span style="color:'+PICKING_COLOR+'">'+nPk+' picking</span>'):(nDp+' dispatch')}</span></span>
           ${nEc?('<span class="badge warn">⚠ '+nEc+' avec écart(s)</span>'):'<span class="badge ok">conformes</span>'}
         </summary>
         <div class="live-grid" style="margin-top:10px">${sess.map(card).join("")}</div>
       </details>`; };
   const olderNote = (!dpHistoDate && olderCount>0) ? `<div class="muted" style="margin:6px 0 12px;font-size:12px">➕ ${olderCount} jour(s) de mois précédents masqués — utilise le filtre <b>Date</b> ci-dessus pour les afficher.</div>` : '';
-  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique <b style="color:#1a4d2e">🚚 dispatch</b> &amp; <b style="color:${PICKING_COLOR}">🛒 picking</b>, <b>par journée</b> (aujourd'hui ouvert, les autres à déplier). Par défaut le <b>mois en cours</b> ; les mois précédents via le filtre Date.</p>
+  el.innerHTML=bar+`<p class="muted" style="margin-top:0">Historique ${isPkView?'<b style="color:'+PICKING_COLOR+'">🛒 picking</b> (export Excel + .txt G5 sur chaque carte)':'<b style="color:#1a4d2e">🚚 dispatch</b>'}, <b>par journée</b> (aujourd'hui ouvert, les autres à déplier). Par défaut le <b>mois en cours</b> ; les mois précédents via le filtre Date.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-      <input placeholder="🔎 fournisseur, magasin, n° commande…" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
+      <input placeholder="${isPkView?'🔎 magasin, n° commande, préparateur…':'🔎 fournisseur, dispatcheur…'}" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpHistoDate)}" onchange="dpHistoDate=this.value;renderCentrale()"/>
       <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpHistoDate='';dpHistoSearch='';renderCentrale()">✕</button>
     </div>${olderNote}
-    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucun dispatch / picking '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>'}`;
+    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucun '+(isPkView?'picking':'dispatch')+' '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>'}`;
 }
 function openCentraleDetail(sid){
   const s=(centraleState.dispatch||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s);
