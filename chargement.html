@@ -116,7 +116,7 @@
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.10";
+const APP_VERSION = "1.9.11";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -2483,11 +2483,42 @@ function decoupeInfoLine(s,stx){
   const m=s.meta||{}; const a=decoupeAgg(Object.assign({id:s.id},s)); const parts=[];
   if(m.docNumber&&!String(m.supplier||"").includes(m.docNumber)) parts.push("BL "+esc(m.docNumber));
   if(m.loadedBy) parts.push("📦 BL chargé par le responsable ("+esc(m.loadedBy)+(m.loadedAt?(" · "+esc(dateShort(m.loadedAt))+" "+esc(heure(m.loadedAt))):"")+")");
-  else if(m.docNumber) parts.push('<span style="color:#e65100">BL pas encore chargé dans la console</span>');
+  else if(m.docNumber) parts.push('<span style="color:#e65100">BL pas encore chargé dans la console</span> <button class="btn" style="background:#fff3e0;color:#e65100;border:1px solid #e65100;padding:2px 8px;font-size:11px" onclick="event.stopPropagation();markDecoupeBlLoaded(\''+esc(s.id||"")+'\')">📎 Rattacher le BL (marquer chargé)</button>');
   if(a.cutDays.length) parts.push("🔪 découpé le "+a.cutDays.map(d=>{ const p=d.split("-"); return p[2]+"/"+p[1]; }).join(", "));
   else parts.push('<span style="color:#c62828">aucun fromage saisi</span>');
   return `<div style="font-size:12px;color:#555;margin-top:4px">${parts.join(" · ")}</div>`;
 }
+/* v1.9.11 — Rattacher manuellement le BL à une découpe démarrée par l'entrepôt (BL déjà reçu / chargé ailleurs). */
+function markDecoupeBlLoaded(sid){
+  if(!dbCentrale||!sid) return; const s=(centraleState.decoupe||{})[sid]; if(!s||!s.meta) return;
+  if(!confirm("Marquer le BL "+(s.meta.docNumber||"")+" comme chargé pour cette découpe ?\n\nLes fromages déjà saisis sont conservés. (Pour ajouter les fromages du BL, charge-le aussi dans la carte Découpe : il est fusionné, jamais en double.)")) return;
+  dbCentrale.ref("decoupe/"+sid+"/meta").update({ loadedBy:ME_EMAIL, loadedAt:Date.now(), loadSource:"rattachement-manuel" }).catch(e=>alert("Erreur : "+e.message));
+}
+/* v1.9.11 — Lots de traçabilité rattachés à un fromage découpé (même BL + nom proche, ou même jour + nom). */
+function _lotNorm(x){ return String(x==null?"":x).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\b(aop|aoc|bio|fermier|igp|de|du|des|la|le|les|d|l)\b/g," ").replace(/\s+/g," ").trim(); }
+function _lotNameMatch(a,b){ const x=_lotNorm(a), y=_lotNorm(b); if(!x||!y) return false; if(x===y||x.includes(y)||y.includes(x)) return true;
+  const wx=x.split(" ").filter(w=>w.length>2), wy=y.split(" ").filter(w=>w.length>2); if(!wx.length||!wy.length) return false;
+  const common=wx.filter(w=>wy.includes(w)).length; return common>=Math.min(2,Math.min(wx.length,wy.length)); }
+function lotsForCheese(designation, opts){
+  opts=opts||{}; const bl=String(opts.bl||"").replace(/[^a-zA-Z0-9]/g,""); const ent=String(opts.entity||"").toUpperCase(); const day=opts.day||"";
+  const seen={}; const out=[];
+  tracaAllEntries().forEach(e=>{
+    if(!e||!_lotNameMatch(e.nom,designation)) return;
+    const ebl=String(e.bl||"").replace(/[^a-zA-Z0-9]/g,"");
+    const eday=e.decoupeDate?String(e.decoupeDate):(e.at?isoDayKey(e.at):"");
+    const okBl = bl && ebl===bl; const okDay = day && eday===day;
+    if(!(okBl||okDay)) return;
+    if(ent && e.magasin && String(e.magasin).toUpperCase()!==ent && !okBl) return;
+    const k=String(e.lot||"?").toLowerCase().replace(/\s+/g,"")+"|"+(e.dlc||""); if(seen[k]) return; seen[k]=1; out.push(e);
+  });
+  return out.sort((a,b)=>(a.at||0)-(b.at||0));
+}
+function lotsCell(list){
+  if(!list.length) return '<span style="color:#c62828;font-size:12px">aucun lot</span>';
+  return list.map(e=>'<div style="white-space:nowrap;font-size:12px"><b>'+esc(e.lot||"(lot ?)")+'</b>'+(e.dlc?(' <span style="color:#777">DLC '+esc(frDateShort_(e.dlc))+'</span>'):'')+(e.photoUrl?(' <a href="'+esc(e.photoUrl)+'" target="_blank" rel="noreferrer">📷</a>'):'')+'</div>').join("");
+}
+let decDetailSort="desc";
+function setDecDetailSort(sid,v){ decDetailSort=v; document.querySelectorAll(".modal-back").forEach(x=>x.remove()); openDecoupeDetail(sid); }
 // Découpes vides (aucun fromage saisi) — « parasites » à nettoyer.
 function emptyDecoupeSids(){
   return Object.entries(centraleState.decoupe||{}).filter(([sid,s])=>{
@@ -2634,14 +2665,14 @@ function openDecoupeDayDetail(dayKey){
   let body="";
   if(ag.hasKbg){
     body+=`<h3 style="margin:12px 0 6px;font-size:15px;color:#1565c0">🔵 Kelbongoo — ${ag.kbgN} portions${ag.kbgTheo>0?(' / '+ag.kbgTheo+' théo.'):''}${ag.rendPortions!=null?(' · rendement '+ag.rendPortions+'%'):''}</h3>`;
-    body+=`<div style="overflow:auto"><table><thead><tr><th>Fromage</th><th>Portions</th><th>Théo.</th><th>Rend.</th><th>Hors gabarit → Montreuil</th></tr></thead><tbody>`;
-    body+=ag.kbgLines.map(l=>`<tr><td>${esc(l.designation)}</td><td style="text-align:center">${l.kbgN}</td><td style="text-align:center">${l.theo||"—"}</td><td style="text-align:center">${l.rend!=null?(l.rend+"%"):"—"}</td><td style="text-align:center">${l.montG>0?(Math.round(l.montG/1000*10)/10+" kg"):"—"}</td></tr>`).join("");
+    body+=`<div style="overflow:auto"><table><thead><tr><th>Fromage</th><th>Portions</th><th>Théo.</th><th>Rend.</th><th>Hors gabarit → Montreuil</th><th>Lot(s)</th></tr></thead><tbody>`;
+    body+=ag.kbgLines.map(l=>`<tr><td>${esc(l.designation)}</td><td style="text-align:center">${l.kbgN}</td><td style="text-align:center">${l.theo||"—"}</td><td style="text-align:center">${l.rend!=null?(l.rend+"%"):"—"}</td><td style="text-align:center">${l.montG>0?(Math.round(l.montG/1000*10)/10+" kg"):"—"}</td><td>${lotsCell(lotsForCheese(l.designation,{day:dayKey,entity:"KBG"}))}</td></tr>`).join("");
     body+=`</tbody></table></div>`;
   }
   if(ag.hasRob){
     body+=`<h3 style="margin:14px 0 6px;font-size:15px;color:#6a1b9a">🟣 Montreuil (Robespierre) — ${ag.robMeules} meule(s)/colis · ${ag.robN} morceaux${kg>0?(" · ≈ "+kg+" kg"):""}</h3>`;
-    body+=`<div style="overflow:auto"><table><thead><tr><th>Fromage</th><th>Meules/colis</th><th>Morceaux</th><th>Poids approx.</th></tr></thead><tbody>`;
-    body+=ag.robLines.map(l=>`<tr><td>${esc(l.designation)}</td><td style="text-align:center">${l.robMeules} ${l.robUnit==="colis"?"colis":"meule(s)"}</td><td style="text-align:center">${l.robN}</td><td style="text-align:center">${l.robG>0?(Math.round(l.robG/1000*10)/10+" kg"):"—"}</td></tr>`).join("");
+    body+=`<div style="overflow:auto"><table><thead><tr><th>Fromage</th><th>Meules/colis</th><th>Morceaux</th><th>Poids approx.</th><th>Lot(s)</th></tr></thead><tbody>`;
+    body+=ag.robLines.map(l=>`<tr><td>${esc(l.designation)}</td><td style="text-align:center">${l.robMeules} ${l.robUnit==="colis"?"colis":"meule(s)"}</td><td style="text-align:center">${l.robN}</td><td style="text-align:center">${l.robG>0?(Math.round(l.robG/1000*10)/10+" kg"):"—"}</td><td>${lotsCell(lotsForCheese(l.designation,{day:dayKey,entity:"ROB"}))}</td></tr>`).join("");
     body+=`</tbody></table></div>`;
   }
   if(!ag.hasKbg && !ag.hasRob) body='<div class="muted">Aucune découpe saisie ce jour.</div>';
@@ -2742,14 +2773,15 @@ function openDecoupeDetail(sid){
   const s=(centraleState.decoupe||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s); const a=decoupeAgg(sess); const isRob=a.entity==="ROB";
   const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
   const head=isRob
-    ? `<tr><th>Fromage</th><th>Découpé</th><th>Morceaux</th><th>Poids approx.</th><th>Découpé le</th></tr>`
-    : `<tr><th>Fromage</th><th>KBG pc</th><th>KBG poids</th><th>→ ROB pc</th><th>ROB poids</th><th>Découpé le</th></tr>`;
-  const rows=(a.lines||[]).map(l=>{ const lkg=(l.robG||0)>0?(Math.round((l.robG||0)/1000*10)/10+' kg'):'—';
+    ? `<tr><th>Fromage</th><th>Découpé</th><th>Morceaux</th><th>Poids approx.</th><th>Découpé le</th><th>Lot(s) rattaché(s)</th></tr>`
+    : `<tr><th>Fromage</th><th>KBG pc</th><th>KBG poids</th><th>→ ROB pc</th><th>ROB poids</th><th>Découpé le</th><th>Lot(s) rattaché(s)</th></tr>`;
+  const sortedLines=(a.lines||[]).slice().sort((x,y)=>{ const d=(x.cutAt||0)-(y.cutAt||0); return decDetailSort==="asc"?d:-d; });
+  const rows=sortedLines.map(l=>{ const lots=lotsCell(lotsForCheese(l.designation,{bl:sess.meta.docNumber,entity:a.entity,day:l.cutDay})); const lkg=(l.robG||0)>0?(Math.round((l.robG||0)/1000*10)/10+' kg'):'—';
     return isRob
-      ? `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.robMeules||0} ${l.robUnit==='colis'?'colis':'meule(s)'}</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${lkg}</td><td style="text-align:center">${esc(dayFrC(l.cutDay))}</td></tr>`
-      : `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.kbgN||0}${l.kbgTarget>0?(' / '+l.kbgTarget):''}</td><td style="text-align:center">${Math.round(l.kbgG||0)} g</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${Math.round(l.robG||0)} g</td><td style="text-align:center">${esc(dayFrC(l.cutDay))}</td></tr>`;
+      ? `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.robMeules||0} ${l.robUnit==='colis'?'colis':'meule(s)'}</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${lkg}</td><td style="text-align:center">${esc(dayFrC(l.cutDay))}${l.cutAt?('<div style="font-size:11px;color:#999">'+esc(heure(l.cutAt))+'</div>'):''}</td><td>${lots}</td></tr>`
+      : `<tr><td>${esc(l.designation||'')}</td><td style="text-align:center">${l.kbgN||0}${l.kbgTarget>0?(' / '+l.kbgTarget):''}</td><td style="text-align:center">${Math.round(l.kbgG||0)} g</td><td style="text-align:center">${l.robN||0}</td><td style="text-align:center">${Math.round(l.robG||0)} g</td><td style="text-align:center">${esc(dayFrC(l.cutDay))}${l.cutAt?('<div style="font-size:11px;color:#999">'+esc(heure(l.cutAt))+'</div>'):''}</td><td>${lots}</td></tr>`;
   }).join("");
-  const colspan=isRob?5:6;
+  const colspan=isRob?6:7;
   const summary=isRob
     ? `${a.robMeules} meule(s)/colis · ${a.robN} morceaux${kg>0?(' · ≈ '+kg+' kg'):''}`
     : `Rendement <b>${a.rend}%</b> · KBG ${a.kbgN} pc / ROB ${a.robN} pc`;
@@ -2757,6 +2789,9 @@ function openDecoupeDetail(sid){
   back.innerHTML=`<div class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">Découpe ${isRob?'Montreuil':'Kelbongoo'} · ${esc(sess.meta.supplier||'')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <div class="muted" style="margin:4px 0 10px">Créée le ${esc(dateShort(sess.meta.startedAt))} · ${esc(a.by||sess.meta.createdBy||'—')} · ${summary}</div>${decoupeInfoLine(sess)}
+    <div style="display:flex;gap:6px;align-items:center;margin:8px 0;flex-wrap:wrap"><b style="font-size:13px">Trier par date de découpe :</b>
+      <button class="btn" style="padding:6px 10px;font-size:12px;background:${decDetailSort==='desc'?'#8a5a00':'#eef2f7'};color:${decDetailSort==='desc'?'#fff':'#333'}" onclick="setDecDetailSort('${esc(sid)}','desc')">↓ plus récent d'abord</button>
+      <button class="btn" style="padding:6px 10px;font-size:12px;background:${decDetailSort==='asc'?'#8a5a00':'#eef2f7'};color:${decDetailSort==='asc'?'#fff':'#333'}" onclick="setDecDetailSort('${esc(sid)}','asc')">↑ plus ancien d'abord</button></div>
     <div style="overflow:auto;max-height:60vh"><table><thead>${head}</thead><tbody>${rows||('<tr><td colspan="'+colspan+'" style="color:#999">Aucune découpe saisie.</td></tr>')}</tbody></table></div>
     <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlDecoupeTxt('${esc(sid)}')">⬇️ Télécharger le .txt</button>
   </div>`;
@@ -2777,8 +2812,8 @@ function dlDecoupeTxt(sid){
   } else {
     txt+="Rendement Kelbongoo : "+a.rend+"%\n";
     txt+="Total KBG : "+a.kbgN+" pc / "+a.kbgG+" g   -   Hors gabarit → ROB : "+a.robN+" pc / "+a.robG+" g\n";
-    txt+="\nFromage\tKBG pc\tKBG g\tROB pc\tROB g\n";
-    (a.lines||[]).forEach(l=>{ txt+=(l.designation||"")+"\t"+(l.kbgN||0)+"\t"+Math.round(l.kbgG||0)+"\t"+(l.robN||0)+"\t"+Math.round(l.robG||0)+"\n"; });
+    txt+="\nFromage\tKBG pc\tKBG g\tROB pc\tROB g\tDécoupé le\tLot(s)\n";
+    (a.lines||[]).slice().sort((x,y)=>(x.cutAt||0)-(y.cutAt||0)).forEach(l=>{ const lots=lotsForCheese(l.designation,{bl:sess.meta.docNumber,entity:a.entity,day:l.cutDay}).map(e=>e.lot||"?").join(" / "); txt+=(l.designation||"")+"\t"+(l.kbgN||0)+"\t"+Math.round(l.kbgG||0)+"\t"+(l.robN||0)+"\t"+Math.round(l.robG||0)+"\t"+dayFrC(l.cutDay)+"\t"+lots+"\n"; });
   }
   const d=new Date(sess.meta.startedAt||Date.now());
   const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");
