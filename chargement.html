@@ -3,10 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PRIBON — Console Responsable</title>
+<title>Pribon Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<!-- v2.0 : Suivi live Kelbongoo (Firestore du projet distribkbg, compte Google master) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-functions-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
@@ -73,50 +78,172 @@
   .modal-box{background:#fff;border-radius:12px;padding:20px;max-width:780px;width:100%;max-height:92vh;overflow:auto}
   .update-bar{position:fixed;top:0;left:0;right:0;z-index:300;background:#c62828;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:13px;font-weight:700}
   .update-bar button{background:#fff;color:#c62828;font-weight:800;padding:6px 14px;border-radius:6px;font-size:13px;border:none;cursor:pointer}
+
+/* =====================================================================
+   CONSOLE 2.0 — design system (aligné sur le Master Kelbongoo sur PC)
+   ===================================================================== */
+:root{
+  --bg:#f7f5f0;--card:#fff;--muted:#fcfaf6;--ink:#1f1d1a;--ink2:#57534d;--mute:#94908a;--line:#e8e3da;--line2:#d6d0c4;
+  --acc:#4a7c3b;--acc-d:#355a29;--acc-s:#ebf3e6;--warn:#b85820;--warn-s:#fff1e6;--dan:#a32a2a;--dan-s:#fde6e6;--info:#2c4a8c;--info-s:#e1e8f5;
+  --side:#17221a;--side-ink:#c9d4c4;--disp:#1a4d2e;--pick:#1565c0;--cold:#0b7285;--cold-s:#e3f6f8;--dry:#9a6b16;--dry-s:#fbf2de;
+  --sh:0 1px 2px rgba(0,0,0,.04);--r:12px;
+}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+.hidden{display:none!important}
+/* Connexion */
+#gate{max-width:420px;margin:12vh auto 0;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.06);padding:30px 28px;text-align:center}
+#gate .g-logo{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#6da55a,#3f6e31);display:grid;place-items:center;color:#fff;font-weight:900;font-size:24px;margin:0 auto 14px}
+#gate h2{margin:0 0 4px;font-size:21px;letter-spacing:-.02em}
+/* Menu latéral */
+.side{position:fixed;left:0;top:0;bottom:0;width:248px;background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;padding:18px 12px 14px;z-index:50;overflow-y:auto}
+.brand{display:flex;gap:10px;align-items:center;padding:2px 10px 16px}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#6da55a,#3f6e31);display:grid;place-items:center;color:#fff;font-weight:900;font-size:16px}
+.brand b{color:#fff;font-size:15px;display:block;letter-spacing:-.01em}.brand small{font-size:11px;color:#8fa189}
+.side-sec{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6f8268;padding:14px 12px 6px}
+.side button.tab{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;padding:7px 12px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--side-ink);cursor:pointer;margin:0;border:none}
+.side button.tab:hover{background:rgba(255,255,255,.06);color:#fff}
+.side button.tab.active{background:rgba(141,196,120,.16);color:#fff;font-weight:650;box-shadow:inset 2px 0 0 #8dc478}
+.side button.tab svg{width:17px;height:17px;flex:0 0 17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.side .cnt{margin-left:auto;font-size:11px;font-weight:700;background:rgba(255,255,255,.09);border-radius:999px;padding:1px 7px;color:#dfe8da}
+.side .cnt.r{background:#f04438;color:#fff}.side .cnt.a{background:#f5a524;color:#1d1503}.side .cnt:empty{display:none}
+.side-foot{margin-top:auto;padding:12px 10px 0;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:10px;align-items:center}
+.side-av{width:30px;height:30px;border-radius:50%;background:#2c3b2a;color:#cfe3c6;display:grid;place-items:center;font-size:12px;font-weight:800;flex:0 0 30px}
+.side-foot div{font-size:12px;color:#e6eee2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.side-foot small{display:block;color:#7d8f77;font-size:11px}
+/* Zone principale */
+.main{margin-left:248px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:40;height:60px;display:flex;align-items:center;gap:12px;padding:0 28px;border-bottom:1px solid var(--line);background:rgba(247,245,240,.94);backdrop-filter:blur(6px)}
+.crumb{font-size:12.5px;color:var(--mute)}.crumb b{color:var(--ink);font-weight:650}
+.sp{flex:1}
+.live-badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:650;color:var(--acc-d);background:var(--acc-s);border-radius:999px;padding:5px 10px}
+.ldot{width:7px;height:7px;border-radius:50%;background:#22a33a;box-shadow:0 0 0 3px rgba(34,163,58,.18);display:inline-block}
+.ldot.off{background:#b9b4ab;box-shadow:none}
+.tbtn{display:inline-flex;align-items:center;gap:7px;font:600 13px Inter,sans-serif;border-radius:8px;padding:7px 12px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;white-space:nowrap}
+.tbtn:hover{border-color:var(--line2);background:var(--muted)}
+.tbtn.p{background:var(--acc);border-color:var(--acc);color:#fff}.tbtn.p:hover{background:var(--acc-d)}
+.tbtn.w{background:var(--warn);border-color:var(--warn);color:#fff}.tbtn.d{color:var(--dan);border-color:#f0c9c9}
+.tbtn.s{padding:5px 9px;font-size:12px}.tbtn:disabled{opacity:.5;cursor:default}
+.wrap{max-width:1480px;width:100%;margin:0;padding:22px 28px 60px}
+.tabs{display:none}
+.page-h{display:flex;align-items:flex-end;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.page-h h1{margin:0;font-size:24px;letter-spacing:-.03em}.page-h .sub{color:var(--ink2);font-size:14px;margin-top:3px}
+.seg{display:inline-flex;background:#efebe3;border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{all:unset;cursor:pointer;font:600 12.5px Inter,sans-serif;padding:5px 11px;border-radius:7px;color:var(--ink2)}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+/* Cartes, KPI, listes */
+.cx{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh)}
+.cx-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.cx-h h3{margin:0;font-size:13px;font-weight:700;letter-spacing:-.005em;color:var(--ink)}
+.cx-h .sub{font-size:12px;color:var(--mute)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.kpi{padding:14px 16px;cursor:pointer;transition:border-color .15s}.kpi:hover{border-color:var(--line2)}
+.kpi .v{font-size:28px;font-weight:800;letter-spacing:-.03em;margin-top:4px;display:flex;align-items:baseline;gap:8px;line-height:1.1}
+.kpi .v small{font-size:12.5px;font-weight:600;color:var(--mute);letter-spacing:0}
+.kpi .s{font-size:12px;color:var(--ink2);margin-top:4px}
+.kbar{height:5px;border-radius:9px;background:#efebe3;margin-top:10px;overflow:hidden;display:flex}.kbar i{display:block;height:100%}
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px}
+.grid-r{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+.row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:none}
+.ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:0 0 32px;font-size:15px}
+.t1{font-size:13.5px;font-weight:650}.t2{font-size:12px;color:var(--mute)}
+.feed .row{padding:9px 16px;gap:10px}.feed .t1{font-weight:500;font-size:13px}.feed time{font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums;width:38px;flex:0 0 38px}
+.tag{font:700 10px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:4px;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pg{background:#e7f4ea;color:#1f7a3a}.pr{background:var(--dan-s);color:var(--dan)}.po{background:var(--warn-s);color:var(--warn)}.pb{background:var(--info-s);color:var(--info)}.pn{background:#eef0ee;color:#4a5547}
+.pcold{background:var(--cold-s);color:var(--cold)}.pdry{background:var(--dry-s);color:var(--dry)}
+.store{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}.store i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.empty{padding:22px 16px;color:var(--mute);font-size:13px;text-align:center}
+table.tb{width:100%;border-collapse:collapse;font-size:13px;margin:0}
+table.tb th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:700;padding:8px 14px;border:none;border-bottom:1px solid var(--line);background:var(--muted)}
+table.tb td{padding:10px 14px;border:none;border-bottom:1px solid var(--line);vertical-align:middle}
+table.tb tr:last-child td{border-bottom:none}
+.thumb{width:44px;height:32px;border-radius:5px;object-fit:cover;background:#eee;display:block;border:1px solid var(--line)}
+.steps{display:flex;align-items:center;padding:16px}
+.step{display:flex;align-items:center;gap:10px;flex:1}
+.step .n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 12px Inter,sans-serif;flex:0 0 28px}
+.step .l{font-size:12.5px;font-weight:650}.step .l small{display:block;font-weight:500;color:var(--mute);font-size:11.5px}
+.step .ln{flex:1;height:2px;background:var(--line);margin:0 12px}
+.step.done .n{background:var(--acc);color:#fff}.step.done .ln{background:var(--acc)}.step.cur .n{background:#fff;border:2px solid var(--warn);color:var(--warn)}.step.todo .n{background:#efebe3;color:var(--mute)}
+.pc{display:flex;gap:12px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line)}.pc:last-child{border-bottom:none}
+.pav{width:38px;height:38px;border-radius:50%;color:#fff;font:800 13px Inter,sans-serif;display:grid;place-items:center;position:relative;flex:0 0 38px}
+.pdot{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2.5px solid #fff}
+.srow{display:flex;align-items:center;gap:12px;padding:9px 16px}.sbar{flex:1;height:8px;border-radius:9px;background:#efebe3;overflow:hidden}.sbar i{display:block;height:100%;border-radius:9px}
+.phone{width:390px;height:min(760px,calc(100vh - 170px));min-height:560px;border-radius:38px;background:#111;padding:12px;box-shadow:0 24px 60px rgba(0,0,0,.22)}
+.phone iframe{width:100%;height:100%;border:0;border-radius:28px;background:#fff}
+textarea.note{font:13px Inter,sans-serif;width:100%;border:1px solid var(--line);border-radius:8px;padding:10px 12px;resize:vertical;min-height:70px;color:var(--ink);box-sizing:border-box}
+/* Contenu des anciens onglets : harmonisation */
+.wrap .card{border:1px solid var(--line);box-shadow:var(--sh);max-width:none}
+.store-card{border:1px solid var(--line)!important;box-shadow:var(--sh)}
+.store-card h3{color:var(--ink)!important}
+.rec{border-width:1px;border-radius:10px}
+button.btn{font-family:Inter,sans-serif;font-weight:650;border-radius:8px}
+.wrap table:not(.tb) th{background:var(--muted)}
+.modal-box{border-radius:14px}
+@media (max-width:1100px){ .side{width:64px;padding:14px 8px} .side .brand div,.side-sec,.side button.tab span.lbl,.side .cnt,.side-foot div{display:none} .main{margin-left:64px} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2,.grid-r{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
-<div class="header">
-  <div><h1>📥 PRIBON — Console Responsable</h1><div class="sub">Suivi & chargement des BL · tous les magasins</div></div>
-  <div style="display:flex;align-items:center;gap:12px">
-    <button id="btnRefresh" onclick="refreshActive(this)" title="Rafraîchir l'affichage sans se déconnecter" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer">⟳ Actualiser</button>
-    <div id="whoami" class="sub"></div>
-  </div>
-</div>
-
 <div id="gate">
-  <h2>Connexion responsable</h2>
-  <p class="muted">Connecte-toi avec ton compte Google autorisé (2FA gérée par Google).</p>
-  <div id="gbtn" style="display:flex;justify-content:center;margin-top:10px"></div>
+  <div class="g-logo">P</div>
+  <h2>Pribon Console</h2>
+  <p class="muted">Espace responsable · magasins, entrepôt PDP et Kelbongoo.<br>Connecte-toi avec ton compte Google autorisé.</p>
+  <div id="gbtn" style="display:flex;justify-content:center;margin-top:16px"></div>
   <div class="err" id="gateErr"></div>
+  <div class="muted" style="margin-top:14px;font-size:11px" id="gateVer"></div>
 </div>
 
-<div class="wrap hidden" id="app">
-  <div class="tabs">
-    <button class="tab active" data-tab="multi">📦 Chargement</button>
-    <button class="tab" data-tab="g5">📥 Réception</button>
-    <button class="tab" data-tab="centrale">🏬 Dispatch &amp; Picking · Découpe</button>
-    <button class="tab" data-tab="inventaire">📋 Inventaire</button>
-    <button class="tab" data-tab="avoirs">💶 Suivi des avoirs</button>
-    <button class="tab" data-tab="suivi">📡 Suivi live</button>
-    <button class="tab" data-tab="msg">📢 Messages</button>
-    <button class="tab" data-tab="fourn">🏭 Fournisseurs</button>
+<div class="hidden" id="app">
+  <nav class="side" aria-label="Navigation">
+    <div class="brand"><div class="logo">P</div><div><b>Pribon Console</b><small id="sideVer">Responsable</small></div></div>
+    <div class="side-sec">Pilotage</div>
+    <button class="tab" data-tab="home" data-key="home"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="lbl">Aujourd'hui</span><span class="cnt" id="cnt-home"></span></button>
+    <button class="tab" data-tab="suivi" data-key="suivi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span class="lbl">Suivi live</span><span class="cnt" id="cnt-suivi"></span></button>
+    <div class="side-sec">Magasins</div>
+    <button class="tab" data-tab="multi" data-key="multi"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg><span class="lbl">Chargement BL</span><span class="cnt" id="cnt-multi"></span></button>
+    <button class="tab" data-tab="g5" data-key="g5"><svg viewBox="0 0 24 24"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/></svg><span class="lbl">Réceptions G5</span><span class="cnt" id="cnt-g5"></span></button>
+    <button class="tab" data-tab="avoirs" data-key="avoirs"><svg viewBox="0 0 24 24"><path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h9M4 14h9"/></svg><span class="lbl">Avoirs</span><span class="cnt" id="cnt-avoirs"></span></button>
+    <button class="tab" data-tab="msg" data-key="msg"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="lbl">Messages</span><span class="cnt" id="cnt-msg"></span></button>
+    <div class="side-sec">Entrepôt PDP</div>
+    <button class="tab" data-tab="centrale" data-key="centrale" data-cview="ecarts"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="11" rx="1"/><path d="M2 19h20M5 15v4M12 15v4M19 15v4"/></svg><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
+    <button class="tab" data-tab="rungis" data-key="rungis"><svg viewBox="0 0 24 24"><path d="M2 6h12v10H2zM14 9h4l4 4v3h-8"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
+    <button class="tab" data-tab="centrale" data-key="decoupe" data-cview="decoupe"><svg viewBox="0 0 24 24"><path d="M14 4 4 14l3 3 3-1 10-10a2.8 2.8 0 0 0-4-4z"/><path d="m4 14 2 6"/></svg><span class="lbl">Découpe fromage</span><span class="cnt" id="cnt-decoupe"></span></button>
+    <button class="tab" data-tab="inventaire" data-key="inventaire"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
+    <div class="side-sec">Référentiels &amp; outils</div>
+    <button class="tab" data-tab="fourn" data-key="fourn"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16z"/></svg><span class="lbl">Fournisseurs</span><span class="cnt" id="cnt-fourn"></span></button>
+    <button class="tab" data-tab="appview" data-key="appview"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg><span class="lbl">Vue appli &amp; ménage</span><span class="cnt" id="cnt-appview"></span></button>
+    <div class="side-foot"><span class="side-av" id="sideAv">·</span><div><span id="whoami"></span><small id="sideDate"></small></div>
+      <button class="tbtn s" style="margin-left:auto;background:transparent;border-color:rgba(255,255,255,.12);color:#9fb098" title="Se déconnecter" onclick="consoleLogout()"><svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></svg></button></div>
+  </nav>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb"></div>
+      <div class="sp"></div>
+      <span class="live-badge" id="liveBadge"><span class="ldot"></span>Live</span>
+      <button class="tbtn" id="btnRefresh" onclick="refreshActive(this)" title="Rafraîchir l'affichage sans se déconnecter"><svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>Actualiser</button>
+    </div>
+    <div class="wrap">
+      <div class="tabs"></div>
+      <div id="tab-home"></div>
+      <div id="tab-multi" class="hidden"></div>
+      <div id="tab-g5" class="hidden"></div>
+      <div id="tab-centrale" class="hidden"></div>
+      <div id="tab-rungis" class="hidden"></div>
+      <div id="tab-inventaire" class="hidden"></div>
+      <div id="tab-kbgpoids" class="hidden"></div>
+      <div id="tab-avoirs" class="hidden"></div>
+      <div id="tab-suivi" class="hidden"><div id="suiviHead"></div><div id="suiviKbg"></div><div id="tab-suivi-old" class="hidden"></div></div>
+      <div id="tab-msg" class="hidden"></div>
+      <div id="tab-fourn" class="hidden"></div>
+      <div id="tab-appview" class="hidden"></div>
+    </div>
   </div>
-  <div id="tab-multi"></div>
-  <div id="tab-g5" class="hidden"></div>
-  <div id="tab-centrale" class="hidden"></div>
-  <div id="tab-inventaire" class="hidden"></div>
-  <div id="tab-kbgpoids" class="hidden"></div>
-  <div id="tab-avoirs" class="hidden"></div>
-  <div id="tab-suivi" class="hidden"></div>
-  <div id="tab-msg" class="hidden"></div>
-  <div id="tab-fourn" class="hidden"></div>
 </div>
 
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "1.9.11";
+const APP_VERSION = "2.0.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -181,7 +308,7 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, picking:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{} };
+const centraleState={ dispatch:{}, picking:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{}, enlevements:{}, rungisNotes:{} };
 let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
@@ -246,7 +373,7 @@ function onCredential(resp){
 }
 window.onload=function(){
   if(OAUTH_CLIENT_ID.indexOf("__")!==-1){ document.getElementById("gateErr").textContent="Renseigne OAUTH_CLIENT_ID et APPS_SCRIPT_URL en haut du fichier."; return; }
-  document.querySelector(".header .sub").textContent="Suivi & chargement BL + commande · tous les magasins · v"+APP_VERSION;
+  try{ document.getElementById("gateVer").textContent="v"+APP_VERSION; document.getElementById("sideVer").textContent="Responsable · v"+APP_VERSION; }catch(e){}
   checkVersion(); setInterval(checkVersion, 5*60*1000); window.addEventListener("focus", checkVersion);
   const t=setInterval(()=>{ if(window.google&&google.accounts&&google.accounts.id){ clearInterval(t);
     google.accounts.id.initialize({client_id:OAUTH_CLIENT_ID,callback:onCredential});
@@ -261,6 +388,7 @@ function start(email){
   document.getElementById("gate").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   document.getElementById("whoami").textContent=email;
+  try{ document.getElementById("sideAv").textContent=String(email||"?").slice(0,2).toUpperCase(); document.getElementById("sideDate").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"}); }catch(e){}
   // Init une app Firebase par magasin configuré
   readyStores().forEach(s=>{
     try{
@@ -282,9 +410,12 @@ function start(email){
     dbCentrale.ref("inventaire_vin").on("value",snap=>{ centraleState.inventaireVin=snap.val()||{}; renderInventaire(); });
     dbCentrale.ref("config/kbg_poids").on("value",snap=>{ centraleState.kbgPoids=snap.val()||{}; renderKbgPoids(); });
     dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
+    // v2.0 — enlèvements Rungis + note du soir (console : accueil, page Enlèvements Rungis)
+    dbCentrale.ref("enlevements").orderByChild("at").startAt(Date.now()-21*86400000).on("value",snap=>{ centraleState.enlevements=snap.val()||{}; dashTick(true); });
+    dbCentrale.ref("rungis_notes").orderByKey().startAt(isoDay(Date.now()-7*86400000)).on("value",snap=>{ centraleState.rungisNotes=snap.val()||{}; dashTick(true); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
-  // Onglets
-  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  // Onglets (menu latéral)
+  document.querySelectorAll(".side .tab").forEach(b=>b.onclick=()=>{ if(b.dataset.cview) centraleView=b.dataset.cview; switchTab(b.dataset.tab, b.dataset.key); });
   renderMulti(); renderMsg();
   apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; }).catch(()=>{});
   // Écouteurs live : réceptions + documents + messages de chaque magasin
@@ -295,20 +426,36 @@ function start(email){
   });
   renderG5();
   setInterval(renderSuivi,1000);
+  // v2.0 — accueil par défaut + compteurs du menu
+  switchTab("home","home");
+  setInterval(()=>dashTick(false), 4000);
 }
-function switchTab(t){
-  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["multi","g5","centrale","inventaire","avoirs","suivi","msg","fourn"].forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+let ACTIVE_TAB="home", ACTIVE_KEY="home";
+const TAB_IDS=["home","multi","g5","centrale","rungis","inventaire","kbgpoids","avoirs","suivi","msg","fourn","appview"];
+const CRUMBS={ home:["Pilotage","Aujourd'hui"], suivi:["Pilotage","Suivi live"], multi:["Magasins","Chargement BL"], g5:["Magasins","Réceptions G5"], avoirs:["Magasins","Avoirs"], msg:["Magasins","Messages"],
+  centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Entrepôt PDP","Découpe fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Entrepôt PDP","Poids Kelbongoo"],
+  fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli & ménage"] };
+function switchTab(t, key){
+  if(TAB_IDS.indexOf(t)<0) t="home";
+  key = key || (t==="centrale" && centraleView==="decoupe" ? "decoupe" : t);
+  ACTIVE_TAB=t; ACTIVE_KEY=key;
+  document.querySelectorAll(".side .tab").forEach(b=>b.classList.toggle("active", b.dataset.key===key));
+  TAB_IDS.forEach(x=>{ const el=document.getElementById("tab-"+x); if(el) el.classList.toggle("hidden",x!==t); });
+  const c=CRUMBS[key]||CRUMBS[t]||["",""]; const cr=document.getElementById("crumb"); if(cr) cr.innerHTML=esc(c[0])+' › <b>'+esc(c[1])+'</b>';
+  if(t==="home") renderHome();
   if(t==="avoirs") renderAvoirs();
   if(t==="centrale") renderCentrale();
   if(t==="inventaire") renderInventaire();
   if(t==="fourn") renderFournisseurs();
+  if(t==="rungis") renderRungis();
+  if(t==="suivi") renderLive();
+  if(t==="appview") renderAppView();
+  try{ window.scrollTo(0,0); }catch(e){}
 }
 /* Rafraîchit l'affichage de l'onglet courant SANS recharger la page (donc sans se reconnecter).
    Les données Firebase sont déjà en direct ; ce bouton force un nouveau rendu si besoin. */
 function refreshActive(btn){
-  const active=document.querySelector(".tab.active");
-  const t=active?active.dataset.tab:"multi";
+  const t=ACTIVE_TAB||"home";
   try{
     if(t==="multi") renderMulti();
     else if(t==="g5") renderG5();
@@ -318,9 +465,14 @@ function refreshActive(btn){
     else if(t==="suivi") renderSuivi();
     else if(t==="msg") renderMsg();
     else if(t==="fourn") renderFournisseurs();
+    else if(t==="home") renderHome();
+    else if(t==="rungis") renderRungis();
+    else if(t==="appview") renderAppView(true);
+    if(t==="suivi") renderLive();
     renderLoadStatus && renderLoadStatus();
+    dashTick(true);
   }catch(e){ console.error("refreshActive", e); }
-  if(btn){ const old=btn.textContent; btn.textContent="✓ Actualisé"; setTimeout(()=>{ btn.textContent=old; }, 1200); }
+  if(btn){ const old=btn.innerHTML; btn.textContent="✓ Actualisé"; setTimeout(()=>{ btn.innerHTML=old; }, 1200); }
 }
 /* Appel Apps Script authentifié (idToken responsable). */
 async function apiRP(action, extra){
@@ -1959,7 +2111,8 @@ async function liveDeleteDay(k){
   if(err) alert(err+" suppression(s) en erreur.");
 }
 function renderSuivi(){
-  const el=document.getElementById("tab-suivi"); if(!el) return;
+  const el=document.getElementById("tab-suivi-old"); if(!el) return;
+  if(el.classList.contains("hidden")) return;
   const WINDOW=7*86400*1000, now=Date.now();
   const items=[]; let totalDraft=0;
   if(suiviType==='tous'||suiviType==='reception') readyStores().forEach(s=>{
@@ -2819,6 +2972,406 @@ function dlDecoupeTxt(sid){
   const yy=String(d.getFullYear()).slice(-2),mm=String(d.getMonth()+1).padStart(2,"0"),dd=String(d.getDate()).padStart(2,"0");
   downloadTxt(yy+mm+dd+"_DECOUPE_"+(a.entity||sess.meta.entity||"")+".txt", txt);
 }
+
+</script>
+<script>
+/* =============================================================================
+   CONSOLE 2.0 — accueil « Aujourd'hui », Suivi live Kelbongoo, Enlèvements Rungis,
+   Vue appli & ménage. (Les anciens onglets restent inchangés, dans le nouveau cadre.)
+   ============================================================================= */
+const ENLEVEMENT_URL = "https://script.google.com/macros/s/AKfycbypY1ue7nBesHFhObOan7KOZjGMB3nX5u9N7K-nNSMC2yKAWYfUc1dWRhpgtMmrRz4X/exec";
+const KBG_FIREBASE_CONFIG = { apiKey:"AIzaSyDiOCgkDItazkaUfNC1kTjF9Z7K9rSqqow", authDomain:"distribkbg.firebaseapp.com", projectId:"distribkbg",
+  storageBucket:"distribkbg.firebasestorage.app", messagingSenderId:"255791649801", appId:"1:255791649801:web:bcf2d080e524000f3194d8" };
+// Réception : même appli pour tous les magasins (le responsable bascule de magasin dans l'appli).
+const APP_URLS = { centrale:"https://pribon.github.io/centrale/", reception:"https://pribon.github.io/Bichat/" };
+const RESP_NAMES = { "hg@probon.fr":"Henry", "rr@pribon.org":"Raimbaud" };
+const SITE_COL = { ROB:"#E11D48", BIC:"#FF1F8E", TOL:"#0A84FF", PDP:"#7C3AED", BOR:"#FF6D00", STB:"#00B060", PDC:"#00A8B5", NCC:"#D946EF", LIL:"#9333EA", CES:"#16A34A", BAR:"#F43F5E", CHA:"#2563EB", NCA:"#0D9488", ROM:"#EA580C", FOR:"#B45309", PAD:"#DB2777", BEL:"#455a64" };
+const SITE_NAME = { ROB:"Robespierre", BIC:"Bichat", TOL:"Tolbiac", PDP:"Porte de Pantin", BOR:"Borrego", STB:"Saint-Blaise", BEL:"Belleville", ENTREPOT:"Entrepôt" };
+const STORE_SHORT = { ROBESPIERRE:"ROB", TOLBIAC:"TOL", BICHAT:"BIC", BELLEVILLE:"BEL" };
+const ZONE_UI = { froid:{ t:"❄ Ch. froide", c:"pcold" }, sec:{ t:"▣ Entrepôt sec", c:"pdry" } };
+const MOTIF_UI = { introuvable:"Palette introuvable", place:"Pas de place dans le camion", pas_prete:"Palette pas prête", autre:"Autre" };
+const DAY = 86400000;
+
+function isoDay(ts){ const d=new Date(ts||Date.now()); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function isToday(ts){ return !!ts && isoDay(ts)===isoDay(); }
+function ago(ts){ if(!ts) return ""; const s=Math.max(0,Math.round((Date.now()-ts)/1000)); if(s<60) return "il y a "+s+" s"; const m=Math.round(s/60); if(m<60) return "il y a "+m+" min"; const h=Math.round(m/60); if(h<24) return "il y a "+h+" h"; return "il y a "+Math.round(h/24)+" j"; }
+function hm(ts){ return ts?new Date(ts).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):""; }
+function shortName(n){ const p=String(n||"").trim().split(/\s+/); return p.length>1 ? p[0]+" "+p[p.length-1].charAt(0).toUpperCase()+"." : (p[0]||"—"); }
+function initials(n){ const p=String(n||"").trim().split(/\s+/); return ((p[0]||"?").charAt(0)+(p.length>1?p[p.length-1].charAt(0):"")).toUpperCase(); }
+function storeChip(code){ const c=STORE_SHORT[code]||code||"?"; return `<span class="store"><i style="background:${SITE_COL[c]||"#777"}"></i>${esc(c)}</span>`; }
+function zonePill(z){ const Z=ZONE_UI[z]; return Z?`<span class="pill ${Z.c}">${Z.t}</span>`:`<span class="pill pr">📍 non indiqué</span>`; }
+function typeTag(t){ return t==="PICKING"?`<span class="tag" style="background:#e3edfa;color:var(--pick)">Picking</span>`:t==="DOLLY"?`<span class="tag" style="background:#fff1e6;color:var(--warn)">Dolly</span>`:`<span class="tag" style="background:#e5efe7;color:var(--disp)">Dispatch</span>`; }
+function focusInside(id){ const el=document.getElementById(id), a=document.activeElement; return !!(el && a && el.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)); }
+function arr(o){ return Array.isArray(o)?o:(o&&typeof o==="object"?Object.values(o):[]); }
+
+/* ----------------------------------------------------------------- données */
+function g5Todo(){ const out=[]; STORES.forEach(s=>{ if(!state[s.code]) return; recsOf(s.code, r=>r.status==="validated" && !r.g5Validated).forEach(r=>out.push(Object.assign({store:s.code},r))); }); return out; }
+function recsInProgress(){ const out=[]; STORES.forEach(s=>{ const st=state[s.code]; if(!st) return; Object.entries(st.receptions||{}).forEach(([id,r])=>{ if(r && r.status!=="validated" && (Date.now()-(r.createdAt||r.updatedAt||0))<DAY) out.push(Object.assign({id,store:s.code},r)); }); }); return out; }
+function avoirsTodo(){ const out=[]; STORES.forEach(s=>{ const st=state[s.code]; if(!st) return; Object.entries(st.receptions||{}).forEach(([id,r])=>{ if(recAvoirLines(r).length && recAvoirStatus(r)!=="termine") out.push(Object.assign({id,store:s.code},r)); }); }); return out; }
+const isArchived=(x)=>!!(x && (x.archived || (x.meta && x.meta.archived)));
+function dispatchToday(){ return centraleSessions().filter(s=>!isArchived(s) && isToday(s.meta.startedAt)).map(s=>Object.assign({st:dispatchStats(s)},s)); }
+function pickingList(){ return Object.entries(centraleState.picking||{}).filter(([,p])=>p&&p.meta&&!isArchived(p)).map(([sid,p])=>Object.assign({id:sid,st:pickingStatsC(p)},p)); }
+function enlList(){ return Object.entries(centraleState.enlevements||{}).map(([id,e])=>Object.assign({id},e)).filter(e=>e&&e.at).sort((a,b)=>(b.at||0)-(a.at||0)); }
+function enlItems(e){ return arr(e.items); }
+function enlPhoto(e, it){ const p=(e.photos||{})[String(it.key||"").replace(/[.#$\[\]\/]/g,"_")]; return p&&p.id?p:null; }
+function enlPending(){ return enlList().filter(e=>e.status==="attente-23h59"); }
+function enlSent(){ return enlList().filter(e=>e.status==="envoye"); }
+function enlValidated(days){ return enlList().filter(e=>e.status==="valide" && (Date.now()-(e.validatedAt||e.at))<(days||10)*DAY); }
+function refusedOpen(){
+  const out=[];
+  enlValidated(14).forEach(e=>{ Object.entries(e.refused||{}).forEach(([k,r])=>{ if(!r || r.relancedAt || r.closedAt) return;
+    const it=enlItems(e).find(x=>String(x.key||"").replace(/[.#$\[\]\/]/g,"_")===k) || { key:k, code:r.code, type:"DISPATCH", n:1 };
+    out.push({ e, k, r, it }); }); });
+  return out.sort((a,b)=>(b.r.at||0)-(a.r.at||0));
+}
+function palCount(items){ return items.reduce((a,x)=>a+(x.kbg?0:(Number(x.n)||0)),0); }
+function dolCount(e){ return enlItems(e).reduce((a,x)=>a+(Number(x.dollies)||0),0) + arr(e.lieux).reduce((a,L)=>a+(Number(L.dolly)||0),0); }
+function ecartsOpen(){ return centraleSessions().filter(s=>!isArchived(s) && sessionEcarts(s).length && !ecartsTraite(s.id)); }
+function noteToday(){ return (centraleState.rungisNotes||{})[isoDay()]||{}; }
+
+/* Ménage : ce qui reste visible sur la tablette alors que c'est traité / abandonné */
+function menageCandidates(){
+  const out=[], now=Date.now();
+  centraleSessions().forEach(s=>{ if(isArchived(s)) return; const st=dispatchStats(s); const age=now-(s.meta.startedAt||0);
+    if(st.done<st.total && age>DAY) out.push({ kind:"dispatch", id:s.id, label:(s.meta.supplier||"?"), code:"", at:s.meta.startedAt, why: st.done? `Jamais terminé (${st.done}/${st.total} lignes)` : "Jamais commencé (0 ligne)", state:"ouvert" }); });
+  pickingList().forEach(p=>{ const age=now-(p.meta.startedAt||0), m=p.meta;
+    if(p.enlevement) return;
+    if(!p.closed && age>2*DAY) out.push({ kind:"picking", id:p.id, label:"n° "+(m.orderNum||"—"), code:m.storeCode, at:m.startedAt, why: p.st.done?`Jamais clôturé (${p.st.done}/${p.st.total})`:"Jamais commencé", state:"ouvert" });
+    else if(p.closed && age>2*DAY && age<14*DAY) out.push({ kind:"picking", id:p.id, label:"n° "+(m.orderNum||"—"), code:m.storeCode, at:(p.closed.at||m.startedAt), why:"Clôturé, jamais demandé à Rungis (déjà parti ?)", state:p.closed.partial?"clôture partielle":"clôturé" }); });
+  return out.sort((a,b)=>(a.at||0)-(b.at||0));
+}
+function archivedList(){
+  const out=[];
+  Object.entries(centraleState.dispatch||{}).forEach(([id,s])=>{ if(s&&s.archived) out.push({ kind:"dispatch", id, label:(s.meta&&s.meta.supplier)||"?", at:s.archived.at, by:s.archived.by }); });
+  Object.entries(centraleState.picking||{}).forEach(([id,p])=>{ if(p&&p.archived) out.push({ kind:"picking", id, label:"n° "+((p.meta&&p.meta.orderNum)||"—"), code:p.meta&&p.meta.storeCode, at:p.archived.at, by:p.archived.by }); });
+  return out.filter(x=>(Date.now()-(x.at||0))<30*DAY).sort((a,b)=>(b.at||0)-(a.at||0));
+}
+
+/* ------------------------------------------------- compteurs du menu + rafraîchissement */
+let __dashLast=0;
+function setCnt(key, n, cls){ const el=document.getElementById("cnt-"+key); if(!el) return; el.textContent=n?String(n):""; el.className="cnt"+(cls&&n?" "+cls:""); }
+function dashTick(force){
+  if(!document.getElementById("app") || document.getElementById("app").classList.contains("hidden")) return;
+  try{
+    setCnt("g5", g5Todo().length); setCnt("avoirs", avoirsTodo().length, "a");
+    setCnt("rungis", refusedOpen().length || enlPending().length, refusedOpen().length?"r":"");
+    setCnt("centrale", ecartsOpen().length, "a"); setCnt("appview", menageCandidates().length);
+    const lb=document.getElementById("liveBadge"); if(lb){ const on=!!dbCentrale; lb.innerHTML=`<span class="ldot${on?"":" off"}"></span>${on?"Live · synchro "+hm(Date.now()):"Hors ligne"}`; }
+  }catch(e){ console.error(e); }
+  if(!force && Date.now()-__dashLast<3500) return; __dashLast=Date.now();
+  try{
+    if(ACTIVE_TAB==="home" && !focusInside("tab-home")) renderHome();
+    if(ACTIVE_TAB==="rungis" && !focusInside("tab-rungis")) renderRungis();
+    if(ACTIVE_TAB==="appview" && !focusInside("tab-appview")) renderAppView();
+    if(ACTIVE_TAB==="suivi" && liveView==="kbg") renderKbgLive();
+  }catch(e){ console.error(e); }
+}
+
+/* ===================================================================== ACCUEIL */
+function kpi(label, v, small, sub, bar, onclick, warn){
+  return `<div class="cx kpi" onclick="${onclick}" ${warn?'style="border-color:#f3c8a6;background:#fffaf5"':''}><div class="eyebrow" ${warn?'style="color:var(--warn)"':''}>${label}</div><div class="v">${v}${small?` <small>${small}</small>`:""}</div><div class="s">${sub||"&nbsp;"}</div><div class="kbar">${bar||""}</div></div>`;
+}
+function todoItems(){
+  const L=[];
+  refusedOpen().forEach(x=>L.push({ pr:0, ic:"🚛", bg:"var(--dan-s)", col:"var(--dan)", t:`Rungis : palette non récupérée (${new Date(x.r.at||x.e.validatedAt||x.e.at).toLocaleDateString("fr-FR")})`,
+    s:`${x.it.type==="PICKING"?"Picking cde "+esc(x.it.ref||"—"):"Dispatch"} → ${storeChip(x.it.code)} · motif « ${esc(MOTIF_UI[x.r.motif]||x.r.motif||"?")} »${x.r.note?" — "+esc(x.r.note):""}`,
+    btn:`<button class="tbtn s w" onclick="relancerRungis(['${esc(x.e.id)}|${esc(x.k)}'])">Relancer Rungis</button>` }));
+  const pend=enlPending(); if(pend.length){ const items=[].concat(...pend.map(enlItems)); const noZone=items.filter(i=>!i.kbg&&!i.mergedWith&&!i.zone).length;
+    L.push({ pr:2, ic:"⏳", bg:"var(--warn-s)", col:"var(--warn)", t:`Enlèvement Rungis : ${palCount(items)} palette(s) en attente du mail de 23h59`, s:`${pend.length} demande(s)${noZone?` · ${noZone} sans emplacement`:""}${noteToday().text?" · note ajoutée":""}`,
+      btn:`<button class="tbtn s" onclick="switchTab('rungis')">Voir</button>` }); }
+  const sent=enlSent().filter(e=>(Date.now()-(e.sentAt||e.at))>10*3600000);
+  if(sent.length) L.push({ pr:1, ic:"📨", bg:"var(--warn-s)", col:"var(--warn)", t:`Rungis n'a pas encore validé ${sent.length} demande(s)`, s:`envoyée(s) ${ago(Math.min(...sent.map(e=>e.sentAt||e.at)))}`, btn:`<button class="tbtn s" onclick="switchTab('rungis')">Relancer</button>` });
+  const g5=g5Todo(); const old=g5.filter(r=>(Date.now()-(r.validatedAt||0))>DAY);
+  if(g5.length) L.push({ pr:old.length?1:3, ic:"📥", bg:old.length?"var(--warn-s)":"var(--info-s)", col:old.length?"var(--warn)":"var(--info)", t:`${g5.length} réception(s) à saisir sur G5`, s:old.length?`dont ${old.length} depuis plus de 24 h`:"validées par les magasins", btn:`<button class="tbtn s" onclick="switchTab('g5')">Ouvrir</button>` });
+  const av=avoirsTodo(); if(av.length) L.push({ pr:3, ic:"💶", bg:"var(--warn-s)", col:"var(--warn)", t:`${av.length} avoir(s) à réclamer`, s:[...new Set(av.map(r=>r.supplier||"?"))].slice(0,4).map(esc).join(" · "), btn:`<button class="tbtn s" onclick="switchTab('avoirs')">Ouvrir</button>` });
+  const ec=ecartsOpen(); if(ec.length) L.push({ pr:4, ic:"⚠", bg:"var(--info-s)", col:"var(--info)", t:`${ec.length} dispatch avec écarts à traiter`, s:ec.slice(0,3).map(s=>esc(s.meta.supplier||"?")).join(" · "), btn:`<button class="tbtn s" onclick="centraleView='ecarts';switchTab('centrale')">Voir</button>` });
+  const pk=pickingList().filter(p=>p.closed&&p.closed.partial&&isToday(p.closed.at)); pk.forEach(p=>L.push({ pr:5, ic:"🛒", bg:"var(--info-s)", col:"var(--pick)", t:`Picking ${STORE_SHORT[p.meta.storeCode]||p.meta.storeCode||""} clôturé partiellement`, s:`cde ${esc(p.meta.orderNum||"—")} · ${p.st.done}/${p.st.total} lignes`, btn:`<button class="tbtn s" onclick="centraleView='picking';switchTab('centrale')">Voir</button>` }));
+  const mn=menageCandidates(); if(mn.length) L.push({ pr:6, ic:"🧹", bg:"#eef0ee", col:"#4a5547", t:`${mn.length} ancien(s) dispatch / picking encore visible(s) sur la tablette`, s:"traités ou abandonnés — à nettoyer", btn:`<button class="tbtn s" onclick="switchTab('appview')">Faire le ménage</button>` });
+  return L.sort((a,b)=>a.pr-b.pr);
+}
+function pribonEvents(){
+  const ev=[], since=Date.now()-DAY;
+  STORES.forEach(s=>{ const st=state[s.code]; if(!st) return; const c=STORE_SHORT[s.code]||s.code;
+    Object.values(st.receptions||{}).forEach(r=>{ if(!r) return; const nm=names[r.operatorCode]?(" · "+shortName(names[r.operatorCode])):"";
+      if(r.validatedAt>since) ev.push({ at:r.validatedAt, tag:c, tc:SITE_COL[c], t:`Réception <b>${esc(r.supplier||"?")}</b> terminée${recEcartLines(r).length?` · ${recEcartLines(r).length} écart(s)`:""}${nm}` });
+      else if(r.createdAt>since) ev.push({ at:r.createdAt, tag:c, tc:SITE_COL[c], t:`Réception <b>${esc(r.supplier||"?")}</b> commencée${nm}` }); });
+    Object.values(st.docs||{}).forEach(d=>{ if(d&&d.createdAt>since) ev.push({ at:d.createdAt, tag:c, tc:SITE_COL[c], t:`BL <b>${esc(d.supplier||"?")}</b> chargé` }); });
+  });
+  centraleSessions().forEach(s=>{ const x=dispatchStats(s); if(s.meta.startedAt>since) ev.push({ at:s.meta.startedAt, tag:"Dispatch", tc:"var(--disp)", t:`<b>${esc(s.meta.supplier||"?")}</b> · ${x.done}/${x.total} lignes` }); });
+  pickingList().forEach(p=>{ if(p.closed&&p.closed.at>since) ev.push({ at:p.closed.at, tag:"Picking", tc:"var(--pick)", t:`Commande <b>${STORE_SHORT[p.meta.storeCode]||esc(p.meta.storeCode||"")}</b> n° ${esc(p.meta.orderNum||"—")} ${p.closed.partial?"clôturée partiellement":"clôturée"}` }); });
+  enlList().forEach(e=>{ if(e.at>since) ev.push({ at:e.at, tag:"Rungis", tc:"var(--warn)", t:`Demande d'enlèvement · ${palCount(enlItems(e))} pal. (${esc(shortName(e.by))})` });
+    if(e.validatedAt>since) ev.push({ at:e.validatedAt, tag:"Rungis", tc:"var(--warn)", t:`Rungis a validé la récupération${Object.keys(e.refused||{}).length?` · <b style="color:var(--dan)">${Object.keys(e.refused).length} non récupérée(s)</b>`:""}` }); });
+  return ev;
+}
+function feedRow(e){ return `<div class="row"><time>${hm(e.at)}</time><span class="tag" style="background:${e.tc}1a;color:${e.tc}">${esc(e.tag)}</span><div class="t1" style="flex:1">${e.t}</div></div>`; }
+function renderHome(){
+  const el=document.getElementById("tab-home"); if(!el) return;
+  const g5=g5Todo(), inp=recsInProgress(), dt=dispatchToday(), pk=pickingList().filter(p=>(Date.now()-(p.meta.startedAt||0))<2*DAY);
+  const pend=enlPending(), pItems=[].concat(...pend.map(enlItems)), pPal=palCount(pItems), pDol=pend.reduce((a,e)=>a+dolCount(e),0);
+  const byStore=(list)=>{ const m={}; list.forEach(r=>{ const c=STORE_SHORT[r.store]||r.store; m[c]=(m[c]||0)+1; }); return m; };
+  const inpS=byStore(inp), totInp=inp.length||1;
+  const dDone=dt.filter(s=>s.st.total&&s.st.done>=s.st.total).length, pClosed=pk.filter(p=>p.closed).length, pPart=pk.filter(p=>p.closed&&p.closed.partial).length;
+  const todos=todoItems(); const who=RESP_NAMES[String(ME_EMAIL||"").toLowerCase()]||""; const hello=(new Date().getHours()<18?"Bonjour":"Bonsoir")+(who?" "+who:"");
+  const ref=refusedOpen().length;
+  const ev=pribonEvents().concat(kbFeed.map(f=>({ at:f.at, tag:"Kelbongoo", tc:"#6e4a9c", t:f.t }))).sort((a,b)=>b.at-a.at).slice(0,9);
+  el.innerHTML=`<div class="page-h"><div><h1>${esc(hello)} 👋</h1><div class="sub">${todos.length?`<b style="color:var(--dan)">${todos.length} point(s)</b> à traiter`:"Rien d'urgent 🎉"}${pend.length?` · mail Rungis à 23h59 (${pPal} pal.)`:""}</div></div></div>
+  <div class="kpis">
+    ${kpi("À saisir sur G5", g5.length, "réception(s)", g5.filter(r=>(Date.now()-(r.validatedAt||0))>DAY).length?`dont ${g5.filter(r=>(Date.now()-(r.validatedAt||0))>DAY).length} depuis +24 h`:"validées en magasin", "", "switchTab('g5')")}
+    ${kpi("Réceptions en cours", inp.length, "", Object.entries(inpS).map(([c,n])=>`<span class="store"><i style="background:${SITE_COL[c]||"#777"}"></i>${n}</span>`).join(" &nbsp;")||"aucune", Object.entries(inpS).map(([c,n])=>`<i style="width:${n/totInp*100}%;background:${SITE_COL[c]||"#777"}"></i>`).join(""), "liveView='pribon';switchTab('suivi')")}
+    ${kpi("Dispatch PDP · aujourd'hui", dt.length, "fournisseur(s)", `${dDone} terminé(s) · ${dt.length-dDone} en cours`, dt.length?`<i style="width:${dDone/dt.length*100}%;background:var(--disp)"></i>`:"", "centraleView='histo';switchTab('centrale')")}
+    ${kpi("Picking PDP · 48 h", pk.length, "commande(s)", `${pClosed} clôturée(s)${pPart?` · ${pPart} partielle(s)`:""}`, pk.length?`<i style="width:${pClosed/pk.length*100}%;background:var(--pick)"></i>`:"", "centraleView='picking';switchTab('centrale')")}
+    ${kpi("Rungis ce soir", pPal, `pal.${pDol?" · "+pDol+" dolly":""}`, ref?`<b style="color:var(--dan)">${ref} non récupérée(s)</b> à relancer`:(pend.length?"Mail auto à <b>23h59</b>":"aucune demande"), "", "switchTab('rungis')", true)}
+  </div>
+  <div class="grid2">
+    <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>À traiter</h3>${todos.length?`<span class="pill pr">${todos.length}</span>`:""}<span class="sp"></span><span class="sub">trié par urgence</span></div>
+      ${todos.length?todos.map(x=>`<div class="row"><div class="ic" style="background:${x.bg};color:${x.col}">${x.ic}</div><div style="flex:1;min-width:0"><div class="t1">${x.t}</div><div class="t2">${x.s}</div></div>${x.btn}</div>`).join(""):`<div class="empty">Tout est à jour. Beau travail ✨</div>`}
+    </div>
+    <div class="cx feed" style="overflow:hidden"><div class="cx-h"><span class="ldot"></span><h3>Activité en direct</h3><span class="sp"></span><span class="sub">Pribon · PDP · Kelbongoo</span></div>
+      ${ev.length?ev.map(feedRow).join(""):`<div class="empty">Pas encore d'activité aujourd'hui.</div>`}
+      <div class="row" style="cursor:pointer;color:var(--acc-d);font-weight:650;font-size:12.5px" onclick="liveView='kbg';switchTab('suivi')">Ouvrir le suivi live complet →</div>
+    </div>
+  </div>`;
+}
+
+/* ===================================================================== ENLÈVEMENTS RUNGIS */
+let rungisView="soir";
+function stepsHTML(){
+  const pend=enlPending(), sent=enlSent(), valToday=enlList().filter(e=>e.status==="valide"&&isToday(e.validatedAt));
+  const pItems=[].concat(...pend.map(enlItems));
+  const cur = pend.length?2 : sent.length?3 : valToday.length?5 : 1;
+  const st=(n,l,sm,last)=>`<div class="step ${n<cur?"done":n===cur?"cur":"todo"}"><span class="n">${n<cur?"✓":n}</span><div class="l">${l}<small>${sm}</small></div>${last?"":'<span class="ln"></span>'}</div>`;
+  return `<div class="cx" style="margin-bottom:16px"><div class="steps">
+    ${st(1, "Demandes PDP", pend.length?`${pend.length} demande(s) · ${palCount(pItems)} pal.`:"en attente de demandes de la tablette")}
+    ${st(2, "Mail à Rungis", pend.length?"part automatiquement à 23h59":(sent.length?"envoyé "+ago(Math.max(...sent.map(e=>e.sentAt||e.at))):"—"))}
+    ${st(3, "Rungis valide la récup", valToday.length?"validée "+ago(Math.max(...valToday.map(e=>e.validatedAt))):"→ mail rr@ + hg@ (avec motifs)")}
+    ${st(4, "Livraison magasins", "BL envoyés · mail rr@ + hg@", true)}
+  </div></div>`;
+}
+function itemRow(e, it, idx, opts){
+  const ph=enlPhoto(e,it), merged=!!it.mergedWith, ref=(e.refused||{})[String(it.key||"").replace(/[.#$\[\]\/]/g,"_")];
+  const qty=it.kbg?"via Kelbongoo":Number(it.dollies)>0?`${it.dollies} dolly`:Number(it.n)>0?`${it.n} pal.`:`🔗 avec ${esc(it.mergedWith)}`;
+  const status= ref?`<span class="pill pr" title="${esc(ref.note||"")}">Non récupérée · ${esc(MOTIF_UI[ref.motif]||ref.motif||"")}</span>` : e.status==="valide"?`<span class="pill pg">Récupérée</span>` : e.status==="envoye"?`<span class="pill pb">Envoyée</span>` : `<span class="pill po">En attente</span>`;
+  return `<tr ${ref?'style="background:#fff7f6"':""}><td>${typeTag(it.type)}</td>
+    <td><div class="t1">${it.type==="PICKING"?"Commande "+esc(it.ref||"—"):esc((it.sups||[]).map(x=>x.name).slice(0,2).join(" · ")||"Dispatch")} <span class="t2">· ${qty}${it.frais?" · ❄️ frais":""}</span></div>
+      <div class="t2">Demandé par ${esc(shortName(e.by))} · ${new Date(e.at).toLocaleDateString("fr-FR")} ${hm(e.at)}${it.note?` · <b style="color:var(--ink2)">ℹ️ ${esc(it.note)}</b>`:""}</div></td>
+    <td>${it.kbg?'<span class="t2">—</span>':merged?'<span class="t2">même palette</span>':zonePill(it.zone)}</td>
+    <td>${storeChip(it.code)}</td>
+    <td>${ph?`<a href="${esc(ph.url||("https://drive.google.com/file/d/"+ph.id+"/view"))}" target="_blank" rel="noopener"><img class="thumb" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(ph.id)}&sz=w200" alt="photo" loading="lazy"></a>`:(it.hasPhoto?'<span class="t2">📷 en cours…</span>':'<span class="t2">—</span>')}</td>
+    <td>${status}</td>
+    <td style="text-align:right;white-space:nowrap">${opts&&opts.edit?`<button class="tbtn s" onclick="addItemNote('${esc(e.id)}',${idx})">ℹ️ Info</button>`:""}${ref&&opts&&opts.relance?` <button class="tbtn s w" onclick="relancerRungis(['${esc(e.id)}|${esc(String(it.key||"").replace(/[.#$\[\]\/]/g,"_"))}'])">Relancer</button>`:""}</td></tr>`;
+}
+function tableFor(list, opts){
+  const rows=[]; list.forEach(e=>enlItems(e).forEach((it,i)=>rows.push(itemRow(e,it,i,opts))));
+  list.forEach(e=>arr(e.lieux).forEach(L=>{ if(Number(L.dolly)>0) rows.push(`<tr><td>${typeTag("DOLLY")}</td><td><div class="t1">Dolly fromage × ${L.dolly}</div><div class="t2">${esc(shortName(e.by))} · ${hm(e.at)}</div></td><td>${zonePill("froid")}</td><td>${storeChip(L.code)}</td><td><span class="t2">—</span></td><td><span class="pill ${e.status==="valide"?"pg":e.status==="envoye"?"pb":"po"}">${e.status==="valide"?"Récupérée":e.status==="envoye"?"Envoyée":"En attente"}</span></td><td></td></tr>`); }));
+  if(!rows.length) return `<div class="empty">${opts&&opts.empty||"Rien ici."}</div>`;
+  return `<table class="tb"><tr><th>Type</th><th>Contenu</th><th>Emplacement</th><th>Pour</th><th>Photo</th><th>Statut</th><th></th></tr>${rows.join("")}</table>`;
+}
+function renderRungis(){
+  const el=document.getElementById("tab-rungis"); if(!el) return;
+  const pend=enlPending(), sent=enlSent(), val=enlValidated(10), refs=refusedOpen();
+  const items=[].concat(...pend.map(enlItems)).filter(x=>!x.kbg);
+  const froid=items.filter(x=>x.zone==="froid").length, sec=items.filter(x=>x.zone==="sec").length;
+  const nt=noteToday();
+  let main;
+  if(rungisView==="soir") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Tournée de ce soir</h3><span class="sub">${palCount(items)} pal. · ${pend.reduce((a,e)=>a+dolCount(e),0)} dolly</span><span class="sp"></span>${froid?`<span class="pill pcold">❄ ${froid} chambre froide</span>`:""}${sec?`<span class="pill pdry">▣ ${sec} entrepôt sec</span>`:""}</div>
+      ${tableFor(pend,{edit:true, empty:"Aucune demande d'enlèvement en attente. La tablette enregistre les demandes au fil de la journée."})}</div>
+      ${sent.length?`<div class="cx" style="overflow:hidden;margin-top:16px"><div class="cx-h"><h3>Envoyé à Rungis — en attente de validation</h3><span class="sp"></span><span class="sub">${sent.length} demande(s)</span></div>${tableFor(sent,{})}</div>`:""}`;
+  else if(rungisView==="nonrecup") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Palettes non récupérées</h3><span class="sp"></span>${refs.length?`<button class="tbtn s w" onclick="relancerRungis(${esc(JSON.stringify(refs.map(x=>x.e.id+"|"+x.k)))})">Tout relancer (${refs.length})</button>`:""}</div>
+      ${refs.length?`<table class="tb"><tr><th>Type</th><th>Contenu</th><th>Emplacement</th><th>Pour</th><th>Motif Rungis</th><th></th></tr>${refs.map(x=>`<tr style="background:#fff7f6"><td>${typeTag(x.it.type)}</td><td><div class="t1">${x.it.type==="PICKING"?"Commande "+esc(x.it.ref||"—"):esc((x.it.sups||[]).map(s=>s.name).slice(0,2).join(" · ")||"Dispatch")}</div><div class="t2">tournée du ${new Date(x.r.at||x.e.validatedAt||x.e.at).toLocaleDateString("fr-FR")}</div></td><td>${zonePill(x.it.zone)}</td><td>${storeChip(x.it.code)}</td><td><b style="color:var(--dan)">${esc(MOTIF_UI[x.r.motif]||x.r.motif||"?")}</b>${x.r.note?`<div class="t2">« ${esc(x.r.note)} »</div>`:""}</td><td style="text-align:right;white-space:nowrap"><button class="tbtn s w" onclick="relancerRungis(['${esc(x.e.id)}|${esc(x.k)}'])">Relancer</button> <button class="tbtn s" title="Déjà réglé autrement (parti par un autre moyen…)" onclick="closeRefused('${esc(x.e.id)}','${esc(x.k)}')">Classer</button></td></tr>`).join("")}</table>`:`<div class="empty">Aucune palette en souffrance 👌</div>`}</div>`;
+  else main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Historique (10 jours)</h3></div>${tableFor(val,{relance:true, empty:"Pas encore de tournée validée."})}</div>`;
+  const mails=[]; enlList().slice(0,40).forEach(e=>{ if(e.validatedAt) mails.push({ at:e.validatedAt, t:`Rungis a validé la récupération`, s:`${palCount(enlItems(e))} pal.${Object.keys(e.refused||{}).length?` · <b style="color:var(--dan)">${Object.keys(e.refused).length} non récupérée(s)</b> + motif`:""}${e.livraison?` · livraison ${Object.entries(e.livraison).map(([c,d])=>c+" "+d).join(", ")}`:""}` });
+    if(e.sentAt) mails.push({ at:e.sentAt, t:`Mail envoyé à Rungis`, s:`${e.sentBy&&e.sentBy!=="23h59"?"envoyé par "+esc(e.sentBy):"envoi automatique 23h59"}`, info:true }); });
+  const seen={}; const mailsU=mails.sort((a,b)=>b.at-a.at).filter(m=>{ const k=m.t+Math.round(m.at/60000); if(seen[k]) return false; seen[k]=1; return true; }).slice(0,8);
+  el.innerHTML=`<div class="page-h"><div><h1>Enlèvements Rungis</h1><div class="sub">Demandes de la tablette, mail consolidé de 23h59, validation Rungis et livraison des magasins.</div></div><span class="sp"></span>
+    <span class="seg"><button class="${rungisView==="soir"?"on":""}" onclick="rungisView='soir';renderRungis()">Tournée de ce soir</button><button class="${rungisView==="nonrecup"?"on":""}" onclick="rungisView='nonrecup';renderRungis()">Non récupérées${refs.length?` (${refs.length})`:""}</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">Historique</button></span></div>
+  ${stepsHTML()}
+  <div class="grid-r"><div>${main}</div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="cx"><div class="cx-h"><h3>📝 Note pour Rungis</h3><span class="sp"></span><span class="sub">${nt.sentAt?"envoyée avec le mail":"ajoutée au mail de 23h59"}</span></div>
+        <div style="padding:12px 16px"><textarea class="note" id="rungisNote" placeholder="Ex. : passer avant 7h, quai 2. La palette TOL est au fond de la chambre froide.">${esc(nt.text||"")}</textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center"><button class="tbtn s p" onclick="saveRungisNote()">Enregistrer la note</button>${nt.at?`<span class="t2">${esc(RESP_NAMES[String(nt.by||"").toLowerCase()]||nt.by||"")} · ${hm(nt.at)}</span>`:""}</div>
+        <div class="t2" style="margin-top:8px">Pour une palette précise : bouton « ℹ️ Info » sur sa ligne.</div></div></div>
+      <div class="cx" style="${refs.length?"border-color:#f0c9c9":""}"><div class="cx-h"><h3>${refs.length?"⚠️ ":""}Relancer Rungis</h3></div>
+        <div style="padding:12px 16px;font-size:13px;color:var(--ink2)">${refs.length?`<b style="color:var(--dan)">${refs.length} palette(s) non récupérée(s).</b> La relance les remet dans une nouvelle demande (photo, emplacement et motif repris).`:"Aucune palette non récupérée."}
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${refs.length?`<button class="tbtn s w" onclick="relancerRungis(${esc(JSON.stringify(refs.map(x=>x.e.id+"|"+x.k)))})">Relancer maintenant</button>`:""}<button class="tbtn s" ${pend.length?"":"disabled"} onclick="envoyerMailRungis(false)">Envoyer le mail du soir maintenant</button></div>
+          <div class="t2" style="margin-top:8px">Envoi à st@, fl@, rr@pribon.org et gestion@probon.fr.</div></div></div>
+      <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>✉️ Mails rr@ et hg@</h3></div>
+        ${mailsU.length?mailsU.map(m=>`<div class="row"><span class="pill ${m.info?"pb":"pg"}">${m.info?"→":"✓"}</span><div style="flex:1"><div class="t1" style="font-size:12.5px">${new Date(m.at).toLocaleDateString("fr-FR")} ${hm(m.at)} · ${m.t}</div><div class="t2">${m.s}</div></div></div>`).join(""):`<div class="empty">Aucun mail pour l'instant.</div>`}
+      </div>
+    </div></div>`;
+}
+async function saveRungisNote(){
+  const t=(document.getElementById("rungisNote")||{}).value||""; if(!dbCentrale) return;
+  try{ await dbCentrale.ref("rungis_notes/"+isoDay()).update({ text:t.trim().slice(0,1500), by:ME_EMAIL, at:Date.now() }); toastC("📝 Note enregistrée — elle partira avec le mail de 23h59"); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function addItemNote(id, idx){
+  const e=(centraleState.enlevements||{})[id]; if(!e) return; const it=enlItems(e)[idx]; if(!it) return;
+  const v=prompt("Info pour Rungis sur cette palette ("+(it.type==="PICKING"?"cde "+(it.ref||""):"dispatch")+" → "+it.code+") :", it.note||""); if(v===null) return;
+  try{ await dbCentrale.ref("enlevements/"+id+"/items/"+(Array.isArray(e.items)?idx:Object.keys(e.items)[idx])+"/note").set(v.trim().slice(0,300)||null); }catch(err){ alert("Erreur : "+err.message); }
+}
+async function closeRefused(id, k){
+  if(!confirm("Classer cette palette (réglée autrement) ? Elle ne sera plus proposée à la relance.")) return;
+  try{ await dbCentrale.ref("enlevements/"+id+"/refused/"+k).update({ closedAt:Date.now(), closedBy:ME_EMAIL }); }catch(e){ alert("Erreur : "+e.message); }
+}
+/* Relance : nouvelle demande (status attente-23h59, relance:true) avec les palettes refusées, puis envoi immédiat proposé. */
+async function relancerRungis(refsKeys){
+  if(!dbCentrale||!refsKeys||!refsKeys.length) return;
+  const all=refusedOpen(); const chosen=all.filter(x=>refsKeys.indexOf(x.e.id+"|"+x.k)>=0); if(!chosen.length){ alert("Rien à relancer."); return; }
+  if(!confirm(`Relancer Rungis pour ${chosen.length} palette(s) ?\n\n`+chosen.map(x=>`• ${x.it.code} — ${x.it.type==="PICKING"?"cde "+(x.it.ref||""):"dispatch"} (${MOTIF_UI[x.r.motif]||x.r.motif})`).join("\n"))) return;
+  const id="enl_rel_"+Date.now(); const up={}; const items=[]; const photos={}; const lieux={};
+  chosen.forEach(x=>{ const it=Object.assign({}, x.it, { relance:true, prevMotif:x.r.motif||"", note:[x.it.note, x.r.note?("Motif précédent : "+x.r.note):""].filter(Boolean).join(" — ") });
+    const ph=enlPhoto(x.e, x.it); if(ph){ photos[x.k]=ph; it.photoId=ph.id; it.photoUrl=ph.url||""; }
+    items.push(it); lieux[it.code]=lieux[it.code]||{ code:it.code, dolly:0, pal:0, dollies:0 }; lieux[it.code].pal+=Number(it.n)||0; lieux[it.code].dollies+=Number(it.dollies)||0;
+    up[`enlevements/${x.e.id}/refused/${x.k}/relancedAt`]=Date.now(); up[`enlevements/${x.e.id}/refused/${x.k}/relanceId`]=id;
+    if(it.sid) up[`picking/${it.sid}/enlevement`]={ id, at:Date.now(), by:"Console · "+ME_EMAIL, byKey:"console" }; });
+  up[`enlevements/${id}`]={ at:Date.now(), by:"Console · "+ME_EMAIL, byKey:"console", mode:"R", relance:true, date:isoDay(), status:"attente-23h59", items, photos, lieux:Object.values(lieux),
+    totPal:items.reduce((a,x)=>a+(Number(x.n)||0),0), totDol:items.reduce((a,x)=>a+(Number(x.dollies)||0),0) };
+  try{ await dbCentrale.ref().update(up); }catch(e){ alert("Erreur : "+e.message); return; }
+  if(confirm("Relance enregistrée ✅\n\nEnvoyer le mail à Rungis MAINTENANT ?\n(OK = maintenant · Annuler = avec le mail de 23h59)")) envoyerMailRungis(true);
+  else toastC("🔁 Relance ajoutée au mail de 23h59");
+}
+async function envoyerMailRungis(relance){
+  if(!relance && !confirm("Envoyer tout de suite à Rungis le mail des demandes en attente (au lieu de 23h59) ?")) return;
+  try{
+    const r=await fetch(ENLEVEMENT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"send-now", idToken:ID_TOKEN, relance:!!relance})});
+    const j=await r.json();
+    if(j&&j.ok) toastC(j.sent?`📨 Mail envoyé à Rungis (${j.sent} demande(s))`:"Rien à envoyer");
+    else alert("Envoi refusé : "+((j&&j.error)||"erreur")+(j&&/autoris/.test(j.error||"")?"\n\nReconnecte-toi à la console (la connexion Google dure 1 h).":""));
+  }catch(e){ alert("Erreur d'envoi : "+e.message+"\n\nLe script « Enlèvement Rungis » est-il bien en v7 ?"); }
+}
+function toastC(msg){ let t=document.getElementById("toastC"); if(!t){ t=document.createElement("div"); t.id="toastC"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f1d1a;color:#fff;padding:10px 16px;border-radius:10px;font:600 13px Inter,sans-serif;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s"; document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 3200); }
+
+/* ===================================================================== VUE APPLI & MÉNAGE */
+let appSel="centrale", appApercu=true, appBuiltFor="", appVersions={}, menageSel={};
+async function loadVersions(){
+  const get=async(u,re)=>{ try{ const t=await (await fetch(u+(u.includes("?")?"&":"?")+"nocache="+Date.now(),{cache:"no-store"})).text(); const m=t.match(re); return m?m[1]:"?"; }catch(e){ return "?"; } };
+  const re=/APP_VERSION\s*=\s*["']([^"']+)["']/;
+  appVersions={ centrale:await get(APP_URLS.centrale, re), reception:await get(APP_URLS.reception, re), console:await get(location.origin+location.pathname, re) };
+  if(ACTIVE_TAB==="appview") renderAppView();
+}
+function renderAppView(force){
+  const el=document.getElementById("tab-appview"); if(!el) return;
+  if(!el.dataset.built){
+    el.innerHTML=`<div class="page-h"><div><h1>Vue appli &amp; ménage</h1><div class="sub">Voir les applis comme sur la tablette pour tester, et retirer les anciens dispatch / picking.</div></div><span class="sp"></span><span class="seg" id="appSeg"></span></div>
+      <div style="display:grid;grid-template-columns:420px minmax(0,1fr);gap:20px;align-items:start">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px"><div class="phone"><iframe id="appFrame" title="Aperçu de l'appli"></iframe></div><div id="appCtl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center"></div></div>
+        <div id="appRight" style="display:flex;flex-direction:column;gap:16px;min-width:0"></div>
+      </div>`;
+    el.dataset.built="1"; loadVersions();
+  }
+  const segs=[["centrale","La Centrale PDP"],["reception","Réception magasins"]];
+  document.getElementById("appSeg").innerHTML=segs.map(([k,l])=>`<button class="${appSel===k?"on":""}" onclick="appSel='${k}';renderAppView(true)">${l}</button>`).join("");
+  const url=APP_URLS[appSel]+(appSel==="centrale"&&appApercu?"?apercu=1":"");
+  if(force || appBuiltFor!==url){ document.getElementById("appFrame").src=url; appBuiltFor=url; }
+  document.getElementById("appCtl").innerHTML=(appSel==="centrale"
+      ? `<span class="seg"><button class="${appApercu?"on":""}" onclick="appApercu=true;renderAppView(true)">Aperçu (confirmation)</button><button class="${appApercu?"":"on"}" onclick="appApercu=false;renderAppView(true)">Normal</button></span>`
+      : `<span class="t2">⚠️ Actions réelles · admin : bascule de magasin dans l'appli</span>`)
+    +` <a class="tbtn s" href="${esc(url)}" target="_blank" rel="noopener">Ouvrir dans un onglet ↗</a>`;
+  const cand=menageCandidates(), arch=archivedList(); const nSel=cand.filter(c=>menageSel[c.kind+":"+c.id]).length;
+  document.getElementById("appRight").innerHTML=`
+    <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>🧹 Ménage — restes encore visibles sur la tablette</h3>${cand.length?`<span class="pill pr">${cand.length}</span>`:""}<span class="sp"></span>${cand.length?`<button class="tbtn s" onclick="menageSelAll()">Tout cocher</button> <button class="tbtn s d" ${nSel?"":"disabled"} onclick="archiveSelected()">Retirer la sélection (${nSel})</button>`:""}</div>
+      ${cand.length?`<table class="tb"><tr><th style="width:34px"></th><th>Élément</th><th>Lieu</th><th>Dernière action</th><th>Pourquoi encore là</th><th></th></tr>${cand.map(c=>{ const k=c.kind+":"+c.id; return `<tr><td><input type="checkbox" ${menageSel[k]?"checked":""} onchange="menageSel['${esc(k)}']=this.checked;renderAppView()"></td><td>${typeTag(c.kind==="picking"?"PICKING":"DISPATCH")} <b>${esc(c.label)}</b></td><td>${c.code?storeChip(c.code):'<span class="t2">PDP</span>'}</td><td>${new Date(c.at||0).toLocaleDateString("fr-FR")} · ${esc(c.state)}</td><td class="t2">${esc(c.why)}</td><td style="text-align:right"><button class="tbtn s" onclick="archiveItems([['${c.kind}','${esc(c.id)}']])">Retirer</button></td></tr>`; }).join("")}</table>`:`<div class="empty">Rien à nettoyer, la tablette est propre ✨</div>`}
+      <div style="padding:10px 16px;font-size:12px;color:var(--mute);border-top:1px solid var(--line)">Retirer = masquer de la tablette et archiver (récupérable 30 jours ci-dessous). Rien n'est supprimé définitivement.</div></div>
+    ${arch.length?`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Archivés (30 jours)</h3><span class="sp"></span><span class="sub">${arch.length}</span></div><table class="tb">${arch.slice(0,15).map(a=>`<tr><td>${typeTag(a.kind==="picking"?"PICKING":"DISPATCH")} <b>${esc(a.label)}</b></td><td>${a.code?storeChip(a.code):""}</td><td class="t2">retiré ${new Date(a.at||0).toLocaleDateString("fr-FR")} · ${esc(a.by||"")}</td><td style="text-align:right"><button class="tbtn s" onclick="restoreItem('${a.kind}','${esc(a.id)}')">Restaurer</button></td></tr>`).join("")}</table></div>`:""}
+    <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Versions en ligne</h3><span class="sp"></span><button class="tbtn s" onclick="loadVersions()">Vérifier</button></div>
+      <table class="tb"><tr><th>Appli</th><th>En ligne</th><th>Adresse</th></tr>
+      ${[["La Centrale PDP","centrale",APP_URLS.centrale],["Réception magasins","reception",APP_URLS.reception],["Console","console",location.origin+location.pathname]].map(([n,k,u])=>`<tr><td><b>${n}</b></td><td>${esc(appVersions[k]||"…")}${k==="console"&&appVersions.console&&appVersions.console!=="?"&&appVersions.console!==APP_VERSION?` <span class="pill po">cette page : ${APP_VERSION}</span>`:""}</td><td class="t2">${esc(u.replace("https://",""))}</td></tr>`).join("")}</table></div>`;
+}
+function menageSelAll(){ menageCandidates().forEach(c=>{ menageSel[c.kind+":"+c.id]=true; }); renderAppView(); }
+function archiveSelected(){ archiveItems(menageCandidates().filter(c=>menageSel[c.kind+":"+c.id]).map(c=>[c.kind,c.id])); }
+async function archiveItems(list){
+  if(!dbCentrale||!list.length) return;
+  if(!confirm(`Retirer ${list.length} élément(s) de la tablette ?\n\nIls sont archivés (récupérables 30 jours), rien n'est supprimé.`)) return;
+  const up={}; list.forEach(([k,id])=>{ up[(k==="picking"?"picking/":"dispatch/")+id+"/archived"]={ at:Date.now(), by:ME_EMAIL }; menageSel[k+":"+id]=false; });
+  try{ await dbCentrale.ref().update(up); toastC(`🧹 ${list.length} élément(s) retiré(s) de la tablette`); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function restoreItem(k,id){ try{ await dbCentrale.ref((k==="picking"?"picking/":"dispatch/")+id+"/archived").remove(); toastC("↩️ Restauré sur la tablette"); }catch(e){ alert("Erreur : "+e.message); } }
+
+/* ===================================================================== SUIVI LIVE (Kelbongoo + Pribon) */
+let liveView="kbg", kbgApp=null, kbgUser=null, kbgState="idle", kbgErr="", kbgPres={}, kbgUnsub=null, kbFeed=[], __kbPrev={};
+const ROLE_UI={ prep:["Prépa","background:#fdf4dd;color:#b88a1a","#b88a1a"], distrib:["Distrib","background:var(--info-s);color:var(--info)","#2c4a8c"], pdp:["Chauffeur PDP","background:#f3ecfd;color:#7C3AED","#7C3AED"], master:["Master","background:#f0e8fa;color:#6e4a9c","#6e4a9c"] };
+function renderLive(){
+  const head=document.getElementById("suiviHead"), kb=document.getElementById("suiviKbg"), old=document.getElementById("tab-suivi-old"); if(!head) return;
+  head.innerHTML=`<div class="page-h"><div><h1>Suivi live</h1><div class="sub">${liveView==="kbg"?"Qui est sur quoi chez Kelbongoo, en ce moment.":"Réceptions magasins, dispatch, picking et découpe PDP en cours."}</div></div><span class="sp"></span>
+    <span class="seg"><button class="${liveView==="kbg"?"on":""}" onclick="liveView='kbg';renderLive()">Kelbongoo</button><button class="${liveView==="pribon"?"on":""}" onclick="liveView='pribon';renderLive()">Pribon &amp; PDP</button></span></div>`;
+  kb.classList.toggle("hidden", liveView!=="kbg"); old.classList.toggle("hidden", liveView!=="pribon");
+  if(liveView==="kbg"){ kbgInit(); renderKbgLive(); } else renderSuivi();
+}
+function kbgInit(){
+  if(kbgApp || typeof firebase==="undefined" || !firebase.auth) { if(!firebase.auth) kbgState="nosdk"; return; }
+  try{
+    kbgApp=firebase.initializeApp(KBG_FIREBASE_CONFIG, "KBG");
+    kbgApp.auth().onAuthStateChanged(async u=>{ kbgUser=u;
+      if(!u){ kbgState="out"; renderKbgLive(); return; }
+      try{ const t=await u.getIdTokenResult(); if(t.claims.admin!==true){ kbgState="noadmin"; renderKbgLive(); return; } }catch(e){}
+      kbgSubscribe(); });
+  }catch(e){ kbgState="err"; kbgErr=e.message; }
+}
+async function kbgConnect(){
+  try{ kbgState="connecting"; renderKbgLive();
+    const prov=new firebase.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt:"select_account" });
+    await kbgApp.auth().signInWithPopup(prov);
+    try{ await kbgApp.functions("europe-west1").httpsCallable("kbgClaimAdmin")({}); }catch(e){ console.warn("kbgClaimAdmin", e); }
+    const t=await kbgApp.auth().currentUser.getIdTokenResult(true);
+    if(t.claims.admin!==true){ kbgState="noadmin"; renderKbgLive(); return; }
+    kbgSubscribe();
+  }catch(e){ kbgState="err"; kbgErr=(e&&e.message)||String(e); renderKbgLive(); }
+}
+function kbgSubscribe(){
+  if(kbgUnsub) return; kbgState="live";
+  kbgUnsub=kbgApp.firestore().collection("kb_presence").onSnapshot(snap=>{
+    const o={}; snap.forEach(d=>{ o[d.id]=d.data(); });
+    Object.entries(o).forEach(([id,p])=>{ if(id.charAt(0)==="~"||!p||!p.name) return; const prev=__kbPrev[id];
+      if(prev && p.task && p.task!==prev.task && (Date.now()-(p.taskAt||p.at||0))<10*60000) kbFeed.unshift({ at:p.taskAt||Date.now(), t:`<b>${esc(shortName(p.name))}</b> ${p.role==="distrib"?"· "+esc(p.site||""):""} → ${esc(p.task)}` });
+      else if(prev && p.task===prev.task && Number(p.done)>Number(prev.done) && Number(p.total)>0 && Number(p.done)===Number(p.total)) kbFeed.unshift({ at:Date.now(), t:`<b>${esc(shortName(p.name))}</b> a terminé ${esc(p.task)} (${p.done}/${p.total})` });
+      __kbPrev[id]={ task:p.task, done:p.done }; });
+    kbFeed=kbFeed.slice(0,40); kbgPres=o;
+    if(ACTIVE_TAB==="suivi"&&liveView==="kbg") renderKbgLive();
+    if(ACTIVE_TAB==="home") renderHome();
+  }, err=>{ kbgState="err"; kbgErr=(err&&err.code==="permission-denied")?"Accès refusé par les règles Firestore (collection kb_presence) — voir le changelog 2.0.":err.message; kbgUnsub=null; renderKbgLive(); });
+}
+function renderKbgLive(){
+  const el=document.getElementById("suiviKbg"); if(!el || el.classList.contains("hidden")) return;
+  if(kbgState!=="live"){
+    const msg={ idle:"Connexion…", out:"La console doit se connecter à Kelbongoo avec ton compte Google master (une seule fois sur ce PC).", connecting:"Connexion à Kelbongoo…", noadmin:"Ce compte Google n'a pas les droits master Kelbongoo.", nosdk:"Module Kelbongoo indisponible (recharge la page).", err:"Erreur : "+kbgErr }[kbgState]||"";
+    el.innerHTML=`<div class="cx" style="padding:28px;text-align:center;max-width:560px;margin:30px auto"><div style="font-size:34px">🥕</div><h3 style="margin:8px 0 6px;font-size:17px">Live Kelbongoo</h3><p class="muted">${esc(msg)}</p>
+      ${["out","noadmin","err"].includes(kbgState)?`<button class="tbtn p" onclick="kbgConnect()">Connecter Kelbongoo (Google)</button>`:""}</div>`;
+    return;
+  }
+  const now=Date.now(); const day=isoDay();
+  const people=Object.entries(kbgPres).filter(([id,p])=>id.charAt(0)!=="~"&&p&&p.name&&(now-(p.at||0))<14*3600000&&p.role!=="master")
+    .map(([id,p])=>Object.assign({id, on:(now-(p.at||0))<180000},p)).sort((a,b)=>(b.on-a.on)||((b.at||0)-(a.at||0)));
+  const online=people.filter(p=>p.on), byRole=(r)=>online.filter(p=>p.role===r).length;
+  const aggs=Object.entries(kbgPres).filter(([id])=>id.indexOf("~prep_")===0).map(([,v])=>v).sort((a,b)=>String(b.day).localeCompare(String(a.day)));
+  const ag=aggs.find(a=>a.day>day) || aggs[0] || null;
+  const dist=online.filter(p=>p.role==="distrib"); const dDone=dist.reduce((a,p)=>a+(Number(p.done)||0),0), dTot=dist.reduce((a,p)=>a+(Number(p.total)||0),0);
+  const drv=people.filter(p=>p.role==="pdp"&&isToday(p.at)); const rDone=drv.reduce((a,p)=>a+(Number(p.done)||0),0), rTot=drv.reduce((a,p)=>a+(Number(p.total)||0),0);
+  const pct=(d,t)=>t?Math.round(d/t*100):0;
+  const card=(p)=>{ const R=ROLE_UI[p.role]||["?","background:#eee;color:#555","#888"]; const fresh=p.taskAt&&(now-p.taskAt)<6*60000;
+    const task=!p.on?`Hors ligne`:(fresh&&p.task?`<b>${esc(p.task)}</b>${Number(p.total)?` · <b>${p.done||0} / ${p.total}</b> ${esc(p.unit||"")}`:""}`:`<span class="t2">écran : ${esc(p.page||"—")}</span>`);
+    const sub=!p.on?`dernière action : ${esc(p.task||p.page||"—")} · ${hm(p.taskAt||p.at)}`:[p.miss?`${p.miss} manquant(s)`:"", (p.with&&p.with.length)?"avec "+p.with.map(shortName).join(", "):""].filter(Boolean).join(" · ");
+    const site=p.site&&p.site!=="ENTREPOT"?storeChip(p.site):"";
+    return `<div class="pc" style="${p.on?"":"opacity:.55"}"><div class="pav" style="background:${p.on?R[2]:"#8b8680"}">${esc(initials(p.name))}<span class="pdot" style="background:${p.on?"#22a33a":"#b9b4ab"}"></span></div>
+      <div style="flex:1;min-width:0"><div style="display:flex;gap:7px;align-items:center"><span class="t1">${esc(shortName(p.name))}</span><span class="tag" style="${R[1]}">${R[0]}</span></div>
+      <div style="font-size:13px;margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${site}<span>${task}</span></div>${sub?`<div class="t2" style="margin-top:2px">${sub}</div>`:""}</div><span class="t2" style="white-space:nowrap">${ago(p.at)}</span></div>`; };
+  const sites=ag?Object.entries(ag.sites||{}).sort((a,b)=>a[0].localeCompare(b[0])):[];
+  el.innerHTML=`<div class="kpis">
+      ${kpi("Équipe en ligne", online.length, `/ ${people.length} aujourd'hui`, `${byRole("prep")} prépa · ${byRole("distrib")} distrib · ${byRole("pdp")} chauffeur`, people.length?`<i style="width:${pct(online.length,people.length)}%;background:#22a33a"></i>`:"", "")}
+      ${kpi("Prépa"+(ag&&ag.day?" · "+new Date(ag.day+"T12:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric"}):""), ag?pct(ag.d,ag.t)+" %":"—", ag?`${ag.d} / ${ag.t} produits`:"", ag?(ag.closed?`clôturée${ag.closedBy?" par "+esc(shortName(ag.closedBy)):""}`:`mis à jour ${ago(ag.at)}`):"pas encore de données", ag?`<i style="width:${pct(ag.d,ag.t)}%;background:#b88a1a"></i>`:"", "")}
+      ${kpi("Distribution · en cours", dDone, dTot?`/ ${dTot} retraits`:"", dist.length?dist.map(p=>esc(p.site||"?")).join(", ")+" ouvert(s)":"aucun point ouvert", dTot?`<i style="width:${pct(dDone,dTot)}%;background:var(--info)"></i>`:"", "")}
+      ${kpi("Ruptures prépa", ag?`<span style="color:var(--dan)">${ag.ruptures||0}</span>`:"—", "produit(s)", ag?`${ag.rupturesTotales||0} totale(s) · ${(ag.ruptures||0)-(ag.rupturesTotales||0)} partielle(s)`:"", "", "")}
+      ${kpi("Retours PDP", rDone, rTot?`/ ${rTot} récupérés`:"", drv.length?(drv.some(p=>p.on)?"chauffeur en tournée":"chauffeur hors ligne"):"pas de tournée aujourd'hui", rTot?`<i style="width:${pct(rDone,rTot)}%;background:#7C3AED"></i>`:"", "")}
+    </div>
+    <div class="grid2">
+      <div class="cx" style="overflow:hidden"><div class="cx-h"><span class="ldot"></span><h3>Qui est sur quoi</h3><span class="sp"></span><span class="sub">mis à jour toutes les 60 s</span></div>${people.length?people.map(card).join(""):`<div class="empty">Personne n'est connecté pour l'instant.<br><span class="t2">Les applis doivent être en V9.95 ou plus.</span></div>`}</div>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="cx"><div class="cx-h"><h3>Avancement prépa par lieu</h3></div><div style="padding:6px 0">${sites.length?sites.map(([c,v])=>`<div class="srow"><span class="store" style="width:150px"><i style="background:${SITE_COL[c]||"#777"}"></i>${esc(c)} <span class="t2" style="font-weight:500">${esc(SITE_NAME[c]||"")}</span></span><div class="sbar"><i style="width:${pct(v.done,v.total)}%;background:${SITE_COL[c]||"#777"}"></i></div><b style="width:44px;text-align:right;font-size:13px">${pct(v.done,v.total)} %</b></div>`).join(""):`<div class="empty">Pas de prépa en cours.</div>`}</div></div>
+        <div class="cx feed" style="overflow:hidden"><div class="cx-h"><h3>Fil Kelbongoo</h3><span class="sp"></span><span class="sub">depuis l'ouverture de la console</span></div>${kbFeed.length?kbFeed.slice(0,12).map(f=>`<div class="row"><time>${hm(f.at)}</time><div class="t1" style="flex:1">${f.t}</div></div>`).join(""):`<div class="empty">Les changements de tâche apparaîtront ici.</div>`}</div>
+      </div>
+    </div>`;
+}
+function consoleLogout(){ if(!confirm("Se déconnecter de la console ?")) return; try{ google.accounts.id.disableAutoSelect(); }catch(e){} location.reload(); }
 
 </script>
 </body>
