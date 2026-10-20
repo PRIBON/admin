@@ -2933,7 +2933,7 @@ function renderTracaAdmin(el, bar){
 /* v2.3.0 — Registre de traçabilité par magasin (Google Sheets, pour les organismes de contrôle).
    Construit par l'Apps Script « PRIBON — Registre & alertes » (apps_script_registre_alertes.gs),
    mis à jour automatiquement toutes les heures depuis Firebase. REGISTRE_URL = URL /exec de ce script. */
-const REGISTRE_URL = "";
+const REGISTRE_URL = "https://script.google.com/macros/s/AKfycby1Yn7tQgxQ7Gql4Mqt1O4XFd1SCRK8MQiu_9A75PuerIRZGt2aOkC89-1kTwsq_GE3gQ/exec";
 let REG_LIENS=null, REG_BUSY=false;
 async function registreLoad(force){
   if(!REGISTRE_URL) return;
