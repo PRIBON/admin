@@ -103,6 +103,9 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-s
 .side button.tab{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;padding:7px 12px;border-radius:8px;font-size:13.5px;font-weight:500;color:var(--side-ink);cursor:pointer;margin:0;border:none}
 .side button.tab:hover{background:rgba(255,255,255,.06);color:#fff}
 .side button.tab.active{background:rgba(141,196,120,.16);color:#fff;font-weight:650;box-shadow:inset 2px 0 0 #8dc478}
+.side button.tab .em{width:22px;flex:0 0 22px;text-align:center;font-size:16px;line-height:1;filter:saturate(.9)}
+.side button.tab.active .em{filter:none;transform:scale(1.08)}
+.side-sec .se{margin-right:6px;font-size:12px;letter-spacing:0}
 .side button.tab svg{width:17px;height:17px;flex:0 0 17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
 .side .cnt{margin-left:auto;font-size:11px;font-weight:700;background:rgba(255,255,255,.09);border-radius:999px;padding:1px 7px;color:#dfe8da}
 .side .cnt.r{background:#f04438;color:#fff}.side .cnt.a{background:#f5a524;color:#1d1503}.side .cnt:empty{display:none}
@@ -180,6 +183,43 @@ textarea.note{font:13px Inter,sans-serif;width:100%;border:1px solid var(--line)
 button.btn{font-family:Inter,sans-serif;font-weight:650;border-radius:8px}
 .wrap table:not(.tb) th{background:var(--muted)}
 .modal-box{border-radius:14px}
+/* v2.1.0 — Suivi fromage */
+.fr-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.fr-kpi{padding:14px 16px}.fr-kpi .v{font-size:26px;font-weight:800;letter-spacing:-.03em;margin-top:4px;line-height:1.1}
+.fr-kpi .v small{font-size:12.5px;font-weight:600;color:var(--mute);letter-spacing:0;margin-left:4px}.fr-kpi .s{font-size:12px;color:var(--ink2);margin-top:4px}
+.fr-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.fr-bar input[type=search]{font:13px Inter,sans-serif;border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:220px;flex:1;background:#fff}
+.fr-bar input[type=date]{font:13px Inter,sans-serif;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff}
+details.fr-day{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:12px;overflow:hidden}
+details.fr-day>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;background:var(--muted)}
+details.fr-day>summary::-webkit-details-marker{display:none}
+details.fr-day>summary .dt{font-size:15px;font-weight:800;letter-spacing:-.01em;text-transform:capitalize}
+details.fr-day>summary .chev{transition:transform .15s;color:var(--mute)}details.fr-day[open]>summary .chev{transform:rotate(90deg)}
+details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
+.fr-tb td.num,.fr-tb th.num{text-align:right;font-variant-numeric:tabular-nums}
+.fr-tb td small{display:block;color:var(--mute);font-size:11.5px}
+.fr-tb td.num{white-space:nowrap}
+.fr-dest{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.fr-dest.kbg{background:#e3eefc;color:#1d4f9a}.fr-dest.rob{background:#f1e6f6;color:#6a1b9a}
+.fr-foot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--line);background:var(--muted)}
+.fr-pv{overflow:auto}.fr-pv table{border-collapse:collapse;font-size:12.5px;width:100%}
+.fr-pv th,.fr-pv td{border-bottom:1px solid var(--line);padding:7px 10px;white-space:nowrap}
+.fr-pv th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);background:var(--muted);position:sticky;top:0}
+.fr-pv td.c{text-align:center;font-variant-numeric:tabular-nums}.fr-pv td.c.z{color:#cfcac0}
+.fr-pv td.first{position:sticky;left:0;background:#fff;font-weight:650;cursor:pointer}.fr-pv td.first:hover{color:var(--acc-d);text-decoration:underline}
+.fr-pv td.tot{font-weight:800;background:var(--muted)}
+.fr-cell b{display:block;font-size:13px}.fr-cell span{font-size:11px;color:var(--mute)}
+/* v2.2.0 — BL fromage */
+.blf-tb td{vertical-align:top}.blf-tb tr.clos td{opacity:.62}.blf-tb tr:hover td{background:#fffdf7}
+.blf-prog{height:6px;border-radius:9px;background:#efebe3;overflow:hidden;margin-top:5px;min-width:90px}.blf-prog i{display:block;height:100%;background:var(--acc)}
+.blf-al{display:flex;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}.blf-al:last-child{border-bottom:none}
+.blf-pill-hors{background:#c62828;color:#fff;font-weight:800}
+.blf-modal{max-width:1100px!important;width:96vw}
+.blf-modal table{width:100%;border-collapse:collapse;font-size:13px}.blf-modal th,.blf-modal td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.blf-modal th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);background:var(--muted)}
+.blf-act{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.blf-log{font-size:12.5px}.blf-log div{padding:6px 0;border-bottom:1px dashed var(--line)}
+@media (max-width:1300px){ .fr-kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:1100px){ .side{width:64px;padding:14px 8px} .side .brand div,.side-sec,.side button.tab span.lbl,.side .cnt,.side-foot div{display:none} .main{margin-left:64px} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2,.grid-r{grid-template-columns:1fr} }
 </style>
 </head>
@@ -196,22 +236,27 @@ button.btn{font-family:Inter,sans-serif;font-weight:650;border-radius:8px}
 <div class="hidden" id="app">
   <nav class="side" aria-label="Navigation">
     <div class="brand"><div class="logo">P</div><div><b>Pribon Console</b><small id="sideVer">Responsable</small></div></div>
-    <div class="side-sec">Pilotage</div>
-    <button class="tab" data-tab="home" data-key="home"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="lbl">Aujourd'hui</span><span class="cnt" id="cnt-home"></span></button>
-    <button class="tab" data-tab="suivi" data-key="suivi"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span class="lbl">Suivi live</span><span class="cnt" id="cnt-suivi"></span></button>
-    <div class="side-sec">Magasins</div>
-    <button class="tab" data-tab="multi" data-key="multi"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg><span class="lbl">Chargement BL</span><span class="cnt" id="cnt-multi"></span></button>
-    <button class="tab" data-tab="g5" data-key="g5"><svg viewBox="0 0 24 24"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/></svg><span class="lbl">Réceptions G5</span><span class="cnt" id="cnt-g5"></span></button>
-    <button class="tab" data-tab="avoirs" data-key="avoirs"><svg viewBox="0 0 24 24"><path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h9M4 14h9"/></svg><span class="lbl">Avoirs</span><span class="cnt" id="cnt-avoirs"></span></button>
-    <button class="tab" data-tab="msg" data-key="msg"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="lbl">Messages</span><span class="cnt" id="cnt-msg"></span></button>
-    <div class="side-sec">Entrepôt PDP</div>
-    <button class="tab" data-tab="centrale" data-key="centrale" data-cview="ecarts"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="11" rx="1"/><path d="M2 19h20M5 15v4M12 15v4M19 15v4"/></svg><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
-    <button class="tab" data-tab="rungis" data-key="rungis"><svg viewBox="0 0 24 24"><path d="M2 6h12v10H2zM14 9h4l4 4v3h-8"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
-    <button class="tab" data-tab="centrale" data-key="decoupe" data-cview="decoupe"><svg viewBox="0 0 24 24"><path d="M14 4 4 14l3 3 3-1 10-10a2.8 2.8 0 0 0-4-4z"/><path d="m4 14 2 6"/></svg><span class="lbl">Découpe fromage</span><span class="cnt" id="cnt-decoupe"></span></button>
-    <button class="tab" data-tab="inventaire" data-key="inventaire"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3"/></svg><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
-    <div class="side-sec">Référentiels &amp; outils</div>
-    <button class="tab" data-tab="fourn" data-key="fourn"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16z"/></svg><span class="lbl">Fournisseurs</span><span class="cnt" id="cnt-fourn"></span></button>
-    <button class="tab" data-tab="appview" data-key="appview"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg><span class="lbl">Vue appli &amp; ménage</span><span class="cnt" id="cnt-appview"></span></button>
+    <div class="side-sec"><span class="se">🧭</span>Pilotage</div>
+    <button class="tab" data-tab="home" data-key="home"><span class="em">🏠</span><span class="lbl">Aujourd'hui</span><span class="cnt" id="cnt-home"></span></button>
+    <button class="tab" data-tab="suivi" data-key="suivi"><span class="em">📡</span><span class="lbl">Suivi live</span><span class="cnt" id="cnt-suivi"></span></button>
+    <div class="side-sec"><span class="se">🏪</span>Magasins</div>
+    <button class="tab" data-tab="multi" data-key="multi"><span class="em">📄</span><span class="lbl">Chargement BL</span><span class="cnt" id="cnt-multi"></span></button>
+    <button class="tab" data-tab="g5" data-key="g5"><span class="em">📥</span><span class="lbl">Réceptions G5</span><span class="cnt" id="cnt-g5"></span></button>
+    <button class="tab" data-tab="avoirs" data-key="avoirs"><span class="em">💶</span><span class="lbl">Avoirs</span><span class="cnt" id="cnt-avoirs"></span></button>
+    <button class="tab" data-tab="msg" data-key="msg"><span class="em">💬</span><span class="lbl">Messages</span><span class="cnt" id="cnt-msg"></span></button>
+    <div class="side-sec"><span class="se">🏭</span>Entrepôt PDP</div>
+    <button class="tab" data-tab="centrale" data-key="centrale" data-cview="ecarts"><span class="em">🚚</span><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
+    <button class="tab" data-tab="rungis" data-key="rungis"><span class="em">🚛</span><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
+    <button class="tab" data-tab="inventaire" data-key="inventaire"><span class="em">📋</span><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
+    <div class="side-sec"><span class="se">🧀</span>Fromage</div>
+    <button class="tab" data-tab="fromage" data-key="fromage"><span class="em">📒</span><span class="lbl">Suivi fromage</span><span class="cnt" id="cnt-fromage"></span></button>
+    <button class="tab" data-tab="blf" data-key="blf"><span class="em">📦</span><span class="lbl">BL fromage</span><span class="cnt" id="cnt-blf"></span></button>
+    <button class="tab" data-tab="centrale" data-key="decoupe" data-cview="decoupe"><span class="em">🔪</span><span class="lbl">Découpes par BL</span><span class="cnt" id="cnt-decoupe"></span></button>
+    <button class="tab" data-tab="centrale" data-key="traca" data-cview="traca"><span class="em">🏷️</span><span class="lbl">Traçabilité lots</span><span class="cnt" id="cnt-traca"></span></button>
+    <button class="tab" data-tab="kbgpoids" data-key="kbgpoids"><span class="em">⚖️</span><span class="lbl">Poids Kelbongoo</span><span class="cnt" id="cnt-kbgpoids"></span></button>
+    <div class="side-sec"><span class="se">🛠️</span>Référentiels &amp; outils</div>
+    <button class="tab" data-tab="fourn" data-key="fourn"><span class="em">🏢</span><span class="lbl">Fournisseurs</span><span class="cnt" id="cnt-fourn"></span></button>
+    <button class="tab" data-tab="appview" data-key="appview"><span class="em">📱</span><span class="lbl">Vue appli &amp; ménage</span><span class="cnt" id="cnt-appview"></span></button>
     <div class="side-foot"><span class="side-av" id="sideAv">·</span><div><span id="whoami"></span><small id="sideDate"></small></div>
       <button class="tbtn s" style="margin-left:auto;background:transparent;border-color:rgba(255,255,255,.12);color:#9fb098" title="Se déconnecter" onclick="consoleLogout()"><svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></svg></button></div>
   </nav>
@@ -231,6 +276,8 @@ button.btn{font-family:Inter,sans-serif;font-weight:650;border-radius:8px}
       <div id="tab-rungis" class="hidden"></div>
       <div id="tab-inventaire" class="hidden"></div>
       <div id="tab-kbgpoids" class="hidden"></div>
+      <div id="tab-fromage" class="hidden"></div>
+      <div id="tab-blf" class="hidden"></div>
       <div id="tab-avoirs" class="hidden"></div>
       <div id="tab-suivi" class="hidden"><div id="suiviHead"></div><div id="suiviKbg"></div><div id="tab-suivi-old" class="hidden"></div></div>
       <div id="tab-msg" class="hidden"></div>
@@ -243,7 +290,7 @@ button.btn{font-family:Inter,sans-serif;font-weight:650;border-radius:8px}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.0.1";
+const APP_VERSION = "2.2.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -308,7 +355,7 @@ let pendingNames=false;
 let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
-const centraleState={ dispatch:{}, picking:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{}, enlevements:{}, rungisNotes:{} };
+const centraleState={ dispatch:{}, picking:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{}, enlevements:{}, rungisNotes:{}, decAlertes:{}, blHisto:{} };
 let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
 let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
@@ -403,7 +450,9 @@ function start(email){
     dbCentrale=firebase.database(appC);
     dbCentrale.ref("dispatch").on("value",snap=>{ centraleState.dispatch=snap.val()||{}; renderCentrale(); renderSuivi(); });
     dbCentrale.ref("picking").on("value",snap=>{ centraleState.picking=snap.val()||{}; renderCentrale(); renderSuivi(); });
-    dbCentrale.ref("decoupe").on("value",snap=>{ centraleState.decoupe=snap.val()||{}; renderCentrale(); renderSuivi(); });
+    dbCentrale.ref("decoupe").on("value",snap=>{ centraleState.decoupe=snap.val()||{}; renderCentrale(); renderSuivi(); if(ACTIVE_TAB==="fromage") renderFromage(); if(ACTIVE_TAB==="blf") renderBlf(); blfCount(); });
+    dbCentrale.ref("decoupe_alertes").on("value",snap=>{ centraleState.decAlertes=snap.val()||{}; if(ACTIVE_TAB==="blf") renderBlf(); if(ACTIVE_TAB==="fromage") renderFromage(); blfCount(); });
+    dbCentrale.ref("bl_historique").on("value",snap=>{ centraleState.blHisto=snap.val()||{}; if(ACTIVE_TAB==="blf") renderBlf(); });
     dbCentrale.ref("tracabilite").on("value",snap=>{ centraleState.tracabilite=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("centrale_reception").on("value",snap=>{ centraleState.reception=snap.val()||{}; renderCentrale(); });
     dbCentrale.ref("ecarts_suivi").on("value",snap=>{ centraleState.ecartsSuivi=snap.val()||{}; renderCentrale(); });
@@ -431,13 +480,13 @@ function start(email){
   setInterval(()=>dashTick(false), 4000);
 }
 let ACTIVE_TAB="home", ACTIVE_KEY="home";
-const TAB_IDS=["home","multi","g5","centrale","rungis","inventaire","kbgpoids","avoirs","suivi","msg","fourn","appview"];
+const TAB_IDS=["home","multi","g5","centrale","rungis","inventaire","kbgpoids","fromage","blf","avoirs","suivi","msg","fourn","appview"];
 const CRUMBS={ home:["Pilotage","Aujourd'hui"], suivi:["Pilotage","Suivi live"], multi:["Magasins","Chargement BL"], g5:["Magasins","Réceptions G5"], avoirs:["Magasins","Avoirs"], msg:["Magasins","Messages"],
-  centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Entrepôt PDP","Découpe fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Entrepôt PDP","Poids Kelbongoo"],
+  centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Fromage","Découpes par BL"], traca:["Fromage","Traçabilité lots"], fromage:["Fromage","Suivi fromage"], blf:["Fromage","BL fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Fromage","Poids Kelbongoo"],
   fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli & ménage"] };
 function switchTab(t, key){
   if(TAB_IDS.indexOf(t)<0) t="home";
-  key = key || (t==="centrale" && centraleView==="decoupe" ? "decoupe" : t);
+  key = key || (t==="centrale" && centraleView==="decoupe" ? "decoupe" : (t==="centrale" && centraleView==="traca" ? "traca" : t));
   ACTIVE_TAB=t; ACTIVE_KEY=key;
   document.querySelectorAll(".side .tab").forEach(b=>b.classList.toggle("active", b.dataset.key===key));
   TAB_IDS.forEach(x=>{ const el=document.getElementById("tab-"+x); if(el) el.classList.toggle("hidden",x!==t); });
@@ -450,6 +499,9 @@ function switchTab(t, key){
   if(t==="rungis") renderRungis();
   if(t==="suivi") renderLive();
   if(t==="appview") renderAppView();
+  if(t==="kbgpoids") renderKbgPoids();
+  if(t==="fromage") renderFromage();
+  if(t==="blf") renderBlf();
   try{ window.scrollTo(0,0); }catch(e){}
 }
 /* Rafraîchit l'affichage de l'onglet courant SANS recharger la page (donc sans se reconnecter).
@@ -468,6 +520,9 @@ function refreshActive(btn){
     else if(t==="home") renderHome();
     else if(t==="rungis") renderRungis();
     else if(t==="appview") renderAppView(true);
+    else if(t==="fromage") renderFromage();
+    else if(t==="blf") renderBlf();
+    else if(t==="kbgpoids") renderKbgPoids();
     if(t==="suivi") renderLive();
     renderLoadStatus && renderLoadStatus();
     dashTick(true);
@@ -1634,10 +1689,13 @@ async function cpdpSendDecoupe(){
   }catch(_){}
   // Découpe déjà commencée : on GARDE sa date de départ et son opérateur (l'historique reste daté du jour de découpe),
   // on ajoute « chargé par le responsable » + les fromages du BL.
+  const blFromages=products.map(p=>p&&p.designation).filter(Boolean);
   const patch={ supplier:supLabel, entity:C.entity, deliveryDate:C.deliveryDate||"", docNumber:blNum, products:mergedProducts,
-                loadedBy:ME_EMAIL, loadedAt:Date.now(), source:"console", libre:false };
+                loadedBy:ME_EMAIL, loadedAt:Date.now(), source:"console", libre:false,
+                blFromages, blFile:C.fileName||"", blSupplier:C.parsed.supplier||"", blClos:false };
   if(!alreadyStarted){ patch.startedAt=Date.now(); patch.createdBy=ME_EMAIL; }
   try{ await dbCentrale.ref("decoupe/"+sid+"/meta").update(patch);
+    blLog(sid, existingMeta&&existingMeta.loadedBy?"rechargement":"chargement", { bl:blNum, entity:C.entity, file:C.fileName||"", n:blFromages.length, joined:alreadyStarted });
     C.sent=true; C.err=""; renderCPDPCard();
     alert("✓ BL "+entLabel+" n°"+blNum+" envoyé à l'app La Centrale PDP"+(C.deliveryDate?(" · réception prévue "+C.deliveryDate):"")+"."
       +(alreadyStarted?("\n\n🔗 Découpe déjà commencée par l'entrepôt ("+dateShort(existingMeta.startedAt)+") : BL rattaché, liste mise à jour ("+mergedProducts.length+" fromages). Les saisies déjà faites sont conservées."):""));
@@ -2481,6 +2539,7 @@ function renderCentrale(){
   if(!dbCentrale){ el.innerHTML='<div class="muted">Connexion à la centrale indisponible.</div>'; return; }
   const sessions=centraleSessions();
   const view=centraleView||"ecarts";
+  if(ACTIVE_TAB==="centrale") sideSync(view==="decoupe"?"decoupe":(view==="traca"?"traca":"centrale"));
   const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🚚 Historique dispatch</button>
@@ -2640,7 +2699,8 @@ function decoupeAgg(sess){
       if(recuKg>0&&w>0){ theo=Math.round(Math.max(0,Math.round((recuKg-kgM)*100)/100)/(w/1000)); rend=theo>0?Math.round(np/theo*100):null; } }
     if(st.done) done++;
     if(k+rr+rm>0||rg>0){ const cutAt=st.firstAt||st.at||0;
-      lines.push({ designation:p.designation, kbgN:k, kbgTheo:theo, rend, kbgTarget:p.kbgTarget||0, robN:rr, kbgG:Math.round(kg), robG:Math.round(rg), robMeules:rm, robUnit:(st.rob&&st.rob.unit)||"meule", poidsRecu:recuKg, cutAt, cutDay:decDayOfC(cutAt)||sessDay }); }
+      lines.push({ designation:p.designation, kbgN:k, kbgTheo:theo, rend, kbgTarget:p.kbgTarget||0, robN:rr, kbgG:Math.round(kg), robG:Math.round(rg), robMeules:rm, robUnit:(st.rob&&st.rob.unit)||"meule", poidsRecu:recuKg, cutAt, cutDay:decDayOfC(cutAt)||sessDay,
+        done:!!st.done, doneBy:st.doneBy||"", lastAt:st.at||0, kgMontreuil:Number(st.kgMontreuil)||0 }); }
     kbgN+=k;kbgG+=kg;robN+=rr;robG+=rg;robMeules+=rm;kbgTheo+=theo;
   });
   const t=kbgG+robG; const rend=t>0?Math.round(kbgG/t*100):0; const r=sess.recap||{};
@@ -2887,6 +2947,401 @@ function dlDecoupeDayTxt(dayKey){
   downloadTxt(yy+mm+dd+"_DECOUPE_JOUR.txt", txt);
 }
 
+/* ===== v2.1.0 — SUIVI FROMAGE : ce qui a été coupé, exactement, jour par jour =====
+   Source : nœud "decoupe" de la Centrale (mêmes calculs que l'historique : decoupeAgg).
+   Une ligne = un fromage découpé dans une découpe (BL ou libre), datée du 1er geste de découpe. */
+let frPeriod="7j", frDay="", frFrom="", frTo="", frSearch="", frDest="all", frMode="journal", frOpenDays={};
+function sideSync(key){
+  ACTIVE_KEY=key;
+  document.querySelectorAll(".side .tab").forEach(b=>b.classList.toggle("active", b.dataset.key===key));
+  const c=CRUMBS[key]||["",""]; const cr=document.getElementById("crumb"); if(cr) cr.innerHTML=esc(c[0])+' › <b>'+esc(c[1])+'</b>';
+}
+function frKg(g, dec){ const v=(Number(g)||0)/1000; return v.toLocaleString("fr-FR",{minimumFractionDigits:dec==null?1:dec,maximumFractionDigits:dec==null?1:dec})+" kg"; }
+function frDayLabel(k){ const d=new Date(k+"T12:00:00"); return d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"}); }
+function frDayShort(k){ const d=new Date(k+"T12:00:00"); return d.toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"2-digit"}); }
+// Opérateur affiché : jamais un code (confidentiel) — uniquement un nom.
+function frOp(v){ v=String(v||"").trim(); if(!v||/^[0-9#*\- ]{2,}$/.test(v)) return ""; return v; }
+function frRange(){
+  const today=isoDayKey(Date.now()), dayMs=86400000;
+  if(frPeriod==="jour"){ const d=frDay||today; return [d,d]; }
+  if(frPeriod==="hier"){ const d=isoDayKey(Date.now()-dayMs); return [d,d]; }
+  if(frPeriod==="plage"){ const a=frFrom||today, b=frTo||today; return a<=b?[a,b]:[b,a]; }
+  if(frPeriod==="mois") return [today.slice(0,7)+"-01", today];
+  if(frPeriod==="30j") return [isoDayKey(Date.now()-29*dayMs), today];
+  return [isoDayKey(Date.now()-6*dayMs), today];
+}
+function frDaysBetween(a,b){ const out=[]; let d=new Date(a+"T12:00:00"); const e=new Date(b+"T12:00:00"); let g=0; while(d<=e && g<400){ out.push(isoDayKey(d.getTime())); d.setDate(d.getDate()+1); g++; } return out; }
+function fromageEvents(){
+  const ev=[];
+  decoupeSessions().forEach(s=>{ const a=decoupeAgg(s); const ent=(a.entity||"").toUpperCase(); const m=s.meta||{};
+    (a.lines||[]).forEach(l=>{
+      const isRob = ent==="ROB" ? true : (ent==="KBG" ? false : (((l.kbgN||0)===0) && (((l.robN||0)>0)||((l.robMeules||0)>0))));
+      ev.push({ sid:s.id, day:l.cutDay||decoupeDayKeyC(s), at:l.cutAt||m.startedAt||0, lastAt:l.lastAt||0,
+        designation:l.designation||"(sans nom)", dest:isRob?"ROB":"KBG",
+        kbgN:l.kbgN||0, kbgTarget:l.kbgTarget||0, kbgTheo:l.kbgTheo||0, rend:l.rend, kbgG:l.kbgG||0,
+        robN:l.robN||0, robG:l.robG||0, robMeules:l.robMeules||0, robUnit:l.robUnit||"meule",
+        poidsRecu:l.poidsRecu||0, done:!!l.done, by:frOp(l.doneBy)||frOp(a.by)||frOp(m.createdBy)||"—",
+        supplier:m.supplier||"", bl:m.docNumber||"", libre:!!m.libre, recapSent:!!(s.recap&&s.recap.daySentAt),
+        horsBl: blfIsHorsBl(s, l.designation) });
+    }); });
+  return ev;
+}
+function frFiltered(){
+  const [a,b]=frRange(); const q=norm(frSearch);
+  return fromageEvents().filter(e=>{
+    if(e.day<a||e.day>b) return false;
+    if(frDest==="KBG" && !(e.dest==="KBG"&&e.kbgN>0)) return false;
+    if(frDest==="ROB" && !(e.dest==="ROB"||e.robG>0||e.robN>0)) return false;
+    if(q && !(norm(e.designation).includes(q)||norm(e.supplier).includes(q)||norm(e.bl).includes(q)||norm(e.by).includes(q))) return false;
+    return true; });
+}
+function frTotals(list){
+  const t={ n:list.length, fromages:new Set(), kbgN:0, kbgG:0, kbgTheo:0, robN:0, robG:0, robMeules:0, recuKg:0, days:new Set(), ops:new Set() };
+  list.forEach(e=>{ t.fromages.add(norm(e.designation)); t.kbgN+=e.kbgN; t.kbgG+=e.kbgG; t.kbgTheo+=e.kbgTheo; t.robN+=e.robN; t.robG+=e.robG; t.robMeules+=e.robMeules; t.recuKg+=e.poidsRecu; t.days.add(e.day); if(e.by&&e.by!=="—") t.ops.add(e.by); });
+  t.rend = t.kbgTheo>0 ? Math.round(t.kbgN/t.kbgTheo*100) : null;
+  t.totalG = t.kbgG + t.robG;
+  return t;
+}
+function frCutCell(e){
+  if(e.dest==="ROB"){
+    const u=e.robUnit==="colis"?"colis":(e.robMeules>1?"meules":"meule");
+    return `<b>${e.robMeules?(String(e.robMeules).replace(".",",")+" "+u+" → "):""}${e.robN} morceau${e.robN>1?"x":""}</b>`;
+  }
+  let h=`<b>${e.kbgN} portion${e.kbgN>1?"s":""}</b>`;
+  if(e.kbgTarget>0) h+=`<small>cible ${e.kbgTarget}${e.kbgN<e.kbgTarget?` · <span style="color:var(--warn)">manque ${e.kbgTarget-e.kbgN}</span>`:""}</small>`;
+  else if(e.kbgTheo>0) h+=`<small>${e.kbgTheo} théoriques</small>`;
+  if(e.robG>0||e.robN>0) h+=`<small>+ hors gabarit → Montreuil ${e.robN?e.robN+" pc · ":""}${frKg(e.robG)}</small>`;
+  return h;
+}
+function frRendCell(e){
+  if(e.dest!=="KBG"||e.rend==null) return '<span class="t2">—</span>';
+  const c=e.rend>=85?"pg":(e.rend>=70?"po":"pr"); return `<span class="pill ${c}">${e.rend}%</span>`;
+}
+function frDayBlock(day, list, isOpen){
+  const t=frTotals(list);
+  const rows=list.slice().sort((x,y)=>(x.at||0)-(y.at||0)).map(e=>{
+    const lots=lotsCell(lotsForCheese(e.designation,{bl:e.bl,entity:e.dest,day:e.day}));
+    const orig=(e.libre?'<span class="pill pn">découpe libre</span>':(e.bl?('BL '+esc(e.bl)):'—'))+(e.supplier&&!String(e.supplier).includes(e.bl||"§")?`<small>${esc(e.supplier)}</small>`:"");
+    const poids=e.dest==="ROB"?frKg(e.robG):(e.kbgG>0?frKg(e.kbgG):"—");
+    const recu=e.poidsRecu>0?`<small>reçu ${String(e.poidsRecu).replace(".",",")} kg</small>`:"";
+    return `<tr>
+      <td style="font-variant-numeric:tabular-nums;white-space:nowrap"><b>${esc(heure(e.at))||"—"}</b>${e.lastAt&&heure(e.lastAt)!==heure(e.at)?`<small>→ ${esc(heure(e.lastAt))}</small>`:""}</td>
+      <td><b>${esc(e.designation)}</b>${e.horsBl?'<div><span class="pill blf-pill-hors">⛔ HORS BL</span></div>':''}</td>
+      <td><span class="fr-dest ${e.dest==="ROB"?"rob":"kbg"}">${e.dest==="ROB"?"🟣 Montreuil":"🔵 Kelbongoo"}</span></td>
+      <td>${frCutCell(e)}</td>
+      <td class="num">${poids}${recu}</td>
+      <td style="text-align:center">${frRendCell(e)}</td>
+      <td>${orig}</td>
+      <td>${esc(e.by)}</td>
+      <td>${lots}</td>
+      <td style="text-align:center">${e.done?'<span class="pill pg">✓ fini</span>':'<span class="pill po">en cours</span>'}</td>
+    </tr>`; }).join("");
+  const chips=[];
+  chips.push(`<span class="pill pn">🧀 ${t.fromages.size} fromage${t.fromages.size>1?"s":""}</span>`);
+  if(t.kbgN) chips.push(`<span class="fr-dest kbg">🔵 ${t.kbgN} portions${t.rend!=null?" · rend. "+t.rend+"%":""}</span>`);
+  if(t.robG||t.robN) chips.push(`<span class="fr-dest rob">🟣 ${t.robN} morceaux · ${frKg(t.robG)}</span>`);
+  chips.push(`<span class="pill pn">⚖️ ${frKg(t.totalG)} découpés</span>`);
+  if(t.ops.size) chips.push(`<span class="t2">👤 ${esc([...t.ops].join(", "))}</span>`);
+  const sent=list.some(e=>e.recapSent);
+  return `<details class="fr-day"${isOpen?" open":""} ontoggle="frOpenDays['${day}']=this.open">
+    <summary><span class="chev">▶</span><span class="dt">📅 ${esc(frDayLabel(day))}</span>${chips.join(" ")}<span class="sp" style="flex:1"></span>${sent?'<span class="pill pg">✓ récap envoyé</span>':'<span class="pill po">récap non envoyé</span>'}</summary>
+    <div style="overflow:auto"><table class="tb fr-tb"><thead><tr><th>Heure</th><th>Fromage</th><th>Pour</th><th>Ce qui a été coupé</th><th class="num">Poids</th><th style="text-align:center">Rend.</th><th>Origine</th><th>Par</th><th>Lot(s)</th><th style="text-align:center">Statut</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+    <div class="fr-foot"><span class="t2">Total du jour : ${[t.kbgN?`<b style="color:var(--ink)">${t.kbgN} portions KBG</b>`:"", (t.robN||t.robMeules)?`<b style="color:var(--ink)">${t.robMeules?String(Math.round(t.robMeules*100)/100).replace(".",",")+" meule(s)/colis → ":""}${t.robN} morceaux Montreuil</b>`:"", `<b style="color:var(--ink)">${frKg(t.totalG)}</b>`].filter(Boolean).join(" · ")}</span><span style="flex:1"></span>
+      <button class="tbtn s" onclick="openDecoupeDayDetail('${day}')">👁 Récap consolidé</button>
+      <button class="tbtn s" onclick="dlDecoupeDayTxt('${day}')">⬇️ .txt du jour</button></div>
+  </details>`;
+}
+function frPivot(list){
+  const [a,b]=frRange(); let days=frDaysBetween(a,b); const truncated=days.length>31; if(truncated) days=days.slice(-31);
+  const map={};
+  list.forEach(e=>{ const k=norm(e.designation); const r=map[k]||(map[k]={designation:e.designation,cells:{},kbgN:0,robN:0,g:0,dest:new Set()});
+    const c=r.cells[e.day]||(r.cells[e.day]={kbgN:0,robN:0,g:0});
+    c.kbgN+=e.kbgN; c.robN+=e.robN; c.g+=e.kbgG+e.robG; r.kbgN+=e.kbgN; r.robN+=e.robN; r.g+=e.kbgG+e.robG; r.dest.add(e.dest); });
+  const rows=Object.values(map).sort((x,y)=>y.g-x.g||x.designation.localeCompare(y.designation,"fr"));
+  if(!rows.length) return '<div class="cx empty">Aucune découpe sur la période.</div>';
+  const cell=c=>{ if(!c||(!c.kbgN&&!c.robN&&!c.g)) return '<td class="c z">·</td>';
+    const top=[c.kbgN?c.kbgN+" p":"", c.robN?c.robN+" m":""].filter(Boolean).join(" · ");
+    return `<td class="c"><div class="fr-cell"><b>${top||"—"}</b><span>${frKg(c.g)}</span></div></td>`; };
+  const colTot=days.map(d=>rows.reduce((acc,r)=>acc+((r.cells[d]&&r.cells[d].g)||0),0));
+  return `<div class="cx fr-pv"><table>
+    <thead><tr><th style="text-align:left;position:sticky;left:0;z-index:2">Fromage</th>${days.map(d=>`<th style="text-align:center">${esc(frDayShort(d))}</th>`).join("")}<th style="text-align:center">Total</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr><td class="first" title="Voir le journal de ce fromage" onclick="frSearch=${esc(JSON.stringify(r.designation))};frMode='journal';renderFromage()">${[...r.dest].map(d=>d==="ROB"?"🟣":"🔵").join("")} ${esc(r.designation)}</td>${days.map(d=>cell(r.cells[d])).join("")}<td class="c tot"><div class="fr-cell"><b>${[r.kbgN?r.kbgN+" p":"",r.robN?r.robN+" m":""].filter(Boolean).join(" · ")||"—"}</b><span>${frKg(r.g)}</span></div></td></tr>`).join("")}
+      <tr><td class="first tot" style="cursor:default">Total / jour</td>${colTot.map(g=>`<td class="c tot">${g?frKg(g):"·"}</td>`).join("")}<td class="c tot">${frKg(colTot.reduce((x,y)=>x+y,0))}</td></tr></tbody>
+  </table></div><div class="t2" style="margin-top:6px">p = portions Kelbongoo · m = morceaux Montreuil · poids découpé en dessous. Clique un fromage pour voir son détail jour par jour.${truncated?" Seuls les 31 derniers jours de la période sont affichés.":""}</div>`;
+}
+function frExportCsv(){
+  const list=frFiltered().sort((x,y)=>(x.at||0)-(y.at||0));
+  const head=["Jour","Heure","Fromage","Hors BL","Pour","Portions KBG","Cible KBG","Théo KBG","Rendement %","Meules/colis ROB","Unité","Morceaux ROB","Poids KBG (kg)","Poids Montreuil (kg)","Poids reçu (kg)","BL","Fournisseur / libellé","Découpe libre","Par","Statut"];
+  const q=v=>{ v=String(v==null?"":v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const n=v=>String(v).replace(".",",");
+  const lines=list.map(e=>[dayFrC(e.day),heure(e.at),e.designation,e.horsBl?"HORS BL":"",e.dest==="ROB"?"Montreuil":"Kelbongoo",e.kbgN,e.kbgTarget||"",e.kbgTheo||"",e.rend==null?"":e.rend,
+    e.robMeules||"",e.robMeules?(e.robUnit==="colis"?"colis":"meule"):"",e.robN,n(Math.round(e.kbgG/10)/100),n(Math.round(e.robG/10)/100),e.poidsRecu?n(e.poidsRecu):"",
+    e.bl,e.supplier,e.libre?"oui":"",e.by,e.done?"fini":"en cours"].map(q).join(";"));
+  const [a,b]=frRange();
+  const blob=new Blob(["\uFEFF"+[head.join(";")].concat(lines).join("\n")],{type:"text/csv;charset=utf-8"});
+  const el=document.createElement("a"); el.href=URL.createObjectURL(blob); el.download="SUIVI_FROMAGE_"+a+(a!==b?"_au_"+b:"")+".csv"; el.click(); setTimeout(()=>URL.revokeObjectURL(el.href),1500);
+}
+function renderFromage(){
+  const el=document.getElementById("tab-fromage"); if(!el) return;
+  if(!dbCentrale){ el.innerHTML='<div class="muted">Connexion à la centrale indisponible.</div>'; return; }
+  const focus=document.activeElement&&document.activeElement.id==="frSearchIn"; const caret=focus?document.activeElement.selectionStart:null;
+  const list=frFiltered(); const t=frTotals(list);
+  const today=isoDayKey(Date.now()); const tt=frTotals(fromageEvents().filter(e=>e.day===today));
+  const [a,b]=frRange();
+  const perLbl = a===b ? frDayLabel(a) : ("du "+dayFrC(a)+" au "+dayFrC(b));
+  const segP=[["jour","Un jour"],["hier","Hier"],["7j","7 jours"],["30j","30 jours"],["mois","Mois en cours"],["plage","Période…"]]
+    .map(([k,l])=>`<button class="${frPeriod===k?"on":""}" onclick="frPeriod='${k}';renderFromage()">${l}</button>`).join("");
+  const segD=[["all","Tout"],["KBG","🔵 Kelbongoo"],["ROB","🟣 Montreuil"]].map(([k,l])=>`<button class="${frDest===k?"on":""}" onclick="frDest='${k}';renderFromage()">${l}</button>`).join("");
+  const segM=[["journal","📒 Journal jour par jour"],["pivot","🧀 Par fromage × jour"]].map(([k,l])=>`<button class="${frMode===k?"on":""}" onclick="frMode='${k}';renderFromage()">${l}</button>`).join("");
+  const dateInputs = frPeriod==="jour" ? `<input type="date" value="${esc(frDay||today)}" max="${today}" onchange="frDay=this.value;renderFromage()"/>`
+    : frPeriod==="plage" ? `<input type="date" value="${esc(frFrom||"")}" max="${today}" onchange="frFrom=this.value;renderFromage()"/><span class="t2">→</span><input type="date" value="${esc(frTo||"")}" max="${today}" onchange="frTo=this.value;renderFromage()"/>` : "";
+  const kpi=(lbl,v,sub)=>`<div class="cx fr-kpi"><div class="eyebrow">${lbl}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
+  const kpis=`<div class="fr-kpis">
+    ${kpi("☀️ Aujourd'hui", tt.fromages.size+"<small>fromage"+(tt.fromages.size>1?"s":"")+"</small>", tt.n?(tt.kbgN+" portions KBG · "+tt.robN+" morceaux ROB · "+frKg(tt.totalG)):"Rien de découpé pour l'instant")}
+    ${kpi("🧀 Fromages découpés", t.fromages.size+"<small>réf.</small>", t.n+" découpe(s) · "+t.days.size+" jour(s) actif(s)")}
+    ${kpi("🔵 Kelbongoo", t.kbgN+"<small>portions</small>", (t.kbgTheo?t.kbgTheo+" théoriques · ":"")+(t.rend!=null?"rendement <b>"+t.rend+"%</b>":"rendement —"))}
+    ${kpi("🟣 Montreuil", frKg(t.robG).replace(" kg","")+"<small>kg</small>", (t.robMeules?String(Math.round(t.robMeules*100)/100).replace(".",",")+" meule(s)/colis · ":"")+t.robN+" morceaux")}
+    ${kpi("⚖️ Total découpé", frKg(t.totalG).replace(" kg","")+"<small>kg</small>", t.recuKg?("sur "+String(Math.round(t.recuKg*10)/10).replace(".",",")+" kg reçus (BL)"):(t.ops.size?"👤 "+esc([...t.ops].join(", ")):"—"))}
+  </div>`;
+  let body="";
+  if(frMode==="pivot") body=frPivot(list);
+  else {
+    const byDay={}; list.forEach(e=>{ (byDay[e.day]=byDay[e.day]||[]).push(e); });
+    const days=Object.keys(byDay).sort((x,y)=>y.localeCompare(x));
+    body = days.length ? days.map((d,i)=>frDayBlock(d, byDay[d], frOpenDays[d]!=null ? frOpenDays[d] : (i<3 || days.length<=7 || !!frSearch))).join("")
+      : `<div class="cx empty">🧀 Aucune découpe ${a===b?"ce jour-là":"sur la période"}${frSearch?" pour « "+esc(frSearch)+" »":""}.</div>`;
+  }
+  const horsN=list.filter(e=>e.horsBl).length;
+  const horsBanner = horsN ? `<div class="cx" style="border-color:#e8a3a3;background:#fdecea;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:#a32a2a">⛔ ${horsN} découpe(s) de fromage hors BL sur la période :</b> <span>${esc([...new Set(list.filter(e=>e.horsBl).map(e=>e.designation))].join(", "))}</span><span style="flex:1"></span><button class="tbtn s" onclick="switchTab('blf')">📦 Voir / traiter dans BL fromage</button></div>` : "";
+  el.innerHTML=`<div class="page-h"><div><h1>📒 Suivi fromage</h1><div class="sub">Ce qui a été coupé, exactement, jour par jour — <b>${esc(perLbl)}</b></div></div><span class="sp" style="flex:1"></span>
+      <button class="tbtn" onclick="frExportCsv()" ${list.length?"":"disabled"}>⬇️ Export CSV</button>
+      <button class="tbtn" onclick="centraleView='decoupe';switchTab('centrale','decoupe')">🔪 Découpes par BL</button></div>
+    ${horsBanner}${kpis}
+    <div class="fr-bar"><div class="seg">${segP}</div>${dateInputs}<div class="seg">${segD}</div></div>
+    <div class="fr-bar"><input id="frSearchIn" type="search" placeholder="🔎 Fromage, BL, fournisseur, opérateur…" value="${esc(frSearch)}" oninput="frSearch=this.value;renderFromage()"/>
+      ${frSearch?`<button class="tbtn s" onclick="frSearch='';renderFromage()">✕ Effacer</button>`:""}<div class="seg">${segM}</div></div>
+    ${body}`;
+  setCnt("fromage", tt.fromages.size);
+  if(focus){ const i=document.getElementById("frSearchIn"); if(i){ i.focus(); try{ i.setSelectionRange(caret,caret); }catch(_){} } }
+}
+/* ===== v2.2.0 — 📦 BL FROMAGE : suivi, historique, rattachement et contrôle des BL chargés =====
+   Un BL = une découpe bl_<entité>_<n°> (meta.loadedBy = chargé par le responsable). Plusieurs arrivages
+   coexistent : tous les BL « ouverts » (non clos, < 21 j) forment la liste des fromages autorisés sur la tablette.
+   Mêmes règles que la Centrale v5.18 (blNameMatch / decBlFromages / openBlsFrom). */
+const BLF_OUVERT_JOURS=21;
+const _blfStop=/\b(aop|aoc|igp|bio|fermier|fermiere|de|du|des|la|le|les|d|l|au|aux|et|g|kg|gr|x)\b/g;
+function blfNorm(x){ return String(x==null?"":x).normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").replace(/\b\d+\s*(g|gr|kg)\b/g," ").replace(_blfStop," ").replace(/\s+/g," ").trim(); }
+function blfMatch(a,b){ const x=blfNorm(a), y=blfNorm(b); if(!x||!y) return false; if(x===y||x.includes(y)||y.includes(x)) return true;
+  const wx=x.split(" ").filter(w=>w.length>2), wy=y.split(" ").filter(w=>w.length>2); if(!wx.length||!wy.length) return false;
+  return wx.filter(w=>wy.includes(w)).length>=Math.min(2,Math.min(wx.length,wy.length)); }
+function blfIsBlProduct(p){ if(!p||p.ajoutOp) return false; return !!(p.article||p.code||p.ref||p.fournisseur||Number(p.poidsRecu)>0); }
+function blfFromages(meta){ if(!meta) return []; if(Array.isArray(meta.blFromages)&&meta.blFromages.length) return meta.blFromages.filter(Boolean);
+  return (Array.isArray(meta.products)?meta.products:[]).filter(blfIsBlProduct).map(p=>p.designation).filter(Boolean); }
+function blfKey(d){ return "d_"+String(d||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""); }
+function blfLoadedBls(){ return Object.entries(centraleState.decoupe||{}).filter(([sid,s])=>s&&s.meta&&s.meta.loadedBy).map(([sid,s])=>({sid,s,m:s.meta})); }
+// Hors BL : la découpe a son BL chargé, et le fromage n'est ni sur ce BL ni sur un autre BL chargé (±21 j autour du chargement).
+function blfIsHorsBl(sess, designation){
+  const m=(sess&&sess.meta)||{}; if(!m.loadedBy) return false;
+  if(blfFromages(m).some(f=>blfMatch(f,designation))) return false;
+  const ref=m.loadedAt||m.startedAt||Date.now(), win=BLF_OUVERT_JOURS*86400000;
+  return !blfLoadedBls().some(({m:o})=>{ const at=o.loadedAt||o.startedAt||0; return Math.abs(at-ref)<=win && blfFromages(o).some(f=>blfMatch(f,designation)); });
+}
+function blLog(sid, action, data){ try{ if(dbCentrale) dbCentrale.ref("bl_historique").push(Object.assign({ sid, action, by:ME_EMAIL, at:Date.now() }, data||{})); }catch(e){} }
+function blfWho(email){ const e=String(email||"").toLowerCase(); return (typeof RESP_NAMES!=="undefined"&&RESP_NAMES[e])||email||"—"; }
+// Liste de tous les BL : chargés (ouverts / clos) + découpes qui attendent leur BL (n° saisi par l'opérateur, BL pas chargé).
+function blfList(){
+  const out=[]; const lim=Date.now()-BLF_OUVERT_JOURS*86400000;
+  Object.entries(centraleState.decoupe||{}).forEach(([sid,s])=>{ if(!s||!s.meta||!s.meta.startedAt) return; const m=s.meta;
+    if(m.mergedInto) return;
+    const sess=Object.assign({id:sid},s); const a=decoupeAgg(sess);
+    const fr=blfFromages(m); const loaded=!!m.loadedBy;
+    const status = loaded ? (m.blClos ? "clos" : ((m.loadedAt||m.startedAt)<lim ? "ancien" : "ouvert")) : (m.docNumber ? "attente" : "sansbl");
+    const cutKeys=new Set((a.lines||[]).map(l=>blfNorm(l.designation)));
+    const frCut=fr.filter(f=>[...cutKeys].some(k=>blfMatch(k,f))).length;
+    const hors=loaded ? (a.lines||[]).filter(l=>blfIsHorsBl(sess,l.designation)).map(l=>l.designation) : [];
+    const recuKg=((m.products||[]).reduce((t,p)=>t+(Number(p.poidsRecu)||0),0));
+    out.push({ sid, s:sess, m, a, num:m.docNumber||"", supplier:m.blSupplier||String(m.supplier||"").split(" → ")[0]||"", entity:(m.entity||"").toUpperCase(),
+      loaded, status, loadedAt:m.loadedAt||0, loadedBy:m.loadedBy||"", startedAt:m.startedAt||0, fromages:fr, frCut, hors, recuKg, cutG:(a.kbgG||0)+(a.robG||0),
+      file:m.blFile||"", libre:!!m.libre, by:m.createdBy||"" });
+  });
+  return out.sort((x,y)=>(y.loadedAt||y.startedAt)-(x.loadedAt||x.startedAt));
+}
+function blfAlertesOpen(){ return Object.entries(centraleState.decAlertes||{}).map(([id,a])=>Object.assign({id},a||{})).filter(a=>!a.traiteAt).sort((a,b)=>(b.at||0)-(a.at||0)); }
+function blfCount(){ try{ setCnt("blf", blfAlertesOpen().length || blfList().filter(b=>b.status==="attente").length, blfAlertesOpen().length?"r":"a"); }catch(e){} }
+let blfFilter="actifs", blfSearch="", blfEnt="all";
+const BLF_ST={ ouvert:['pg','🟢 Ouvert'], attente:['po','⏳ BL à charger'], clos:['pn','🔒 Clos'], ancien:['pn','🕰️ > 21 j'], sansbl:['pr','⚠️ sans n° BL'] };
+function renderBlf(){
+  const el=document.getElementById("tab-blf"); if(!el) return;
+  if(!dbCentrale){ el.innerHTML='<div class="muted">Connexion à la centrale indisponible.</div>'; return; }
+  const focus=document.activeElement&&document.activeElement.id==="blfSearchIn"; const caret=focus?document.activeElement.selectionStart:null;
+  const all=blfList(); const q=norm(blfSearch);
+  let list=all.filter(b=>{
+    if(blfFilter==="actifs" && !(b.status==="ouvert"||b.status==="attente"||b.status==="sansbl")) return false;
+    if(blfFilter==="ouvert" && b.status!=="ouvert") return false;
+    if(blfFilter==="attente" && !(b.status==="attente"||b.status==="sansbl")) return false;
+    if(blfFilter==="clos" && !(b.status==="clos"||b.status==="ancien")) return false;
+    if(blfFilter==="hors" && !b.hors.length) return false;
+    if(blfEnt!=="all" && b.entity!==blfEnt) return false;
+    if(q && !(norm(b.num).includes(q)||norm(b.supplier).includes(q)||b.fromages.some(f=>norm(f).includes(q))||norm(b.file).includes(q))) return false;
+    return true; });
+  const al=blfAlertesOpen();
+  const nOuv=all.filter(b=>b.status==="ouvert").length, nAtt=all.filter(b=>b.status==="attente"||b.status==="sansbl").length, nHors=all.reduce((t,b)=>t+b.hors.length,0);
+  const kpi=(lbl,v,sub,f)=>`<div class="cx fr-kpi" style="cursor:pointer" onclick="blfFilter='${f}';renderBlf()"><div class="eyebrow">${lbl}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
+  const kpis=`<div class="fr-kpis">
+    ${kpi("🟢 BL ouverts", nOuv, "arrivages en cours — fromages autorisés", "ouvert")}
+    ${kpi("⏳ À charger / rattacher", nAtt, "découpes commencées sans BL chargé", "attente")}
+    ${kpi("⛔ Hors BL", nHors, "fromages découpés sur aucun BL", "hors")}
+    ${kpi("🚨 Alertes entrepôt", al.length, "tentatives bloquées à traiter", "actifs")}
+    ${kpi("📚 Historique", all.filter(b=>b.loaded).length, "BL chargés au total", "tous")}
+  </div>`;
+  const alertes = al.length ? `<div class="cx" style="margin-bottom:16px;border-color:#e8a3a3"><div class="cx-h" style="background:#fdecea"><h3 style="color:#a32a2a">🚨 Alertes de l'entrepôt — fromage hors BL</h3><span class="sub">${al.length} à traiter</span><span style="flex:1"></span><button class="tbtn s" onclick="blfTraiterTout()">✓ Tout marquer traité</button></div>
+    ${al.slice(0,30).map(a=>{ const lbl={ajout_refuse:"Ajout refusé",saisie_refusee:"Saisie bloquée",decoupe_hors_bl:"Découpé hors BL"}[a.type]||a.type;
+      const tgt=blfList().find(b=>b.sid===a.sid);
+      return `<div class="blf-al"><span class="pill ${a.type==="decoupe_hors_bl"?"pr":"po"}">${esc(lbl)}</span><b>${esc(a.fromage||"?")}</b><span class="t2">${esc(a.op||"")} · ${a.bl?("découpe BL "+esc(a.bl)):"découpe libre"} · ${esc(dateShort(a.at))} ${esc(heure(a.at))}</span><span style="flex:1"></span>
+        ${tgt&&tgt.loaded?`<button class="tbtn s" onclick="blfAddFromage('${esc(tgt.sid)}',${esc(JSON.stringify(a.fromage||""))},'${esc(a.id)}')" title="Le fromage était bien livré : l'ajouter au BL débloque la tablette">➕ Ajouter au BL ${esc(tgt.num)}</button>`:""}
+        ${tgt?`<button class="tbtn s" onclick="openBlf('${esc(tgt.sid)}')">👁 BL</button>`:""}
+        <button class="tbtn s" onclick="blfTraiter('${esc(a.id)}')">✓ Traité</button></div>`; }).join("")}</div>` : "";
+  const segF=[["actifs","Actifs"],["ouvert","🟢 Ouverts"],["attente","⏳ À charger"],["hors","⛔ Hors BL"],["clos","🔒 Clos"],["tous","Tous"]].map(([k,l])=>`<button class="${blfFilter===k?"on":""}" onclick="blfFilter='${k}';renderBlf()">${l}</button>`).join("");
+  const segE=[["all","Tout"],["KBG","🔵 Kelbongoo"],["ROB","🟣 Montreuil"]].map(([k,l])=>`<button class="${blfEnt===k?"on":""}" onclick="blfEnt='${k}';renderBlf()">${l}</button>`).join("");
+  const rows=list.map(b=>{ const st=BLF_ST[b.status]||['pn',b.status];
+    const pct=b.fromages.length?Math.round(b.frCut/b.fromages.length*100):0;
+    const ent=b.entity==="ROB"?'<span class="fr-dest rob">🟣 Montreuil</span>':(b.entity==="KBG"?'<span class="fr-dest kbg">🔵 Kelbongoo</span>':'<span class="t2">—</span>');
+    return `<tr class="${b.status==="clos"||b.status==="ancien"?"clos":""}">
+      <td><b style="font-size:14px">${b.num?("BL "+esc(b.num)):'<span style="color:var(--dan)">sans n°</span>'}</b>${b.file?`<small class="t2" style="display:block">📎 ${esc(b.file)}</small>`:""}</td>
+      <td>${esc(b.supplier||"—")}</td><td>${ent}</td>
+      <td>${b.loaded?(`${esc(blfWho(b.loadedBy))}<small class="t2" style="display:block">${esc(dateShort(b.loadedAt))} ${esc(heure(b.loadedAt))}</small>`):(`<span class="t2">pas chargé</span><small class="t2" style="display:block">découpe ouverte le ${esc(dateShort(b.startedAt))} par ${esc(b.by||"?")}</small>`)}</td>
+      <td style="text-align:center">${b.loaded?b.fromages.length:'—'}</td>
+      <td>${b.loaded?`<b>${b.frCut}/${b.fromages.length}</b> fromages · ${frKg(b.cutG)}${b.recuKg?` / ${String(Math.round(b.recuKg*10)/10).replace(".",",")} kg reçus`:""}<div class="blf-prog"><i style="width:${pct}%"></i></div>`:`${(b.a.lines||[]).length} fromage(s) saisi(s)`}</td>
+      <td>${b.hors.length?`<span class="pill blf-pill-hors">⛔ ${b.hors.length}</span><small style="display:block;color:var(--dan)">${esc(b.hors.join(", "))}</small>`:'<span class="t2">—</span>'}</td>
+      <td><span class="pill ${st[0]}">${st[1]}</span></td>
+      <td style="white-space:nowrap"><button class="tbtn s" onclick="openBlf('${esc(b.sid)}')">👁 Gérer</button>
+        ${b.loaded?(b.m.blClos?`<button class="tbtn s" onclick="blfSetClos('${esc(b.sid)}',false)">🔓</button>`:`<button class="tbtn s" title="Clore : arrivage épuisé, ses fromages ne sont plus autorisés" onclick="blfSetClos('${esc(b.sid)}',true)">🔒</button>`):`<button class="tbtn s p" onclick="blfLoadFor('${esc(b.sid)}')">⬆️ Charger le BL</button>`}</td></tr>`; }).join("");
+  const histo=blfHistoRows(null).slice(0,40);
+  el.innerHTML=`<div class="page-h"><div><h1>📦 BL fromage</h1><div class="sub">Tous les BL chargés, les arrivages en cours et les découpes à rattacher — <b>seuls les fromages des BL ouverts peuvent être découpés</b> sur la tablette.</div></div><span class="sp" style="flex:1"></span>
+      <button class="tbtn p" onclick="blfLoadFor('')">⬆️ Charger un BL</button></div>
+    ${kpis}${alertes}
+    <div class="fr-bar"><div class="seg">${segF}</div><div class="seg">${segE}</div><input id="blfSearchIn" type="search" placeholder="🔎 N° BL, fournisseur, fromage, fichier…" value="${esc(blfSearch)}" oninput="blfSearch=this.value;renderBlf()"/></div>
+    <div class="cx" style="overflow:auto;margin-bottom:16px"><table class="tb blf-tb"><thead><tr><th>BL</th><th>Fournisseur</th><th>Pour</th><th>Chargé par</th><th style="text-align:center">Fromages</th><th>Avancement découpe</th><th>Hors BL</th><th>Statut</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="9" class="empty">Aucun BL pour ce filtre.</td></tr>'}</tbody></table></div>
+    <div class="cx"><div class="cx-h"><h3>📚 Historique des chargements et actions</h3><span class="sub">40 derniers événements</span></div>
+      <div style="padding:6px 16px" class="blf-log">${histo.length?histo.map(h=>`<div>${h}</div>`).join(""):'<span class="t2">Aucun événement.</span>'}</div></div>`;
+  blfCount();
+  if(focus){ const i=document.getElementById("blfSearchIn"); if(i){ i.focus(); try{ i.setSelectionRange(caret,caret); }catch(_){} } }
+}
+// Historique : journal bl_historique + chargements antérieurs reconstitués depuis les découpes.
+function blfHistoRows(sid){
+  const ACT={chargement:"⬆️ BL chargé",rechargement:"🔁 BL rechargé",clos:"🔒 BL clos",rouvert:"🔓 BL rouvert",ajout_fromage:"➕ Fromage ajouté au BL",retrait_fromage:"➖ Fromage retiré du BL",
+    numero:"✏️ N° de BL modifié",entite:"🔀 Entité modifiée",rattachement:"🔗 Découpe libre rattachée",decharge:"↩️ BL déchargé",suppression:"🗑 Découpe supprimée",alerte_traitee:"✓ Alerte traitée"};
+  const ev=Object.values(centraleState.blHisto||{}).filter(h=>h&&(!sid||h.sid===sid));
+  const seen=new Set(ev.filter(h=>h.action==="chargement").map(h=>h.sid));
+  blfLoadedBls().forEach(({sid:k,m})=>{ if((!sid||k===sid)&&!seen.has(k)) ev.push({ sid:k, action:"chargement", by:m.loadedBy, at:m.loadedAt||m.startedAt, bl:m.docNumber, entity:m.entity, n:blfFromages(m).length, file:m.blFile||"", legacy:true }); });
+  return ev.sort((a,b)=>(b.at||0)-(a.at||0)).map(h=>`<b>${esc(dateShort(h.at))} ${esc(heure(h.at))}</b> · ${ACT[h.action]||esc(h.action)}${h.bl?(" <b>BL "+esc(h.bl)+"</b>"):""}${h.entity?(" ("+esc(h.entity)+")"):""}${h.n!=null?(" · "+h.n+" fromage(s)"):""}${h.fromage?(" · "+esc(h.fromage)):""}${h.file?(" · 📎 "+esc(h.file)):""}${h.detail?(" · "+esc(h.detail)):""} — <span class="t2">${esc(blfWho(h.by))}${h.legacy?" (reconstitué)":""}</span>`);
+}
+function openBlf(sid){
+  document.querySelectorAll(".modal-back.blf").forEach(x=>x.remove());
+  const b=blfList().find(x=>x.sid===sid); if(!b) return;
+  const lines=b.a.lines||[];
+  // Fromages du BL : ce qui a été découpé dans CETTE découpe + dans les autres découpes (même fromage, depuis le chargement).
+  const others=decoupeSessions().filter(s=>s.id!==sid);
+  const frRows=b.fromages.map(f=>{ const own=lines.filter(l=>blfMatch(l.designation,f)); const prod=(b.m.products||[]).find(p=>blfMatch(p.designation,f))||{};
+    const g=own.reduce((t,l)=>t+(l.kbgG||0)+(l.robG||0),0), por=own.reduce((t,l)=>t+(l.kbgN||0),0), mor=own.reduce((t,l)=>t+(l.robN||0),0);
+    const ailleurs=[]; others.forEach(s=>{ if((s.meta.startedAt||0)<(b.loadedAt||0)-86400000) return; const a=decoupeAgg(s); a.lines.filter(l=>blfMatch(l.designation,f)).forEach(l=>ailleurs.push((s.meta.docNumber?("BL "+s.meta.docNumber):"libre")+" "+dayFrC(l.cutDay))); });
+    const recu=Number(prod.poidsRecu)||0;
+    return `<tr><td><b>${esc(f)}</b></td><td>${recu?String(recu).replace(".",",")+" kg":"—"}</td><td>${own.length?[por?por+" portions":"",mor?mor+" morceaux":"",frKg(g)].filter(Boolean).join(" · "):'<span class="t2">pas encore</span>'}</td>
+      <td>${recu&&g?(String(Math.round((recu-g/1000)*10)/10).replace(".",",")+" kg"):"—"}</td><td>${own.length?esc([...new Set(own.map(l=>dayFrC(l.cutDay)))].join(", ")):"—"}</td><td class="t2">${esc(ailleurs.slice(0,3).join(" · "))}</td>
+      <td><button class="tbtn s d" onclick="blfRemoveFromage('${esc(sid)}',${esc(JSON.stringify(f))})" title="Retirer du BL (erreur de chargement)">➖</button></td></tr>`; }).join("");
+  const extra=lines.filter(l=>!b.fromages.some(f=>blfMatch(f,l.designation)));
+  const extraRows=extra.map(l=>{ const hors=b.loaded&&blfIsHorsBl(b.s,l.designation);
+    return `<tr style="${hors?"background:#fdecea":""}"><td><b>${esc(l.designation)}</b> ${hors?'<span class="pill blf-pill-hors">⛔ HORS BL</span>':'<span class="pill po">sur un autre BL</span>'}</td><td>${[l.kbgN?l.kbgN+" portions":"",l.robN?l.robN+" morceaux":"",frKg((l.kbgG||0)+(l.robG||0))].filter(Boolean).join(" · ")}</td><td>${esc(dayFrC(l.cutDay))} ${esc(heure(l.cutAt))}</td>
+      <td>${b.loaded?`<button class="tbtn s" onclick="blfAddFromage('${esc(sid)}',${esc(JSON.stringify(l.designation))})">➕ Il était bien sur ce BL</button>`:""}</td></tr>`; }).join("");
+  const libres=blfList().filter(x=>!x.loaded&&x.sid!==sid);
+  const st=BLF_ST[b.status]||['pn',b.status];
+  const back=document.createElement("div"); back.className="modal-back blf";
+  back.innerHTML=`<div class="modal-box blf-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0;font-size:18px">📦 ${b.num?("BL "+esc(b.num)):"Découpe sans n° de BL"} · ${esc(b.supplier||"")} <span class="pill ${st[0]}">${st[1]}</span></h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div class="muted" style="margin:6px 0">${b.entity==="ROB"?"🟣 Montreuil":b.entity==="KBG"?"🔵 Kelbongoo":"—"} · ${b.loaded?("chargé par "+esc(blfWho(b.loadedBy))+" le "+esc(dateShort(b.loadedAt))+" "+esc(heure(b.loadedAt))):"BL pas encore chargé"} · découpe ouverte le ${esc(dateShort(b.startedAt))} par ${esc(b.by||"?")}${b.file?(" · 📎 "+esc(b.file)):""}${b.m.deliveryDate?(" · réception prévue "+esc(b.m.deliveryDate)):""}</div>
+    <div class="blf-act">
+      ${b.loaded?(b.m.blClos?`<button class="tbtn s" onclick="blfSetClos('${esc(sid)}',false)">🔓 Rouvrir</button>`:`<button class="tbtn s" onclick="blfSetClos('${esc(sid)}',true)">🔒 Clore (arrivage épuisé)</button>`):`<button class="tbtn s p" onclick="blfLoadFor('${esc(sid)}')">⬆️ Charger le BL de cette découpe</button>`}
+      <button class="tbtn s" onclick="blfAddFromage('${esc(sid)}')">➕ Ajouter un fromage au BL</button>
+      <button class="tbtn s" onclick="blfSetNum('${esc(sid)}')">✏️ Modifier le n° de BL</button>
+      <button class="tbtn s" onclick="blfSetEntity('${esc(sid)}')">🔀 Changer l'entité</button>
+      ${libres.length?`<select class="tbtn s" onchange="if(this.value){blfMerge(this.value,'${esc(sid)}');}"><option value="">🔗 Rattacher une découpe libre…</option>${libres.map(x=>`<option value="${esc(x.sid)}">${esc((x.num?("n° "+x.num):"sans n°")+" · "+dateShort(x.startedAt)+" · "+(x.by||"")+" · "+(x.a.lines||[]).length+" fromage(s)")}</option>`).join("")}</select>`:""}
+      <button class="tbtn s" onclick="openDecoupeDetail('${esc(sid)}')">🔪 Détail découpe</button>
+      ${b.loaded?`<button class="tbtn s d" onclick="blfDecharger('${esc(sid)}')">↩️ Décharger le BL</button>`:""}
+      <button class="tbtn s d" onclick="blfDelete('${esc(sid)}')">🗑 Supprimer</button>
+    </div>
+    <h3 style="font-size:14px;margin:14px 0 6px">🧀 Fromages du BL (${b.fromages.length}) — reçu / découpé / restant</h3>
+    <div style="overflow:auto;max-height:38vh"><table><thead><tr><th>Fromage</th><th>Reçu</th><th>Découpé (cette découpe)</th><th>Restant</th><th>Découpé le</th><th>Aussi découpé dans</th><th></th></tr></thead><tbody>${frRows||'<tr><td colspan="7" class="t2">Aucun fromage — BL pas encore chargé.</td></tr>'}</tbody></table></div>
+    ${extra.length?`<h3 style="font-size:14px;margin:14px 0 6px;color:var(--dan)">⚠️ Découpés dans cette découpe mais absents de ce BL (${extra.length})</h3><div style="overflow:auto"><table><thead><tr><th>Fromage</th><th>Découpé</th><th>Quand</th><th></th></tr></thead><tbody>${extraRows}</tbody></table></div>`:""}
+    <h3 style="font-size:14px;margin:14px 0 6px">📚 Historique de ce BL</h3><div class="blf-log">${blfHistoRows(sid).map(h=>`<div>${h}</div>`).join("")||'<span class="t2">—</span>'}</div>
+  </div>`;
+  back.onclick=(e)=>{ if(e.target===back) back.remove(); };
+  document.body.appendChild(back);
+}
+async function blfMetaUpdate(sid, patch){ await dbCentrale.ref("decoupe/"+sid+"/meta").update(patch); }
+async function blfSetClos(sid, clos){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return;
+  if(clos && !confirm("Clore le BL "+b.num+" ?\n\nL'arrivage est considéré comme épuisé : ses fromages ne seront plus proposés ni autorisés sur la tablette (sauf s'ils sont sur un autre BL ouvert).")) return;
+  try{ await blfMetaUpdate(sid,{ blClos:!!clos, blClosAt:clos?Date.now():null, blClosBy:clos?ME_EMAIL:null }); blLog(sid, clos?"clos":"rouvert", { bl:b.num }); toastC(clos?"🔒 BL clos":"🔓 BL rouvert"); if(document.querySelector(".modal-back.blf")) openBlf(sid); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function blfAddFromage(sid, nom, alertId){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return;
+  nom = nom!=null ? nom : prompt("Nom du fromage à ajouter au BL "+b.num+" (tel qu'il est livré) :", "");
+  nom=String(nom||"").trim(); if(!nom) return;
+  if(b.fromages.some(f=>blfMatch(f,nom))){ toastC("Déjà sur le BL"); if(alertId) blfTraiter(alertId); return; }
+  if(!confirm("Ajouter « "+nom+" » au BL "+b.num+" ?\n\nÀ faire seulement s'il a VRAIMENT été livré sur ce BL. La tablette le débloque immédiatement.")) return;
+  try{ await blfMetaUpdate(sid,{ blFromages:[...b.fromages, nom] }); blLog(sid,"ajout_fromage",{ bl:b.num, fromage:nom }); if(alertId) await blfTraiter(alertId,true); toastC("➕ "+nom+" ajouté au BL "+b.num); if(document.querySelector(".modal-back.blf")) openBlf(sid); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function blfRemoveFromage(sid, nom){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return;
+  if(!confirm("Retirer « "+nom+" » du BL "+b.num+" ?\n\nIl ne sera plus autorisé à la découpe (sauf s'il est sur un autre BL ouvert).")) return;
+  try{ await blfMetaUpdate(sid,{ blFromages:b.fromages.filter(f=>f!==nom) }); blLog(sid,"retrait_fromage",{ bl:b.num, fromage:nom }); openBlf(sid); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function blfSetNum(sid){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return; const v=prompt("N° de BL :", b.num||""); if(v==null) return; const n=v.trim(); if(!n) return;
+  try{ await blfMetaUpdate(sid,{ docNumber:n, supplier:String(b.m.supplier||"").replace(/BL\s*\S+$/,"BL "+n) }); blLog(sid,"numero",{ bl:n, detail:"ancien : "+(b.num||"—") }); openBlf(sid); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function blfSetEntity(sid){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return; const v=prompt("Entité : KBG (Kelbongoo) ou ROB (Montreuil)", b.entity||"KBG"); if(v==null) return; const e=v.trim().toUpperCase(); if(e!=="KBG"&&e!=="ROB"){ alert("KBG ou ROB"); return; }
+  try{ await blfMetaUpdate(sid,{ entity:e }); blLog(sid,"entite",{ bl:b.num, entity:e }); openBlf(sid); }catch(err){ alert("Erreur : "+err.message); }
+}
+async function blfDecharger(sid){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return;
+  if(!confirm("Décharger le BL "+b.num+" ?\n\nLa découpe et ses saisies sont conservées, mais le BL n'est plus considéré comme chargé (ses fromages ne sont plus autorisés). Pour un mauvais fichier : décharge puis recharge le bon.")) return;
+  try{ await blfMetaUpdate(sid,{ loadedBy:null, loadedAt:null, blFromages:null, blClos:null }); blLog(sid,"decharge",{ bl:b.num }); openBlf(sid); }catch(e){ alert("Erreur : "+e.message); }
+}
+// Rattache une découpe libre (commencée sans BL) à un BL : saisies, fromages et étiquettes traça déplacés vers la découpe du BL.
+async function blfMerge(fromSid, toSid){
+  const src=(centraleState.decoupe||{})[fromSid], dst=(centraleState.decoupe||{})[toSid]; if(!src||!dst) return;
+  const b=blfList().find(x=>x.sid===toSid);
+  if(!confirm("Rattacher la découpe libre (n° "+((src.meta&&src.meta.docNumber)||"—")+", "+dateShort(src.meta&&src.meta.startedAt)+") au BL "+(b&&b.num)+" ?\n\nSes saisies et étiquettes sont déplacées sur ce BL. En cas de fromage saisi des deux côtés, la saisie du BL est gardée.")) return;
+  const up={}; const dstState=dst.state||{};
+  Object.entries(src.state||{}).forEach(([k,v])=>{ if(!dstState[k]) up["decoupe/"+toSid+"/state/"+k]=v; });
+  const prods=[...((dst.meta&&dst.meta.products)||[])]; ((src.meta&&src.meta.products)||[]).forEach(p=>{ if(p&&p.designation&&!prods.some(x=>blfKey(x.designation)===blfKey(p.designation))) prods.push(p); });
+  up["decoupe/"+toSid+"/meta/products"]=prods;
+  Object.entries(src.tracabilite||{}).forEach(([k,v])=>{ up["decoupe/"+toSid+"/tracabilite/"+k]=v; });
+  Object.entries(src.bl||{}).forEach(([k,v])=>{ up["decoupe/"+toSid+"/bl/"+k]=v; });
+  if(src.meta&&src.meta.startedAt&&(!dst.meta.startedAt||src.meta.startedAt<dst.meta.startedAt)) up["decoupe/"+toSid+"/meta/startedAt"]=src.meta.startedAt;
+  up["decoupe/"+fromSid]=null;
+  try{ await dbCentrale.ref().update(up); blLog(toSid,"rattachement",{ bl:b&&b.num, detail:"découpe "+fromSid+" ("+Object.keys(src.state||{}).length+" saisie(s))" }); toastC("🔗 Découpe rattachée au BL "+(b&&b.num)); openBlf(toSid); }catch(e){ alert("Erreur : "+e.message); }
+}
+// Charger un BL : ouvre la carte de chargement de la page Chargement BL, pré-remplie avec le n° / l'entité de la découpe.
+function blfLoadFor(sid){
+  const s=sid?(centraleState.decoupe||{})[sid]:null; const m=(s&&s.meta)||{};
+  if(m.entity) cpdp.decoupe.entity=(m.entity==="KBG"?"KBG":"ROB");
+  if(m.docNumber) cpdp.decoupe.blNumber=m.docNumber;
+  document.querySelectorAll(".modal-back.blf").forEach(x=>x.remove());
+  switchTab("multi","multi");
+  setTimeout(()=>{ try{ renderCPDPCard(); const z=document.getElementById("cpdpDecFile"); if(z){ z.closest(".card,.cx,div").scrollIntoView({behavior:"smooth",block:"center"}); } toastC(m.docNumber?("Charge le fichier du BL "+m.docNumber+" dans la carte 🧀 Découpe fromage"):"Charge le BL dans la carte 🧀 Découpe fromage"); }catch(e){} },150);
+}
+async function blfDelete(sid){
+  const b=blfList().find(x=>x.sid===sid); if(!b) return;
+  if(!confirm("Supprimer définitivement la découpe "+(b.num?("du BL "+b.num):"sans n°")+" et toutes ses saisies ?")) return;
+  try{ await dbCentrale.ref("decoupe/"+sid).remove(); blLog(sid,"suppression",{ bl:b.num }); document.querySelectorAll(".modal-back.blf").forEach(x=>x.remove()); toastC("🗑 Supprimé"); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function blfTraiter(id, silent){ try{ await dbCentrale.ref("decoupe_alertes/"+id).update({ traiteAt:Date.now(), traiteBy:ME_EMAIL }); if(!silent) toastC("✓ Alerte traitée"); }catch(e){ alert("Erreur : "+e.message); } }
+async function blfTraiterTout(){ const al=blfAlertesOpen(); if(!al.length||!confirm("Marquer les "+al.length+" alerte(s) comme traitées ?")) return; const up={}; al.forEach(a=>{ up["decoupe_alertes/"+a.id+"/traiteAt"]=Date.now(); up["decoupe_alertes/"+a.id+"/traiteBy"]=ME_EMAIL; }); try{ await dbCentrale.ref().update(up); }catch(e){ alert("Erreur : "+e.message); } }
 function renderDecoupeHisto(el, bar){
   let list=decoupeSessions();
   if(dpDecoupeSearch){ const q=norm(dpDecoupeSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)||norm(s.meta.docNumber||"").includes(q)); }
@@ -3101,6 +3556,8 @@ function kpi(label, v, small, sub, bar, onclick, warn){
 }
 function todoItems(){
   const L=[];
+  try{ const al=blfAlertesOpen(); if(al.length) L.push({ pr:0, ic:"⛔", bg:"var(--dan-s)", col:"var(--dan)", t:`Fromage hors BL : ${al.length} alerte(s) de l'entrepôt`, s:esc([...new Set(al.map(a=>a.fromage))].slice(0,4).join(", ")), btn:`<button class="tbtn s" onclick="switchTab('blf')">Traiter</button>` });
+    const att=blfList().filter(b=>b.status==="attente"); if(att.length) L.push({ pr:1, ic:"📦", bg:"var(--warn-s)", col:"var(--warn)", t:`${att.length} découpe(s) en attente de leur BL`, s:esc(att.map(b=>"BL "+(b.num||"?")).slice(0,5).join(", ")), btn:`<button class="tbtn s" onclick="switchTab('blf')">Charger / rattacher</button>` }); }catch(e){}
   refusedOpen().forEach(x=>L.push({ pr:0, ic:"🚛", bg:"var(--dan-s)", col:"var(--dan)", t:`Rungis : palette non récupérée (${new Date(x.r.at||x.e.validatedAt||x.e.at).toLocaleDateString("fr-FR")})`,
     s:`${x.it.type==="PICKING"?"Picking cde "+esc(x.it.ref||"—"):"Dispatch"} → ${storeChip(x.it.code)} · motif « ${esc(MOTIF_UI[x.r.motif]||x.r.motif||"?")} »${x.r.note?" — "+esc(x.r.note):""}`,
     btn:`<button class="tbtn s w" onclick="relancerRungis(['${esc(x.e.id)}|${esc(x.k)}'])">Relancer Rungis</button>` }));
