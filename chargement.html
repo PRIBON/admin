@@ -290,7 +290,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -462,6 +462,8 @@ function start(email){
     dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
     // v2.0 — enlèvements Rungis + note du soir (console : accueil, page Enlèvements Rungis)
     dbCentrale.ref("enlevements").orderByChild("at").startAt(Date.now()-21*86400000).on("value",snap=>{ centraleState.enlevements=snap.val()||{}; dashTick(true); });
+    // v2.4.0 — registre des palettes EPAL (envois validés par Rungis, retours chauffeur, ajustements console)
+    dbCentrale.ref("epal/mvts").on("value",snap=>{ centraleState.epal=snap.val()||{}; dashTick(true); });
     dbCentrale.ref("rungis_notes").orderByKey().startAt(isoDay(Date.now()-7*86400000)).on("value",snap=>{ centraleState.rungisNotes=snap.val()||{}; dashTick(true); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
   // Onglets (menu latéral)
@@ -3738,7 +3740,7 @@ function stepsHTML(){
 }
 function itemRow(e, it, idx, opts){
   const ph=enlPhoto(e,it), merged=!!it.mergedWith, ref=(e.refused||{})[String(it.key||"").replace(/[.#$\[\]\/]/g,"_")];
-  const qty=it.kbg?"via Kelbongoo":Number(it.dollies)>0?`${it.dollies} dolly`:Number(it.n)>0?`${it.n} pal.`:`🔗 avec ${esc(it.mergedWith)}`;
+  const qty=(it.kbg?"via Kelbongoo":Number(it.dollies)>0?`${it.dollies} dolly`:Number(it.n)>0?`${it.n} pal.`:`🔗 avec ${esc(it.mergedWith)}`)+epalTag(it);
   const status= ref?`<span class="pill pr" title="${esc(ref.note||"")}">Non récupérée · ${esc(MOTIF_UI[ref.motif]||ref.motif||"")}</span>` : e.status==="valide"?`<span class="pill pg">Récupérée</span>` : e.status==="envoye"?`<span class="pill pb">Envoyée</span>` : `<span class="pill po">En attente</span>`;
   return `<tr ${ref?'style="background:#fff7f6"':""}><td>${typeTag(it.type)}</td>
     <td><div class="t1">${it.type==="PICKING"?"Commande "+esc(it.ref||"—"):esc((it.sups||[]).map(x=>x.name).slice(0,2).join(" · ")||"Dispatch")} <span class="t2">· ${qty}${it.frais?" · ❄️ frais":""}</span></div>
@@ -3767,12 +3769,13 @@ function renderRungis(){
       ${sent.length?`<div class="cx" style="overflow:hidden;margin-top:16px"><div class="cx-h"><h3>Envoyé à Rungis — en attente de validation</h3><span class="sp"></span><span class="sub">${sent.length} demande(s)</span></div>${tableFor(sent,{})}</div>`:""}`;
   else if(rungisView==="nonrecup") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Palettes non récupérées</h3><span class="sp"></span>${refs.length?`<button class="tbtn s w" onclick="relancerRungis(${esc(JSON.stringify(refs.map(x=>x.e.id+"|"+x.k)))})">Tout relancer (${refs.length})</button>`:""}</div>
       ${refs.length?`<table class="tb"><tr><th>Type</th><th>Contenu</th><th>Emplacement</th><th>Pour</th><th>Motif Rungis</th><th></th></tr>${refs.map(x=>`<tr style="background:#fff7f6"><td>${typeTag(x.it.type)}</td><td><div class="t1">${x.it.type==="PICKING"?"Commande "+esc(x.it.ref||"—"):esc((x.it.sups||[]).map(s=>s.name).slice(0,2).join(" · ")||"Dispatch")}</div><div class="t2">tournée du ${new Date(x.r.at||x.e.validatedAt||x.e.at).toLocaleDateString("fr-FR")}</div></td><td>${zonePill(x.it.zone)}</td><td>${storeChip(x.it.code)}</td><td><b style="color:var(--dan)">${esc(MOTIF_UI[x.r.motif]||x.r.motif||"?")}</b>${x.r.note?`<div class="t2">« ${esc(x.r.note)} »</div>`:""}</td><td style="text-align:right;white-space:nowrap"><button class="tbtn s w" onclick="relancerRungis(['${esc(x.e.id)}|${esc(x.k)}'])">Relancer</button> <button class="tbtn s" title="Déjà réglé autrement (parti par un autre moyen…)" onclick="closeRefused('${esc(x.e.id)}','${esc(x.k)}')">Classer</button></td></tr>`).join("")}</table>`:`<div class="empty">Aucune palette en souffrance 👌</div>`}</div>`;
+  else if(rungisView==="epal") main=epalHTML();
   else main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Historique (10 jours)</h3></div>${tableFor(val,{relance:true, empty:"Pas encore de tournée validée."})}</div>`;
   const mails=[]; enlList().slice(0,40).forEach(e=>{ if(e.validatedAt) mails.push({ at:e.validatedAt, t:`Rungis a validé la récupération`, s:`${palCount(enlItems(e))} pal.${Object.keys(e.refused||{}).length?` · <b style="color:var(--dan)">${Object.keys(e.refused).length} non récupérée(s)</b> + motif`:""}${e.livraison?` · livraison ${Object.entries(e.livraison).map(([c,d])=>c+" "+d).join(", ")}`:""}` });
     if(e.sentAt) mails.push({ at:e.sentAt, t:`Mail envoyé à Rungis`, s:`${e.sentBy&&e.sentBy!=="23h59"?"envoyé par "+esc(e.sentBy):"envoi automatique 23h59"}`, info:true }); });
   const seen={}; const mailsU=mails.sort((a,b)=>b.at-a.at).filter(m=>{ const k=m.t+Math.round(m.at/60000); if(seen[k]) return false; seen[k]=1; return true; }).slice(0,8);
   el.innerHTML=`<div class="page-h"><div><h1>Enlèvements Rungis</h1><div class="sub">Demandes de la tablette, mail consolidé de 23h59, validation Rungis et livraison des magasins.</div></div><span class="sp"></span>
-    <span class="seg"><button class="${rungisView==="soir"?"on":""}" onclick="rungisView='soir';renderRungis()">Tournée de ce soir</button><button class="${rungisView==="nonrecup"?"on":""}" onclick="rungisView='nonrecup';renderRungis()">Non récupérées${refs.length?` (${refs.length})`:""}</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">Historique</button></span></div>
+    <span class="seg"><button class="${rungisView==="soir"?"on":""}" onclick="rungisView='soir';renderRungis()">Tournée de ce soir</button><button class="${rungisView==="nonrecup"?"on":""}" onclick="rungisView='nonrecup';renderRungis()">Non récupérées${refs.length?` (${refs.length})`:""}</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">Historique</button><button class="${rungisView==="epal"?"on":""}" onclick="rungisView='epal';renderRungis()">🟫 Palettes EPAL${epalDueTotal()?` (${epalDueTotal()})`:""}</button></span></div>
   ${stepsHTML()}
   <div class="grid-r"><div>${main}</div>
     <div style="display:flex;flex-direction:column;gap:16px">
@@ -3788,6 +3791,71 @@ function renderRungis(){
         ${mailsU.length?mailsU.map(m=>`<div class="row"><span class="pill ${m.info?"pb":"pg"}">${m.info?"→":"✓"}</span><div style="flex:1"><div class="t1" style="font-size:12.5px">${new Date(m.at).toLocaleDateString("fr-FR")} ${hm(m.at)} · ${m.t}</div><div class="t2">${m.s}</div></div></div>`).join(""):`<div class="empty">Aucun mail pour l'instant.</div>`}
       </div>
     </div></div>`;
+}
+/* ===================================================================== PALETTES EPAL (v2.4.0)
+   Firebase Centrale : epal/mvts/<id> = { type:"envoi"|"retour"|"ajust", code, n, day, at, by, src, bl, tour, note, cancelled }
+   envoi = écrit par l'Apps Script enlèvement à la validation Rungis (palettes EPAL récupérées, par magasin)
+   retour = chauffeur Rungis (appli Kelbongoo) · ajust = correction console (+ doit plus / − doit moins).
+   Solde dû = envois + ajust(+) − retours − ajust(−) ; « depuis le » = plus ancienne palette non rendue. */
+const EPAL_STORES=["ROB","TOL","BIC"], EPAL_START="2026-10-22";
+const EPAL_TYPE={ envoi:["Envoi (BL)","pb"], retour:["Retour chauffeur","pg"], ajust:["Ajustement","po"] };
+function epalBalance(code){
+  const mv=centraleState.epal||{}; const deb=[]; let cred=0, sent=0, back=0, adj=0, last=null;
+  Object.keys(mv).forEach(k=>{ const m=mv[k]; if(!m||m.cancelled||String(m.code||"").toUpperCase()!==code||String(m.day||"")<EPAL_START) return;
+    const n=Math.round(Number(m.n)||0); if(!n) return;
+    if(m.type==="envoi"){ sent+=n; deb.push({day:m.day,at:m.at||0,n}); }
+    else if(m.type==="retour"){ back+=n; cred+=n; if(!last||(m.at||0)>last.at) last={at:m.at||0,day:m.day,n,by:m.by}; }
+    else if(m.type==="ajust"){ adj+=n; if(n>0) deb.push({day:m.day,at:m.at||0,n}); else cred+=-n; } });
+  deb.sort((a,b)=>a.day<b.day?-1:a.day>b.day?1:a.at-b.at);
+  let rest=cred, since=""; for(const d of deb){ if(rest>=d.n){ rest-=d.n; continue; } since=d.day; break; }
+  const due=sent+adj-back; return { sent, back, adj, due, since:due>0?since:"", last };
+}
+function epalDueTotal(){ return EPAL_STORES.reduce((a,c)=>a+Math.max(0,epalBalance(c).due),0); }
+function epalItemCount(it){ if(!it||it.kbg||Number(it.dollies)>0) return 0; const n=Number(it.n)||0; if(!n) return 0;
+  if(it.epalN!=null&&it.epalN!=="") return Math.max(0,Math.min(Number(it.epalN)||0,n)); return it.epal===false?0:n; }
+function epalTag(it){ const n=Number(it.n)||0; if(!n||it.kbg||Number(it.dollies)>0) return ""; const e=epalItemCount(it);
+  return e===n?` · 🟫 ${e} EPAL`:` · <b style="color:var(--dan)">⚠️ ${n-e} autre format</b>${e?` + ${e} EPAL`:""}`; }
+function frIso(iso){ const p=String(iso||"").split("-"); return p.length===3?p[2]+"/"+p[1]+"/"+p[0]:String(iso||""); }
+let epalFilter="";
+function epalHTML(){
+  const mv=centraleState.epal||{};
+  const cards=EPAL_STORES.map(c=>{ const b=epalBalance(c), due=Math.max(0,b.due), col=SITE_COL[c]||"#777";
+    return `<div class="cx" style="padding:16px 18px;border-left:6px solid ${col};cursor:pointer;${epalFilter===c?"box-shadow:0 0 0 2px "+col:""}" onclick="epalFilter=epalFilter==='${c}'?'':'${c}';renderRungis()">
+      <div style="display:flex;align-items:center;gap:8px">${storeChip(c)}<span class="t2">${esc(STORE_LONG_C[c]||c)}</span></div>
+      <div style="font-size:38px;font-weight:800;line-height:1.1;margin-top:8px;color:${due?"var(--dan)":"#2e7d32"}">${due}</div><div style="font-size:13px;font-weight:650;color:var(--ink2)">palette${due>1?"s":""} EPAL à rendre</div>
+      <div class="t2" style="margin-top:2px">${due?(b.since?`depuis le <b>${frIso(b.since)}</b>`:""):"rien à rendre 👌"}${b.due<0?` · ${-b.due} rendue(s) en avance`:""}</div>
+      <div class="t2" style="margin-top:8px">Envoyées <b>${b.sent}</b> · rendues <b>${b.back}</b>${b.adj?` · ajust. <b>${b.adj>0?"+":""}${b.adj}</b>`:""}</div>
+      <div class="t2">Dernier retour : ${b.last?`<b>${b.last.n}</b> le ${frIso(b.last.day)}${b.last.by?" · "+esc(b.last.by):""}`:"—"}</div></div>`; }).join("");
+  const rows=Object.keys(mv).map(id=>({id,...mv[id]})).filter(m=>m&&m.code&&(!epalFilter||m.code===epalFilter)).sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,150);
+  const tbl=rows.length?`<table class="tb"><tr><th>Date</th><th>Magasin</th><th>Mouvement</th><th style="text-align:right">Palettes</th><th>Par · détail</th><th></th></tr>${rows.map(m=>{ const T=EPAL_TYPE[m.type]||[m.type,"po"]; const n=Math.round(Number(m.n)||0); const sign=m.type==="retour"?-n:n;
+    return `<tr ${m.cancelled?'style="opacity:.45;text-decoration:line-through"':""}><td>${frIso(m.day)}<div class="t2">${m.at?new Date(m.at).toLocaleDateString("fr-FR")+" "+hm(m.at):""}</div></td><td>${storeChip(m.code)}</td><td><span class="pill ${T[1]}">${T[0]}</span></td>
+      <td style="text-align:right;font-weight:800;color:${sign>0?"var(--dan)":"#2e7d32"}">${sign>0?"+":""}${sign}</td><td><div class="t1" style="font-size:12.5px">${esc(m.by||"")}</div><div class="t2">${m.bl?esc(m.bl):""}${m.note?` « ${esc(m.note)} »`:""}${m.cancelled?` · annulé par ${esc(m.cancelled.by||"")}`:""}</div></td>
+      <td style="text-align:right">${m.cancelled?`<button class="tbtn s" onclick="epalCancel('${esc(m.id)}',false)">Rétablir</button>`:`<button class="tbtn s" onclick="epalCancel('${esc(m.id)}',true)">Annuler</button>`}</td></tr>`; }).join("")}</table>`
+    :`<div class="empty">Aucun mouvement${epalFilter?" pour "+epalFilter:""}. Les envois s'ajoutent à la validation Rungis, les retours quand le chauffeur valide « Retour palettes EPAL ».</div>`;
+  return `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px">${cards}</div>
+    <div class="cx" style="overflow:hidden;margin-bottom:16px"><div class="cx-h"><h3>✍️ Saisie manuelle</h3><span class="sp"></span><span class="sub">retour oublié, inventaire, correction</span></div>
+      <div style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="epalCode">${EPAL_STORES.map(c=>`<option value="${c}">${c} · ${esc(STORE_LONG_C[c]||c)}</option>`).join("")}</select>
+        <select id="epalType"><option value="retour">↩️ Retour récupéré (le magasin doit MOINS)</option><option value="plus">➕ Ajustement : le magasin doit PLUS</option><option value="moins">➖ Ajustement : le magasin doit MOINS</option></select>
+        <input id="epalN" type="number" min="1" step="1" value="1" style="width:90px">
+        <input id="epalDay" type="date" value="${isoDay()}">
+        <input id="epalNote" placeholder="Note (facultatif)" style="flex:1;min-width:160px">
+        <button class="tbtn s p" onclick="epalAddManual()">Enregistrer</button></div></div>
+    <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Journal des palettes EPAL</h3><span class="sp"></span>${epalFilter?`<button class="tbtn s" onclick="epalFilter='';renderRungis()">Tous les magasins</button>`:`<span class="sub">clique sur un magasin pour filtrer</span>`}</div>${tbl}</div>`;
+}
+const STORE_LONG_C={ ROB:"Robespierre (Montreuil)", TOL:"Tolbiac", BIC:"Bichat" };
+async function epalAddManual(){
+  if(!dbCentrale) return; const g=id=>(document.getElementById(id)||{}).value||"";
+  const code=g("epalCode"), kind=g("epalType"), n=Math.round(Number(g("epalN"))||0), day=g("epalDay")||isoDay(), note=g("epalNote").trim().slice(0,300);
+  if(!EPAL_STORES.includes(code)||n<1){ alert("Indique un magasin et un nombre de palettes (≥ 1)."); return; }
+  const type=kind==="retour"?"retour":"ajust", val=kind==="moins"?-n:n;
+  const lbl=kind==="retour"?`${n} palette(s) EPAL rendue(s) par ${code}`:`${code} doit ${kind==="plus"?"+":"−"}${n} palette(s) EPAL`;
+  if(!confirm(`Enregistrer : ${lbl} (le ${frIso(day)}) ?`)) return;
+  try{ await dbCentrale.ref("epal/mvts").push({ type, code, n:val, day, at:Date.now(), by:RESP_NAMES[String(ME_EMAIL||"").toLowerCase()]||ME_EMAIL||"Console", src:"console", note:note||null }); toastC("🟫 Enregistré"); renderRungis(); }catch(e){ alert("Erreur : "+e.message); }
+}
+async function epalCancel(id, on){
+  if(!dbCentrale) return; if(on && !confirm("Annuler ce mouvement ? (il reste visible, barré, et ne compte plus)")) return;
+  try{ await dbCentrale.ref("epal/mvts/"+id+"/cancelled").set(on?{ at:Date.now(), by:RESP_NAMES[String(ME_EMAIL||"").toLowerCase()]||ME_EMAIL||"Console" }:null); toastC(on?"Mouvement annulé":"Mouvement rétabli"); }catch(e){ alert("Erreur : "+e.message); }
 }
 async function saveRungisNote(){
   const t=(document.getElementById("rungisNote")||{}).value||""; if(!dbCentrale) return;
