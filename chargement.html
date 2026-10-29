@@ -290,7 +290,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.4.0";
+const APP_VERSION = "2.5.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -3176,8 +3176,11 @@ function frPivot(list){
       <tr><td class="first tot" style="cursor:default">Total / jour</td>${colTot.map(g=>`<td class="c tot">${g?frKg(g):"·"}</td>`).join("")}<td class="c tot">${frKg(colTot.reduce((x,y)=>x+y,0))}</td></tr></tbody>
   </table></div><div class="t2" style="margin-top:6px">p = portions Kelbongoo · m = morceaux Montreuil · poids découpé en dessous. Clique un fromage pour voir son détail jour par jour.${truncated?" Seuls les 31 derniers jours de la période sont affichés.":""}</div>`;
 }
-function frExportCsv(){
-  const list=frFiltered().sort((x,y)=>(x.at||0)-(y.at||0));
+// v2.5.0 — export CSV par magasin (mag = "KBG" | "ROB" ; vide = tout, comme avant).
+function frExportCsv(mag){
+  let list=frFiltered().sort((x,y)=>(x.at||0)-(y.at||0));
+  if(mag) list=list.filter(e=>(e.dest==="ROB"?"ROB":"KBG")===mag);
+  if(!list.length){ alert("Aucune découpe "+(mag==="ROB"?"Montreuil":mag==="KBG"?"Kelbongoo":"")+" sur la période."); return; }
   const head=["Jour","Heure","Fromage","Hors BL","Pour","Portions KBG","Cible KBG","Théo KBG","Rendement %","Meules/colis ROB","Unité","Morceaux ROB","Poids KBG (kg)","Poids Montreuil (kg)","Poids reçu (kg)","BL","Fournisseur / libellé","Découpe libre","Par","Statut"];
   const q=v=>{ v=String(v==null?"":v); return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   const n=v=>String(v).replace(".",",");
@@ -3186,7 +3189,7 @@ function frExportCsv(){
     e.bl,e.supplier,e.libre?"oui":"",e.by,e.done?"fini":"en cours"].map(q).join(";"));
   const [a,b]=frRange();
   const blob=new Blob(["\uFEFF"+[head.join(";")].concat(lines).join("\n")],{type:"text/csv;charset=utf-8"});
-  const el=document.createElement("a"); el.href=URL.createObjectURL(blob); el.download="SUIVI_FROMAGE_"+a+(a!==b?"_au_"+b:"")+".csv"; el.click(); setTimeout(()=>URL.revokeObjectURL(el.href),1500);
+  const el=document.createElement("a"); el.href=URL.createObjectURL(blob); el.download="SUIVI_FROMAGE_"+(mag==="ROB"?"MONTREUIL_":mag==="KBG"?"KELBONGOO_":"")+a+(a!==b?"_au_"+b:"")+".csv"; el.click(); setTimeout(()=>URL.revokeObjectURL(el.href),1500);
 }
 function renderFromage(){
   const el=document.getElementById("tab-fromage"); if(!el) return;
@@ -3221,7 +3224,9 @@ function renderFromage(){
   const horsN=list.filter(e=>e.horsBl).length;
   const horsBanner = horsN ? `<div class="cx" style="border-color:#e8a3a3;background:#fdecea;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="color:#a32a2a">⛔ ${horsN} découpe(s) de fromage hors BL sur la période :</b> <span>${esc([...new Set(list.filter(e=>e.horsBl).map(e=>e.designation))].join(", "))}</span><span style="flex:1"></span><button class="tbtn s" onclick="switchTab('blf')">📦 Voir / traiter dans BL fromage</button></div>` : "";
   el.innerHTML=`<div class="page-h"><div><h1>📒 Suivi fromage</h1><div class="sub">Ce qui a été coupé, exactement, jour par jour — <b>${esc(perLbl)}</b></div></div><span class="sp" style="flex:1"></span>
-      <button class="tbtn" onclick="frExportCsv()" ${list.length?"":"disabled"}>⬇️ Export CSV</button>
+      <button class="tbtn" onclick="frExportCsv('KBG')" ${list.length?"":"disabled"} title="CSV Kelbongoo sur la période affichée">⬇️ CSV 🔵 Kelbongoo</button>
+      <button class="tbtn" onclick="frExportCsv('ROB')" ${list.length?"":"disabled"} title="CSV Pribon Montreuil sur la période affichée">⬇️ CSV 🟣 Montreuil</button>
+      <button class="tbtn" onclick="frExportCsv()" ${list.length?"":"disabled"}>⬇️ CSV tout</button>
       <button class="tbtn" onclick="centraleView='decoupe';switchTab('centrale','decoupe')">🔪 Découpes par BL</button></div>
     ${horsBanner}${kpis}
     <div class="fr-bar"><div class="seg">${segP}</div>${dateInputs}<div class="seg">${segD}</div></div>
