@@ -290,7 +290,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.5.1";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -3743,13 +3743,47 @@ function stepsHTML(){
     ${st(4, "Livraison magasins", "BL envoyés · mail rr@ + hg@", true)}
   </div></div>`;
 }
+/* v2.5.1 — 📋 Voir le BL en détail (même liste que le BL envoyé à la boutique : items[].lines {s,d,q}) */
+function enlLines(it){ const l=it&&it.lines; return (Array.isArray(l)?l:(l&&typeof l==="object"?Object.values(l):[])).filter(Boolean); }
+function blBtn(e,it,idx){ const L=enlLines(it); if(!L.length) return "";
+  const tot=L.reduce((a,x)=>a+(Number(x.q)||0),0), bl=(e.bl||{})[String(it.code||"").toUpperCase()];
+  return `<button class="tbtn s" style="margin-top:4px" onclick="showBlList('${esc(e.id)}',${idx})">📋 Voir le BL${bl&&bl.n?" "+esc(bl.n):""} · ${L.length} ligne${L.length>1?"s":""} · ${tot} u.</button>`; }
+function showBlList(id, idx){
+  const e=Object.assign({id},(centraleState.enlevements||{})[id]||{}); const it=enlItems(e)[idx]; if(!it) return;
+  const L=enlLines(it), code=String(it.code||"").toUpperCase(), bl=(e.bl||{})[code];
+  const groups={}; L.forEach(x=>{ const g=x.s||"—"; (groups[g]=groups[g]||[]).push(x); });
+  const tot=L.reduce((a,x)=>a+(Number(x.q)||0),0);
+  const rows=Object.keys(groups).sort((a,b)=>a.localeCompare(b,"fr")).map(g=>{ const sub=groups[g].reduce((a,x)=>a+(Number(x.q)||0),0);
+    return `<tr><td colspan="2" style="background:#f3f6fa;font-weight:800">🏷️ ${esc(g)}</td><td style="background:#f3f6fa;text-align:right;font-weight:800">${sub}</td></tr>`+
+      groups[g].slice().sort((a,b)=>String(a.d||"").localeCompare(String(b.d||""),"fr")).map(x=>`<tr><td></td><td>${esc(x.d||"")}</td><td style="text-align:right;font-weight:700">${esc(x.q)}</td></tr>`).join(""); }).join("");
+  const liv=(e.livraison||{})[code];
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box" style="border-top:6px solid ${SITE_COL[code]||"#607d8b"}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">📋 ${bl&&bl.n?"BL "+esc(bl.n):"BL"} · ${storeChip(code)} ${esc(STORE_LONG_C[code]||"")}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">✕</button></div>
+    <div class="muted" style="margin:4px 0 10px">${typeTag(it.type)} ${it.type==="PICKING"?"Commande "+esc(it.ref||"—"):"Dispatch"} · ${Number(it.dollies)>0?it.dollies+" dolly":Number(it.n)>0?it.n+" pal.":it.kbg?"via Kelbongoo":"même palette"} · demandé par ${esc(shortName(e.by))} le ${new Date(e.at).toLocaleDateString("fr-FR")} ${hm(e.at)}${e.fast?` · <b style="color:#c62828">⚡ FAST ${esc(e.fast.ini||"")}</b>`:""}${liv?` · 🚚 livraison ${esc(liv)}`:""}${e.status!=="valide"?' · <b style="color:#ef6c00">BL pas encore émis (en attente de validation)</b>':""}</div>
+    <div style="overflow:auto;max-height:60vh"><table class="tb"><tr><th>Fournisseur</th><th>Désignation</th><th style="text-align:right">Qté</th></tr>${rows}
+      <tr><td colspan="2" style="font-weight:800;text-align:right">TOTAL · ${L.length} ligne${L.length>1?"s":""}</td><td style="text-align:right;font-weight:800">${tot}</td></tr></table></div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      ${bl&&bl.url?`<a class="btn btn-lg" style="flex:1;text-align:center;background:#e3f2fd;text-decoration:none" href="${esc(bl.url)}" target="_blank" rel="noopener">📄 Ouvrir le PDF du BL</a>`:""}
+      <button class="btn btn-green btn-lg" style="flex:1" onclick="dlBlCsv('${esc(id)}',${idx})">⬇️ Export CSV</button>
+    </div></div>`;
+  back.onclick=(ev)=>{ if(ev.target===back) back.remove(); };
+  document.body.appendChild(back);
+}
+function dlBlCsv(id, idx){
+  const e=(centraleState.enlevements||{})[id]||{}; const it=enlItems(e)[idx]; if(!it) return; const code=String(it.code||"").toUpperCase(), bl=(e.bl||{})[code];
+  const q=v=>'"'+String(v==null?"":v).replace(/"/g,'""')+'"';
+  const csv="﻿"+["Fournisseur;Désignation;Quantité"].concat(enlLines(it).map(x=>[q(x.s),q(x.d),q(x.q)].join(";"))).join("\r\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`BL_${bl&&bl.n?bl.n:code+"_"+(it.type==="PICKING"?"cde"+(it.ref||""):"dispatch")}_${isoDay(e.at||Date.now())}.csv`.replace(/[^\w.\-]/g,"_"); a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
 function itemRow(e, it, idx, opts){
   const ph=enlPhoto(e,it), merged=!!it.mergedWith, ref=(e.refused||{})[String(it.key||"").replace(/[.#$\[\]\/]/g,"_")];
   const qty=(it.kbg?"via Kelbongoo":Number(it.dollies)>0?`${it.dollies} dolly`:Number(it.n)>0?`${it.n} pal.`:`🔗 avec ${esc(it.mergedWith)}`)+epalTag(it);
   const status= ref?`<span class="pill pr" title="${esc(ref.note||"")}">Non récupérée · ${esc(MOTIF_UI[ref.motif]||ref.motif||"")}</span>` : e.status==="valide"?`<span class="pill pg">Récupérée</span>` : e.status==="envoye"?`<span class="pill pb">Envoyée</span>` : `<span class="pill po">En attente</span>`;
   return `<tr ${ref?'style="background:#fff7f6"':""}><td>${typeTag(it.type)}</td>
     <td><div class="t1">${it.type==="PICKING"?"Commande "+esc(it.ref||"—"):esc((it.sups||[]).map(x=>x.name).slice(0,2).join(" · ")||"Dispatch")} <span class="t2">· ${qty}${it.frais?" · ❄️ frais":""}</span></div>
-      <div class="t2">Demandé par ${esc(shortName(e.by))} · ${new Date(e.at).toLocaleDateString("fr-FR")} ${hm(e.at)}${it.note?` · <b style="color:var(--ink2)">ℹ️ ${esc(it.note)}</b>`:""}</div></td>
+      <div class="t2">Demandé par ${esc(shortName(e.by))} · ${new Date(e.at).toLocaleDateString("fr-FR")} ${hm(e.at)}${it.note?` · <b style="color:var(--ink2)">ℹ️ ${esc(it.note)}</b>`:""}</div>${blBtn(e,it,idx)}</td>
     <td>${it.kbg?'<span class="t2">—</span>':merged?'<span class="t2">même palette</span>':zonePill(it.zone)}</td>
     <td>${storeChip(it.code)}</td>
     <td>${ph?`<a href="${esc(ph.url||("https://drive.google.com/file/d/"+ph.id+"/view"))}" target="_blank" rel="noopener"><img class="thumb" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(ph.id)}&sz=w200" alt="photo" loading="lazy"></a>`:(it.hasPhoto?'<span class="t2">📷 en cours…</span>':'<span class="t2">—</span>')}</td>
