@@ -290,7 +290,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.5.1";
+const APP_VERSION = "2.5.2";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -3780,7 +3780,12 @@ function dlBlCsv(id, idx){
 function itemRow(e, it, idx, opts){
   const ph=enlPhoto(e,it), merged=!!it.mergedWith, ref=(e.refused||{})[String(it.key||"").replace(/[.#$\[\]\/]/g,"_")];
   const qty=(it.kbg?"via Kelbongoo":Number(it.dollies)>0?`${it.dollies} dolly`:Number(it.n)>0?`${it.n} pal.`:`🔗 avec ${esc(it.mergedWith)}`)+epalTag(it);
-  const status= ref?`<span class="pill pr" title="${esc(ref.note||"")}">Non récupérée · ${esc(MOTIF_UI[ref.motif]||ref.motif||"")}</span>` : e.status==="valide"?`<span class="pill pg">Récupérée</span>` : e.status==="envoye"?`<span class="pill pb">Envoyée</span>` : `<span class="pill po">En attente</span>`;
+  // v2.5.2 — pointage du chauffeur dans l'appli Kelbongoo (V10.79) : enlevements/<id>/picked/<clé>
+  const pkd=(e.picked||{})[String(it.key||"").replace(/[.#$\[\]\/]/g,"_")];
+  const status= ref?`<span class="pill pr" title="${esc(ref.note||"")}">Non récupérée · ${esc(MOTIF_UI[ref.motif]||ref.motif||"")}</span>`
+    : pkd&&pkd.status==="ok"?`<span class="pill pg" title="${esc(pkd.by||"")}">🚚 Prise par le chauffeur ${new Date(pkd.at).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})} ${hm(pkd.at)}</span>${pkd.by?`<div class="t2">${esc(pkd.by)}</div>`:""}`
+    : pkd&&pkd.status==="missed"?`<span class="pill pr" title="${esc(pkd.note||"")}">❌ Pas prise (chauffeur) · ${esc(MOTIF_UI[pkd.motif]||pkd.motif||"")}</span>`
+    : e.status==="valide"?`<span class="pill pg">${e.fast?"⚡ FAST · ":""}Validée — pas encore pointée</span>` : e.status==="envoye"?`<span class="pill pb">Envoyée</span>` : `<span class="pill po">En attente</span>`;
   return `<tr ${ref?'style="background:#fff7f6"':""}><td>${typeTag(it.type)}</td>
     <td><div class="t1">${it.type==="PICKING"?"Commande "+esc(it.ref||"—"):esc((it.sups||[]).map(x=>x.name).slice(0,2).join(" · ")||"Dispatch")} <span class="t2">· ${qty}${it.frais?" · ❄️ frais":""}</span></div>
       <div class="t2">Demandé par ${esc(shortName(e.by))} · ${new Date(e.at).toLocaleDateString("fr-FR")} ${hm(e.at)}${it.note?` · <b style="color:var(--ink2)">ℹ️ ${esc(it.note)}</b>`:""}</div>${blBtn(e,it,idx)}</td>
