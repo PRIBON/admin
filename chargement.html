@@ -245,7 +245,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
     <button class="tab" data-tab="avoirs" data-key="avoirs"><span class="em">💶</span><span class="lbl">Avoirs</span><span class="cnt" id="cnt-avoirs"></span></button>
     <button class="tab" data-tab="msg" data-key="msg"><span class="em">💬</span><span class="lbl">Messages</span><span class="cnt" id="cnt-msg"></span></button>
     <div class="side-sec"><span class="se">🏭</span>Entrepôt PDP</div>
-    <button class="tab" data-tab="centrale" data-key="centrale" data-cview="ecarts"><span class="em">🚚</span><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
+    <button class="tab" data-tab="centrale" data-key="centrale" data-cview="histo"><span class="em">🚚</span><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
     <button class="tab" data-tab="rungis" data-key="rungis"><span class="em">🚛</span><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
     <button class="tab" data-tab="inventaire" data-key="inventaire"><span class="em">📋</span><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
     <div class="side-sec"><span class="se">🧀</span>Fromage</div>
@@ -290,7 +290,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -356,9 +356,10 @@ let msgStore=null;       // magasin sélectionné dans l'onglet Messages
 let avoirView="magasin", avoirStatut="", avoirDate=""; // onglet Suivi des avoirs
 let dbCentrale=null;                       // Firebase du projet CENTRALE (app Dispatch)
 const centraleState={ dispatch:{}, picking:{}, reception:{}, decoupe:{}, ecartsSuivi:{}, broadcasts:{}, tracabilite:{}, inventaireVin:{}, kbgPoids:{}, enlevements:{}, rungisNotes:{}, decAlertes:{}, blHisto:{} };
-let centraleView="ecarts";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
+let centraleView="histo";                 // onglet Dispatch & Découpe : ecarts | histo | decoupe
 let dpDecoupeDate="", dpDecoupeSearch="";  // filtres de l'historique découpe
-let dpHistoDate="", dpHistoSearch="";      // filtres de l'historique dispatch
+let dpHistoDate="", dpHistoSearch="";
+let dpEcartsOnly=false, dpDecoupeEcarts=false;   // v2.7.0 — filtres « écarts seulement »      // filtres de l'historique dispatch
 let recView="todo";                        // onglet Réception : todo | archives
 let suiviType="tous";
 let liveOpenDays={};                        // Suivi live : jours dépliés (clé AAAA-MM-JJ) ; aujourd'hui déplié par défaut                      // filtre Suivi live : tous | reception | dispatch | decoupe
@@ -1073,11 +1074,40 @@ function mergeOrderAndBL(order, bl){
     reconciliation:{ commandLines:(order.lines||[]).length, blLines:blLines.length, unmatchedCommand:unmatched, unmatchedBL:merged.filter(x=>x.horsCommande).length }
   };
 }
+/* v2.7.0 — RUPTURES FOURNISSEUR au chargement : produits commandés introuvables sur le BL.
+   Un clic « 🚫 Rupture » = ligne nonLivre (rien à pointer au magasin, pas d'écart, pas dans le .txt G5). */
+const RUP_DOCS={}; let RUP_SEQ=0;
+function rupRid(p){ if(!p.__rid){ p.__rid="r"+(++RUP_SEQ); } RUP_DOCS[p.__rid]=p; return p.__rid; }
+function rupMissing(p){ return (p.lines||[]).map((l,i)=>({l,i})).filter(x=>!x.l.horsCommande && x.l.commandMatched===false && (Number(x.l.attendu)||0)>0); }
+function ruptureBlock(p){
+  const miss=rupMissing(p), rid=p.__rid;
+  if(!miss.length) return '<div class="parse-note" style="background:#e8f5e9;color:#1a4d2e">✅ Tous les produits commandés sont sur le BL.</div>';
+  const nR=miss.filter(x=>x.l.rupture).length, all=(nR===miss.length);
+  const rows=miss.map(x=>{ const l=x.l, on=!!l.rupture;
+    return `<div style="display:flex;gap:8px;align-items:center;padding:7px 10px;border-top:1px dashed #f1d5c4;background:${on?'#f5f5f5':'#fff'}">
+      <div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px;${on?'text-decoration:line-through;color:#888':''}">${esc(l.designation||'?')}</div>
+      <div style="font-size:11px;color:#888">${esc(l.code||l.ref||'')} · commandé <b>${esc(l.attendu)}</b>${l.cdt?(' (C'+esc(l.cdt)+')'):''}</div></div>
+      ${on?`<span class="badge" style="background:#eceff1;color:#455a64">🚫 Rupture</span><button class="btn" style="background:#eef2f7;color:#333;padding:5px 10px;font-size:12px" title="Annuler" onclick="rupSet('${rid}',${x.i},false)">↩︎</button>`
+          :`<button class="btn" style="background:#455a64;color:#fff;padding:6px 12px;font-size:12px;font-weight:800" onclick="rupSet('${rid}',${x.i},true)">🚫 Rupture</button>`}
+    </div>`; }).join("");
+  return `<div style="margin-top:10px;border:2px solid ${all?'#90a4ae':'#ff9800'};border-radius:10px;overflow:hidden;text-align:left">
+    <div style="background:${all?'#eceff1':'#fff3e0'};padding:8px 10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <b style="font-size:13px">🔎 ${miss.length} produit(s) commandé(s) absent(s) du BL${nR?(' · '+nR+' en rupture'):''}</b>
+      ${all?`<button class="btn" style="background:#eef2f7;color:#333;padding:5px 10px;font-size:12px" onclick="rupAll('${rid}',false)">↩︎ Tout annuler</button>`
+           :`<button class="btn" style="background:#455a64;color:#fff;padding:5px 10px;font-size:12px" onclick="rupAll('${rid}',true)">🚫 Tout en rupture</button>`}
+    </div>
+    <div style="font-size:11px;color:#666;padding:6px 10px;background:#fffdf8">Probablement en <b>rupture fournisseur</b>. 🚫 Rupture = <b>normal</b> : pas d'écart, rien à pointer au magasin. Sans clic, le produit reste à pointer (→ « pas reçu » = écart).</div>
+    ${rows}</div>`;
+}
+function rupApply(l,on){ l.rupture=!!on; l.nonLivre=!!on; l.comment=on?"Rupture fournisseur":""; }
+function rupRefresh(rid){ const p=RUP_DOCS[rid]; if(!p) return; document.querySelectorAll('[data-rnote="'+rid+'"]').forEach(el=>{ el.outerHTML=parseNote(p); }); }
+function rupSet(rid,i,on){ const p=RUP_DOCS[rid]; if(!p||!p.lines[i]) return; rupApply(p.lines[i],on); rupRefresh(rid); }
+function rupAll(rid,on){ const p=RUP_DOCS[rid]; if(!p) return; rupMissing(p).forEach(x=>rupApply(x.l,on)); rupRefresh(rid); }
 function parseNote(p){
   if(p.format==='BL+CMD'){
     const cl=p.lines.filter(l=>l.cdt).length;
     const hors=p.lines.filter(l=>l.horsCommande).length;
-    return `<div class="parse-note">🔗 <b>BL + commande rapprochés</b> · BL ${esc(p.docNumber||'—')} · commande ${esc(p.commandNumber||'—')} · ${p.lines.length} lignes${cl?' · '+cl+' conditionnements':''}${hors?' · ⚠️ '+hors+' BL hors commande':''}</div>`;
+    return '<div data-rnote="'+rupRid(p)+'">'+`<div class="parse-note">🔗 <b>BL + commande rapprochés</b> · BL ${esc(p.docNumber||'—')} · commande ${esc(p.commandNumber||'—')} · ${p.lines.length} lignes${cl?' · '+cl+' conditionnements':''}${hors?' · ⚠️ '+hors+' BL hors commande':''}</div>`+ruptureBlock(p)+'</div>';
   }
   if(p.format==='CMD'){
     const pv=p.lines.filter(l=>l.poidsVariable).length, cl=p.lines.filter(l=>l.cdt).length;
@@ -1774,7 +1804,10 @@ function updateMultiSummary(){
 async function loadOneStore(code){
   const m=multiFiles[code]; if(!m||!m.merged) return;
   const lab=(STORES.find(x=>x.code===code)||{}).label||code;
-  if(!confirm('Charger '+lab+' après rapprochement BL + commande ?\n\n'+(m.merged.lines||[]).length+' ligne(s) · '+(m.supplier||m.merged.supplier||'')))return;
+  { const miss=rupMissing(m.merged), nR=miss.filter(x=>x.l.rupture).length, rest=miss.length-nR;
+    if(!confirm('Charger '+lab+' après rapprochement BL + commande ?\n\n'+(m.merged.lines||[]).length+' ligne(s) · '+(m.supplier||m.merged.supplier||'')
+      +(nR?('\n🚫 '+nR+' produit(s) en rupture (pas d\'écart)'):'')
+      +(rest?('\n⚠️ '+rest+' produit(s) absent(s) du BL NON marqué(s) rupture → resteront à pointer'):'')))return; }
   const btn=document.getElementById('loadBtn_'+code); if(btn){btn.disabled=true;btn.textContent='Chargement…';}
   try{
     await loadToStore(code,m.merged,{supplier:m.supplier||m.merged.supplier,type:"BL + commande",deliveryDate:m.deliveryDate});
@@ -1959,6 +1992,7 @@ function renderMsg(){
         <div class="field"><label>Magasin</label><select id="msgStoreSel" style="width:100%" onchange="msgStore=this.value;renderMsgList()">${opts}</select></div>
         <div class="field"><label>Message</label><textarea id="msgText" rows="4" style="width:100%" placeholder="Ex : Vous n'aurez pas les yaourts X aujourd'hui, c'est normal."></textarea></div>
         <div class="field"><label>Valable jusqu'au (inclus)</label><input id="msgDate" type="date" style="width:100%" value="${todayIso()}"/></div>
+        <div class="field"><label>🔐 Ton code personnel (signe le message avec tes initiales)</label><input id="msgCode" type="password" inputmode="numeric" autocomplete="off" maxlength="7" style="width:100%;letter-spacing:4px" placeholder="•••••" oninput="msgCodeCheck(this.value)"/><div id="msgWho" style="font-size:12px;margin-top:4px;color:#666">Le code n'est jamais affiché ni enregistré : seules tes initiales apparaissent au magasin.</div></div>
         <button class="btn btn-primary btn-lg" id="msgSendBtn" onclick="sendBroadcast()" style="margin-top:8px">Envoyer le message</button>
         <div id="msgSendMsg"></div>
       </div>
@@ -1980,21 +2014,47 @@ function renderMsgList(){
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(isCentrale) list=list.filter(b=>(b.target||"all")===target);
   if(!list.length){ box.innerHTML='<div class="muted">Aucun message pour ce magasin.</div>'; return; }
+  try{ queueNames(); }catch(e){}
   box.innerHTML=list.map(b=>{
     const expired=b.validUntil && now>b.validUntil;
     const reads=b.reads||{};
     const codes=Object.keys(reads);
-    const who=codes.length? codes.map(c=>esc(names[c]||("code "+c))).join(", ") : "personne pour l'instant";
+    const who=codes.length? codes.map(c=>esc(names[c]||"…")).join(", ") : "personne pour l'instant";
     return `<div class="rec ${expired?'expired':'valid'}">
       <div style="white-space:pre-wrap;font-size:14px">${esc(b.message||'')}</div>
       <div style="font-size:12px;color:#666;margin-top:6px">
         ${b.validUntil?('Valable jusqu\'au '+esc(dateShort(b.validUntil))):'Sans date'} ${expired?'<span class="badge warn">expiré</span>':'<span class="badge ok">actif</span>'}
-        · envoyé ${esc(dateShort(b.createdAt))}${b.createdBy?(' par '+esc(b.createdBy)):''}
+        · envoyé ${esc(dateShort(b.createdAt))}${b.signedBy?(' par <b>'+esc(b.signedName||'')+'</b> <span class="badge info">'+esc(b.signedBy)+'</span>'):(b.createdBy?(' par '+esc(b.createdBy)):'')}
       </div>
       <div style="font-size:12px;color:#1a4d2e;margin-top:6px"><b>Vu / validé par (${codes.length})</b> : ${who}</div>
       <div style="margin-top:8px"><button class="btn" style="background:#fdecea;color:#c62828;padding:6px 12px;font-size:13px" onclick="deleteBroadcast('${esc(b.id)}')">Supprimer</button></div>
     </div>`;
   }).join("");
+}
+/* v2.7.0 — Signature des messages : le responsable tape SON code personnel, on reconnaît la personne
+   dans le registre (resolve-names) et on signe avec ses INITIALES. Le code n'est ni affiché ni enregistré. */
+let MSG_SIGNER=null, MSG_CODE_T=null;
+async function msgResolveCode(code){
+  code=String(code||"").replace(/\D/g,""); if(code.length<4) return null;
+  if(names[code]) return names[code];
+  try{ const r=await fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action:"resolve-names",idToken:ID_TOKEN,codes:[code]})});
+    const j=await r.json(); const nm=j&&j.names&&j.names[code]; if(nm){ names[code]=nm; return nm; } }catch(e){}
+  return null;
+}
+function msgCodeCheck(v){
+  MSG_SIGNER=null; clearTimeout(MSG_CODE_T); const w=document.getElementById("msgWho");
+  const c=String(v||"").replace(/\D/g,"");
+  if(c.length<4){ if(w){ w.style.color="#666"; w.textContent="Le code n'est jamais affiché ni enregistré : seules tes initiales apparaissent au magasin."; } return; }
+  if(w){ w.style.color="#666"; w.textContent="Vérification…"; }
+  MSG_CODE_T=setTimeout(async()=>{ const nm=await msgResolveCode(c);
+    const cur=String((document.getElementById("msgCode")||{}).value||"").replace(/\D/g,""); if(cur!==c) return;
+    if(nm){ MSG_SIGNER={ name:nm, ini:initials(nm) }; if(w){ w.style.color="#1a4d2e"; w.innerHTML="✓ <b>"+esc(nm)+"</b> — signé <b>"+esc(MSG_SIGNER.ini)+"</b>"; } }
+    else if(w){ w.style.color="#c62828"; w.textContent="✗ Code inconnu dans le registre."; } },350);
+}
+async function msgResolveSigner(){
+  if(MSG_SIGNER) return MSG_SIGNER;
+  const nm=await msgResolveCode((document.getElementById("msgCode")||{}).value||""); if(!nm) return null;
+  MSG_SIGNER={ name:nm, ini:initials(nm) }; return MSG_SIGNER;
 }
 async function sendBroadcast(){
   const code=msgStore;
@@ -2006,14 +2066,17 @@ async function sendBroadcast(){
   const out=document.getElementById("msgSendMsg");
   if(!db){ out.innerHTML='<div class="err">'+(isCentrale?'Connexion centrale indisponible.':'Magasin non configuré.')+'</div>'; return; }
   if(!text){ out.innerHTML='<div class="err">Écris un message.</div>'; return; }
+  const signer=await msgResolveSigner();
+  if(!signer){ out.innerHTML='<div class="err">🔐 Tape ton code personnel pour signer le message (code inconnu ou manquant).</div>'; return; }
   const validUntil=endOfDayMs(dateIso)||0;
   const btn=document.getElementById("msgSendBtn"); btn.disabled=true; btn.textContent="Envoi…";
   try{
     const ref=db.ref("broadcasts").push();
-    const payload={ message:text, validUntil:validUntil, createdAt:firebase.database.ServerValue.TIMESTAMP, createdBy:ME_EMAIL };
+    const payload={ message:text+"\n\n— "+signer.ini, validUntil:validUntil, createdAt:firebase.database.ServerValue.TIMESTAMP, createdBy:ME_EMAIL, signedBy:signer.ini, signedName:signer.name };
     if(isCentrale) payload.target=target;
     await ref.set(payload);
     document.getElementById("msgText").value="";
+    { const mc=document.getElementById("msgCode"); if(mc) mc.value=""; MSG_SIGNER=null; const mw=document.getElementById("msgWho"); if(mw){ mw.style.color="#666"; mw.textContent="Le code n'est jamais affiché ni enregistré : seules tes initiales apparaissent au magasin."; } }
     const label=isCentrale?("entrepôt · "+(target==="dispatch"?"Dispatch & Picking":target==="decoupe"?"Découpe fromage":"tous")):((STORES.find(x=>x.code===code)||{}).label||code);
     out.innerHTML='<div class="ok">✓ Message envoyé à '+esc(label)+'.</div>';
   }catch(e){ out.innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
@@ -2154,11 +2217,12 @@ function queueNames(){
     Object.values(st.receptions||{}).forEach(r=>{ if(r.operatorCode&&!(r.operatorCode in names)) need.add(r.operatorCode); });
     Object.values(st.broadcasts||{}).forEach(b=>{ Object.keys(b.reads||{}).forEach(c=>{ if(!(c in names)) need.add(c); }); });
   });
+  Object.values(centraleState.broadcasts||{}).forEach(b=>{ Object.keys((b&&b.reads)||{}).forEach(c=>{ if(!(c in names)) need.add(c); }); });
   if(!need.size||pendingNames) return;
   pendingNames=true;
   fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:JSON.stringify({action:"resolve-names",idToken:ID_TOKEN,codes:Array.from(need)})})
-    .then(r=>r.json()).then(j=>{ if(j&&j.names) Object.assign(names,j.names); pendingNames=false; renderSuivi(); renderMsg(); })
+    .then(r=>r.json()).then(j=>{ need.forEach(c=>{ if(!(c in names)) names[c]=""; }); if(j&&j.names) Object.assign(names,j.names); pendingNames=false; renderSuivi(); renderMsg(); })
     .catch(()=>{ pendingNames=false; });
 }
 function activeCount(doc){ if(!doc||!doc.lines) return 0; return doc.lines.filter(l=>!l.nonLivre).length; }
@@ -2550,7 +2614,7 @@ function renderInventaire(){
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
         <div style="font-weight:800;font-size:15px">🍷 ${esc(v.meta.label||"Inventaire vin")}</div>
         <span class="badge" style="background:${st.c}22;color:${st.c}">${st.t}</span></div>
-      <div style="font-size:12px;color:#666;margin:2px 0 6px">${esc(dateShort(v.meta.startedAt))} ${esc(heure(v.meta.startedAt))} · ${esc(v.meta.createdBy||("Code "+(v.meta.operatorCode||"?")))}</div>
+      <div style="font-size:12px;color:#666;margin:2px 0 6px">${esc(dateShort(v.meta.startedAt))} ${esc(heure(v.meta.startedAt))} · ${esc(v.meta.createdBy||names[v.meta.operatorCode]||"—")}</div>
       <div style="display:flex;gap:14px;font-size:13px;flex-wrap:wrap">
         <span>📋 <b>${s.refs}</b> réf.</span><span>🍾 <b>${s.units}</b> bouteille(s)</span></div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -2615,10 +2679,10 @@ function renderCentrale(){
   const el=document.getElementById("tab-centrale"); if(!el) return;
   if(!dbCentrale){ el.innerHTML='<div class="muted">Connexion à la centrale indisponible.</div>'; return; }
   const sessions=centraleSessions();
-  const view=centraleView||"ecarts";
+  const view=(centraleView&&centraleView!=="ecarts")?centraleView:"histo";
   if(ACTIVE_TAB==="centrale") sideSync(view==="decoupe"?"decoupe":(view==="traca"?"traca":"centrale"));
   const bar=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-    <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='ecarts'?'#1a4d2e':'#eef2f7'};color:${view==='ecarts'?'#fff':'#333'}" onclick="centraleView='ecarts';renderCentrale()">⚠ Écarts</button>
+
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='histo'?'#1a4d2e':'#eef2f7'};color:${view==='histo'?'#fff':'#333'}" onclick="centraleView='histo';renderCentrale()">🚚 Historique dispatch</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='picking'?PICKING_COLOR:'#eef2f7'};color:${view==='picking'?'#fff':'#333'}" onclick="centraleView='picking';renderCentrale()">🛒 Historique picking</button>
     <button class="btn" style="padding:8px 14px;font-size:13px;background:${view==='decoupe'?'#8a5a00':'#eef2f7'};color:${view==='decoupe'?'#fff':'#333'}" onclick="centraleView='decoupe';renderCentrale()">🧀 Historique découpe</button>
@@ -2628,31 +2692,6 @@ function renderCentrale(){
   if(view==="decoupe"){ renderDecoupeHisto(el, bar); return; }
   if(view==="traca"){ renderTracaAdmin(el, bar); return; }
 
-  if(view==="ecarts"){
-    const withEc=sessions.map(s=>({s, ec:sessionEcarts(s)})).filter(x=>x.ec.length>0);
-    const open=withEc.filter(x=>!ecartsTraite(x.s.id)), done=withEc.filter(x=>ecartsTraite(x.s.id));
-    const card=(x)=>{ const s=x.s, traite=ecartsTraite(s.id);
-      const items=x.ec.map(e=>`<div style="font-size:12px;padding:3px 0;border-bottom:1px dashed #f0e0e0">
-        <b>${esc(e.designation||e.article||'?')}</b> ${e.storeLabel?('· '+esc(e.storeLabel)):''} : ${e.planned} → <b style="color:#c62828">${e.real}</b>
-        · ${esc(e.reason||'')}${e.reasonText?(' ('+esc(e.reasonText)+')'):''} <span class="badge ${e.fournisseur?'warn':'info'}">${e.fournisseur?'avoir fourn.':'interne'}</span></div>`).join("");
-      return `<div class="rec valid" style="border-color:${traite?'#4caf50':'#e53935'};border-width:2px">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
-          <div style="font-weight:800;font-size:15px">${esc(s.meta.supplier||'?')}</div>
-          <span class="badge ${traite?'ok':'warn'}">${traite?'✓ traité':(x.ec.length+' écart(s)')}</span></div>
-        <div style="font-size:12px;color:#666;margin:2px 0 6px">${esc(dateShort(s.meta.startedAt))} · dispatché par ${esc(s.meta.createdBy||'—')}</div>
-        <div>${items}</div>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" style="padding:8px 12px;font-size:13px" onclick="openCentraleDetail('${esc(s.id)}')">👁 Détail</button>
-          <button class="btn" style="background:#eef2f7;padding:8px 12px;font-size:13px" onclick="dlCentraleTxt('${esc(s.id)}')">⬇️ .txt</button>
-          ${traite?`<button class="btn" style="background:#fff3e0;color:#e65100;padding:8px 12px;font-size:13px" onclick="unmarkEcartsTraite('${esc(s.id)}')">↩︎ Rouvrir</button>`
-                  :`<button class="btn btn-green" style="padding:8px 12px;font-size:13px" onclick="markEcartsTraite('${esc(s.id)}')">✓ Marquer traité</button>`}
-        </div></div>`; };
-    el.innerHTML=bar+`<p class="muted" style="margin-top:0">Écarts de tous les dispatch (commande centrale vs dispatché en magasins). Action « traité » pour le suivi (non relié au Suivi des avoirs pour l'instant).</p>
-      ${open.length?('<div class="live-grid">'+open.map(card).join("")+'</div>'):'<div class="muted">Aucun écart en attente. 🎉</div>'}
-      ${done.length?('<h3 style="margin:18px 0 8px;font-size:15px;color:#2e7d32">✓ Traités ('+done.length+')</h3><div class="live-grid">'+done.map(card).join("")+'</div>'):''}`;
-    return;
-  }
-
   // Historique
   let list=sessions.slice();
   if(dpHistoSearch){ const q=norm(dpHistoSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)); }
@@ -2661,6 +2700,7 @@ function renderCentrale(){
   let pkList=Object.entries(centraleState.picking||{}).filter(([k,p])=>p&&p.meta).map(([k,p])=>Object.assign({id:k},p));
   if(dpHistoSearch){ const q=norm(dpHistoSearch); pkList=pkList.filter(p=>norm(p.meta.storeLabel).includes(q)||norm(p.meta.storeCode).includes(q)||norm(p.meta.orderNum).includes(q)||norm(p.meta.createdBy).includes(q)||norm("picking").includes(q)); }
   if(dpHistoDate){ pkList=pkList.filter(p=>isoDayKey(p.meta.startedAt)===dpHistoDate); }
+  if(dpEcartsOnly){ list=list.filter(s=>sessionEcarts(s).length>0); pkList=pkList.filter(p=>{ try{ return pickingStatsC(p).short>0; }catch(e){ return false; } }); }
   // v1.9.10 : historiques SÉPARÉS (dispatch / picking)
   const isPkView = view==="picking";
   if(isPkView) list=[]; else pkList=[];
@@ -2687,7 +2727,7 @@ function renderCentrale(){
   const groups={}; list.forEach(s=>{ const k=isoDayKey(s.meta.startedAt); (groups[k]=groups[k]||[]).push(s); });
   pkList.forEach(p=>{ p.__pk=true; const k=isoDayKey(p.meta.startedAt); (groups[k]=groups[k]||[]).push(p); });
   const allDays=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
-  const shownDays = dpHistoDate ? allDays.filter(k=>k===dpHistoDate) : allDays.filter(k=>k.slice(0,7)===curMonth);
+  const shownDays = dpHistoDate ? allDays.filter(k=>k===dpHistoDate) : (dpEcartsOnly ? allDays : allDays.filter(k=>k.slice(0,7)===curMonth));
   const olderCount = allDays.length - shownDays.length;
   const dayBlock=(k)=>{ const sess=groups[k].slice().sort((a,b)=>(b.meta.startedAt||0)-(a.meta.startedAt||0));
     const nEc=sess.reduce((n,s)=>n+(s.__pk?(pickingStatsC(s).short>0?1:0):(sessionEcarts(s).length>0?1:0)),0);
@@ -2705,9 +2745,10 @@ function renderCentrale(){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <input placeholder="${isPkView?'🔎 magasin, n° commande, préparateur…':'🔎 fournisseur, dispatcheur…'}" style="flex:1;min-width:180px" value="${esc(dpHistoSearch)}" oninput="dpHistoSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpHistoDate)}" onchange="dpHistoDate=this.value;renderCentrale()"/>
-      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpHistoDate='';dpHistoSearch='';renderCentrale()">✕</button>
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpHistoDate='';dpHistoSearch='';dpEcartsOnly=false;renderCentrale()">✕</button>
+      <button class="btn" style="padding:8px 12px;font-size:13px;font-weight:800;background:${dpEcartsOnly?'#c62828':'#fdecea'};color:${dpEcartsOnly?'#fff':'#c62828'}" onclick="dpEcartsOnly=!dpEcartsOnly;renderCentrale()" title="N'afficher que les ${isPkView?'picking':'dispatch'} avec écart(s) — tous les mois">⚠ Écarts seulement${dpEcartsOnly?' ✓':''}</button>
     </div>${olderNote}
-    ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucun '+(isPkView?'picking':'dispatch')+' '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>'}`;
+    ${shownDays.length?shownDays.map(dayBlock).join(""):(dpEcartsOnly?'<div class="muted">Aucun écart 🎉</div>':'<div class="muted">Aucun '+(isPkView?'picking':'dispatch')+' '+(dpHistoDate?'à cette date':'ce mois-ci')+'.</div>')}`;
 }
 function openCentraleDetail(sid){
   const s=(centraleState.dispatch||{})[sid]; if(!s) return; const sess=Object.assign({id:sid},s);
@@ -3542,6 +3583,7 @@ function renderDecoupeHisto(el, bar){
   let list=decoupeSessions();
   if(dpDecoupeSearch){ const q=norm(dpDecoupeSearch); list=list.filter(s=>norm(s.meta.supplier).includes(q)||norm(s.meta.createdBy).includes(q)||norm(s.meta.docNumber||"").includes(q)); }
   if(dpDecoupeDate){ list=list.filter(s=>{ const d=new Date(s.meta.startedAt||0); const iso=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); return iso===dpDecoupeDate; }); }
+  if(dpDecoupeEcarts){ list=list.filter(s=>{ try{ const a=decoupeAgg(s); const r=(a.rendPortions!=null?a.rendPortions:a.rend); return a.entity!=="ROB" && a.hasData && r<85; }catch(e){ return false; } }); }
   const card=(s)=>{ const a=decoupeAgg(s); const isRob=a.entity==="ROB"; const kg=a.robG>0?(Math.round(a.robG/1000*10)/10):0;
     const rShown=(a.rendPortions!=null?a.rendPortions:a.rend); const rendOk=rShown>=85;
     const metrics = isRob
@@ -3570,7 +3612,7 @@ function renderDecoupeHisto(el, bar){
   const todayIso=isoDayKey(Date.now()); const curMonth=todayIso.slice(0,7);
   const groups={}; list.forEach(s=>{ decoupeDaysC(s).forEach(k=>{ (groups[k]=groups[k]||[]).push(s); }); });
   const allDays=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
-  const shownDays = dpDecoupeDate ? allDays.filter(k=>k===dpDecoupeDate) : allDays.filter(k=>k.slice(0,7)===curMonth);
+  const shownDays = dpDecoupeDate ? allDays.filter(k=>k===dpDecoupeDate) : (dpDecoupeEcarts ? allDays : allDays.filter(k=>k.slice(0,7)===curMonth));
   const olderCount = allDays.length - shownDays.length;
   const dayBlock=(k)=>{ const sess=groups[k]; const ag=dayDecoupeAggC(sess, k);
     const rShown=(ag.rendPortions!=null?ag.rendPortions:0); const rendOk=rShown>=85;
@@ -3597,7 +3639,7 @@ function renderDecoupeHisto(el, bar){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
       <input placeholder="🔎 fournisseur, opérateur, n° BL…" style="flex:1;min-width:180px" value="${esc(dpDecoupeSearch)}" oninput="dpDecoupeSearch=this.value;renderCentrale()"/>
       <span><b>Date :</b></span><input type="date" value="${esc(dpDecoupeDate)}" onchange="dpDecoupeDate=this.value;renderCentrale()"/>
-      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpDecoupeDate='';dpDecoupeSearch='';renderCentrale()">✕</button>${emptyDecoupeSids().length?`<button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}
+      <button class="btn" style="background:#eef2f7;color:#333;padding:8px 12px;font-size:13px" onclick="dpDecoupeDate='';dpDecoupeSearch='';dpDecoupeEcarts=false;renderCentrale()">✕</button><button class="btn" style="padding:8px 12px;font-size:13px;font-weight:800;background:${dpDecoupeEcarts?'#c62828':'#fdecea'};color:${dpDecoupeEcarts?'#fff':'#c62828'}" onclick="dpDecoupeEcarts=!dpDecoupeEcarts;renderCentrale()" title="Découpes Kelbongoo avec rendement inférieur à 85 % — tous les mois">⚠ Écarts (rendement &lt; 85 %)${dpDecoupeEcarts?' ✓':''}</button>${emptyDecoupeSids().length?`<button class="btn" style="background:#fdecea;color:#c62828;padding:8px 12px;font-size:13px" onclick="purgeEmptyDecoupes()">🧹 Supprimer les découpes vides (${emptyDecoupeSids().length})</button>`:''}
     </div>${olderNote}
     ${shownDays.length?shownDays.map(dayBlock).join(""):'<div class="muted">Aucune découpe '+(dpDecoupeDate?'à cette date':'ce mois-ci')+'.</div>'}`;
 }
@@ -3734,7 +3776,7 @@ function dashTick(force){
   try{
     setCnt("g5", g5Todo().length); setCnt("avoirs", avoirsTodo().length, "a");
     setCnt("rungis", refusedOpen().length || enlPending().length, refusedOpen().length?"r":"");
-    setCnt("centrale", ecartsOpen().length, "a"); setCnt("appview", menageCandidates().length);
+    setCnt("centrale", (function(){ try{ const t=isoDayKey(Date.now()); return centraleSessions().filter(s=>isoDayKey(s.meta.startedAt)===t && sessionEcarts(s).length>0).length; }catch(e){ return 0; } })(), "a"); setCnt("appview", menageCandidates().length);
     const lb=document.getElementById("liveBadge"); if(lb){ const on=!!dbCentrale; lb.innerHTML=`<span class="ldot${on?"":" off"}"></span>${on?"Live · synchro "+hm(Date.now()):"Hors ligne"}`; }
   }catch(e){ console.error(e); }
   if(!force && Date.now()-__dashLast<3500) return; __dashLast=Date.now();
@@ -3765,7 +3807,7 @@ function todoItems(){
   const g5=g5Todo(); const old=g5.filter(r=>(Date.now()-(r.validatedAt||0))>DAY);
   if(g5.length) L.push({ pr:old.length?1:3, ic:"📥", bg:old.length?"var(--warn-s)":"var(--info-s)", col:old.length?"var(--warn)":"var(--info)", t:`${g5.length} réception(s) à saisir sur G5`, s:old.length?`dont ${old.length} depuis plus de 24 h`:"validées par les magasins", btn:`<button class="tbtn s" onclick="switchTab('g5')">Ouvrir</button>` });
   const av=avoirsTodo(); if(av.length) L.push({ pr:3, ic:"💶", bg:"var(--warn-s)", col:"var(--warn)", t:`${av.length} avoir(s) à réclamer`, s:[...new Set(av.map(r=>r.supplier||"?"))].slice(0,4).map(esc).join(" · "), btn:`<button class="tbtn s" onclick="switchTab('avoirs')">Ouvrir</button>` });
-  const ec=ecartsOpen(); if(ec.length) L.push({ pr:4, ic:"⚠", bg:"var(--info-s)", col:"var(--info)", t:`${ec.length} dispatch avec écarts à traiter`, s:ec.slice(0,3).map(s=>esc(s.meta.supplier||"?")).join(" · "), btn:`<button class="tbtn s" onclick="centraleView='ecarts';switchTab('centrale')">Voir</button>` });
+  const ec=[]; if(ec.length) L.push({ pr:4, ic:"⚠", bg:"var(--info-s)", col:"var(--info)", t:`${ec.length} dispatch avec écarts à traiter`, s:ec.slice(0,3).map(s=>esc(s.meta.supplier||"?")).join(" · "), btn:`<button class="tbtn s" onclick="centraleView='ecarts';switchTab('centrale')">Voir</button>` });
   const pk=pickingList().filter(p=>p.closed&&p.closed.partial&&isToday(p.closed.at)); pk.forEach(p=>L.push({ pr:5, ic:"🛒", bg:"var(--info-s)", col:"var(--pick)", t:`Picking ${STORE_SHORT[p.meta.storeCode]||p.meta.storeCode||""} clôturé partiellement`, s:`cde ${esc(p.meta.orderNum||"—")} · ${p.st.done}/${p.st.total} lignes`, btn:`<button class="tbtn s" onclick="centraleView='picking';switchTab('centrale')">Voir</button>` }));
   const mn=menageCandidates(); if(mn.length) L.push({ pr:6, ic:"🧹", bg:"#eef0ee", col:"#4a5547", t:`${mn.length} ancien(s) dispatch / picking encore visible(s) sur la tablette`, s:"traités ou abandonnés — à nettoyer", btn:`<button class="tbtn s" onclick="switchTab('appview')">Faire le ménage</button>` });
   return L.sort((a,b)=>a.pr-b.pr);
