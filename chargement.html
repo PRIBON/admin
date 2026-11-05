@@ -290,7 +290,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.8.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -941,6 +941,11 @@ function g5QtyColis(l, st){
       if(!code||qty==null||qty==="") return;
       out.push(code+"\t"+String(qty).replace(".",","));
     });
+    // v2.8.0 — Produits mis en RUPTURE au chargement : présents dans le .txt avec la quantité 0.
+    ((doc&&doc.lines)||[]).filter(l=>l.nonLivre && (l.rupture || /rupture/i.test(String(l.comment||"")))).forEach(l=>{
+      const code=l.code||(key==='article'?(l.article||l.ean||''):(l.ean||l.article||''));
+      if(code) out.push(code+"\t0");
+    });
     // Produits AJOUTÉS hors BL (reçus en plus) : présents dans la réception mais pas dans le document.
     Object.entries(rec.lines||{}).forEach(([lk,s])=>{
       if(usedKeys.has(lk) || !s || s.nonLivre || !s.status) return;
@@ -1075,7 +1080,7 @@ function mergeOrderAndBL(order, bl){
   };
 }
 /* v2.7.0 — RUPTURES FOURNISSEUR au chargement : produits commandés introuvables sur le BL.
-   Un clic « 🚫 Rupture » = ligne nonLivre (rien à pointer au magasin, pas d'écart, pas dans le .txt G5). */
+   Un clic « 🚫 Rupture » = ligne nonLivre (rien à pointer au magasin, pas d'écart) ; dans le .txt G5 avec la quantité 0 (v2.8.0). */
 const RUP_DOCS={}; let RUP_SEQ=0;
 function rupRid(p){ if(!p.__rid){ p.__rid="r"+(++RUP_SEQ); } RUP_DOCS[p.__rid]=p; return p.__rid; }
 function rupMissing(p){ return (p.lines||[]).map((l,i)=>({l,i})).filter(x=>!x.l.horsCommande && x.l.commandMatched===false && (Number(x.l.attendu)||0)>0); }
@@ -1870,12 +1875,13 @@ function renderG5(){
   }
   const html=STORES.map(s=>{
     const st=state[s.code]; if(!st) return '';
-    const recs=recsOf(s.code, r=>r.status==="validated" && !r.g5Validated).sort((a,b)=>(b.validatedAt||0)-(a.validatedAt||0));
+    const recs=recsOf(s.code, r=>r.status==="validated" && (!r.g5Validated || r.g5Stale)).sort((a,b)=>(b.validatedAt||0)-(a.validatedAt||0));
     if(!recs.length) return `<div class="store-card"><h3>${esc(s.label)}</h3><div class="muted">Rien à réceptionner sur G5.</div></div>`;
     const rows=recs.map(r=>{ const nm=names[r.operatorCode]||""; const ec=recEcartLines(r).length, av=recAvoirLines(r).length;
       return `<div class="rec valid" style="${ec?'border-color:#e53935;border-width:2px':''}">
         <div style="font-weight:800;font-size:14px">${esc(r.supplier||'?')} · ${esc(r.docNumber||'')}</div>
         <div style="font-size:12px;color:#666;margin-top:2px">Validée ${esc(heure(r.validatedAt))} · ${esc(dateShort(r.validatedAt))}${nm?(' · '+esc(nm)):''}</div>
+        ${r.modifCount?`<div style="margin-top:6px"><span class="badge" style="background:#fff3e0;color:#a33a00">✏️ modifiée à ${esc(heure(r.modifiedAt))} par ${esc(r.modifiedBy||'?')}</span>${r.g5Stale?' <span class="badge warn">déjà sur G5 → ressaisir la différence</span>':''}</div>`:''}
         ${ec?`<div style="margin-top:8px"><span class="badge warn">⚠ ${ec} écart(s)</span> ${av?`<span class="badge" style="background:#fdecea;color:#c62828">💶 ${av} en avoir</span>`:''}</div>`:''}
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
           ${ec?`<button class="btn" style="background:#e53935;color:#fff;padding:8px 12px;font-size:13px" onclick="openDetail('${s.code}','${r.id}')">⚠ Voir les écarts</button>`:''}
@@ -1899,8 +1905,18 @@ async function deleteRecG5(code,id){
 async function markG5(code,id){
   if(!confirm("Confirmer : cette réception a bien été saisie sur G5 ?\n\nElle passera dans « Réceptions archivées ».")) return;
   const db=dbByStore[code]; if(!db) return;
-  try{ await db.ref("receptions/"+id).update({ g5Validated:true, g5ValidatedAt:firebase.database.ServerValue.TIMESTAMP }); }
+  try{ await db.ref("receptions/"+id).update({ g5Validated:true, g5Stale:false, g5ValidatedAt:firebase.database.ServerValue.TIMESTAMP }); }
   catch(e){ alert("Erreur : "+e.message); }
+}
+/* v2.8.0 — Journal des modifications faites en magasin après clôture (heure exacte + initiales). */
+function modifsHtml(r){
+  const m=Object.values((r&&r.modifs)||{}).filter(Boolean).sort((a,b)=>(a.atLocal||a.at||0)-(b.atLocal||b.at||0));
+  if(!m.length) return '';
+  return `<div style="margin-top:12px;border:2px solid #e65100;border-radius:10px;padding:10px 12px;background:#fff8f0">
+    <b style="color:#a33a00">✏️ Modifiée après clôture — ${m.length} changement${m.length>1?'s':''}</b>${r.g5Stale?' <span class="badge warn">déjà sur G5 : ressaisir la différence</span>':''}
+    <div style="overflow:auto"><table style="margin-top:6px"><thead><tr><th>Heure</th><th>Qui</th><th>Produit</th><th>Avant</th><th>Après</th></tr></thead><tbody>
+    ${m.map(x=>`<tr><td>${esc(heure(x.at||x.atLocal))}</td><td><b>${esc(x.ini||'')}</b>${(x.op&&names[x.op])?(' · '+esc(names[x.op])):''}</td><td>${esc(x.designation||'')}</td><td>${esc(x.avant||'')}</td><td><b>${esc(x.apres||'')}</b></td></tr>`).join('')}
+    </tbody></table></div></div>`;
 }
 function openDetail(code,id){
   const st=state[code]; if(!st) return; const r=st.receptions[id]; if(!r) return;
@@ -1920,6 +1936,10 @@ function openDetail(code,id){
       const extra=s2.poids?(' · '+s2.poids+' kg'):'';
       return `<tr${bg}><td>${esc(codeVal)}</td><td>${esc(l.designation||'')}</td><td>${l.attendu}</td><td>${esc(stat)}</td><td>${apte}${esc(extra)}</td><td style="text-align:center">${ph}</td><td>${esc(s2.ecartText||'')}</td></tr>`;
     }).join("");
+    rows+=((doc&&doc.lines)||[]).filter(l=>l.nonLivre && (l.rupture || /rupture/i.test(String(l.comment||"")))).map(l=>{
+      const codeVal=(doc&&doc.g5Key==='code')?(l.code||l.ean||l.article||''):((doc&&doc.g5Key==='article')?(l.article||''):(l.ean||l.article||''));
+      return `<tr style="background:#eceff1"><td>${esc(codeVal)}</td><td>${esc(l.designation||'')}</td><td>${l.attendu}</td><td>🚫 rupture fournisseur</td><td>0</td><td></td><td></td></tr>`;
+    }).join("");
   } else {
     rows=Object.values(r.lines||{}).map(s2=>`<tr><td>${esc(s2.ean||s2.article||'')}</td><td>${esc(s2.designation||'')}</td><td>${s2.attendu}</td><td>${esc(s2.status||'')}</td><td>${s2.aptevente!=null?s2.aptevente:(s2.reel!=null?s2.reel:'')}</td><td style="text-align:center">${s2.photoUrl?('<a href="'+esc(s2.photoUrl)+'" target="_blank">📷</a>'):''}</td><td>${esc(s2.ecartText||'')}</td></tr>`).join("");
   }
@@ -1929,6 +1949,7 @@ function openDetail(code,id){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="margin:0;font-size:17px">${esc(r.supplier||'')} · ${esc(r.docNumber||'')}</h2><button class="btn" style="background:#eef2f7" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <div class="muted" style="margin:4px 0 10px">${esc((STORES.find(x=>x.code===code)||{}).label||code)} · validée ${esc(heure(r.validatedAt))} ${esc(dateShort(r.validatedAt))}</div>
     <div style="overflow:auto;max-height:52vh"><table><thead><tr><th>${codeHdr}</th><th>Désignation</th><th>Attendu</th><th>Statut / motif</th><th>Apte vente</th><th>📷</th><th>Remarque</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${modifsHtml(r)}
     ${photos?('<div style="margin-top:10px"><b>Photos :</b> '+photos+'</div>'):'<div class="muted" style="margin-top:8px">Aucune photo.</div>'}
     <button class="btn btn-green btn-lg" style="margin-top:14px" onclick="dlG5('${code}','${id}')">⬇️ Télécharger le .txt G5</button>
   </div>`;
@@ -1961,7 +1982,7 @@ function archivesListHTML(){
   const q=norm(archSearch); let total=0;
   const html=STORES.map(s=>{
     const st=state[s.code]; if(!st) return '';
-    let recs=recsOf(s.code, r=>r.status==="validated" && (r.g5Validated || (r.avoir&&r.avoir.status==='termine')));
+    let recs=recsOf(s.code, r=>r.status==="validated" && ((r.g5Validated && !r.g5Stale) || (r.avoir&&r.avoir.status==='termine')));
     if(q) recs=recs.filter(r=> norm(r.docNumber).includes(q) || norm(r.supplier).includes(q));
     recs.sort((a,b)=>((b.g5ValidatedAt||b.validatedAt||0)-(a.g5ValidatedAt||a.validatedAt||0)));
     total+=recs.length;
@@ -2214,7 +2235,8 @@ function saveFourns(){
 function queueNames(){
   const need=new Set();
   Object.values(state).forEach(st=>{
-    Object.values(st.receptions||{}).forEach(r=>{ if(r.operatorCode&&!(r.operatorCode in names)) need.add(r.operatorCode); });
+    Object.values(st.receptions||{}).forEach(r=>{ if(r.operatorCode&&!(r.operatorCode in names)) need.add(r.operatorCode);
+      Object.values((r&&r.modifs)||{}).forEach(x=>{ if(x&&x.op&&!(x.op in names)) need.add(x.op); }); });
     Object.values(st.broadcasts||{}).forEach(b=>{ Object.keys(b.reads||{}).forEach(c=>{ if(!(c in names)) need.add(c); }); });
   });
   Object.values(centraleState.broadcasts||{}).forEach(b=>{ Object.keys((b&&b.reads)||{}).forEach(c=>{ if(!(c in names)) need.add(c); }); });
@@ -3726,7 +3748,7 @@ function focusInside(id){ const el=document.getElementById(id), a=document.activ
 function arr(o){ return Array.isArray(o)?o:(o&&typeof o==="object"?Object.values(o):[]); }
 
 /* ----------------------------------------------------------------- données */
-function g5Todo(){ const out=[]; STORES.forEach(s=>{ if(!state[s.code]) return; recsOf(s.code, r=>r.status==="validated" && !r.g5Validated).forEach(r=>out.push(Object.assign({store:s.code},r))); }); return out; }
+function g5Todo(){ const out=[]; STORES.forEach(s=>{ if(!state[s.code]) return; recsOf(s.code, r=>r.status==="validated" && (!r.g5Validated || r.g5Stale)).forEach(r=>out.push(Object.assign({store:s.code},r))); }); return out; }
 function recsInProgress(){ const out=[]; STORES.forEach(s=>{ const st=state[s.code]; if(!st) return; Object.entries(st.receptions||{}).forEach(([id,r])=>{ if(r && r.status!=="validated" && (Date.now()-(r.createdAt||r.updatedAt||0))<DAY) out.push(Object.assign({id,store:s.code},r)); }); }); return out; }
 function avoirsTodo(){ const out=[]; STORES.forEach(s=>{ const st=state[s.code]; if(!st) return; Object.entries(st.receptions||{}).forEach(([id,r])=>{ if(recAvoirLines(r).length && recAvoirStatus(r)!=="termine") out.push(Object.assign({id,store:s.code},r)); }); }); return out; }
 const isArchived=(x)=>!!(x && (x.archived || (x.meta && x.meta.archived)));
