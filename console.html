@@ -292,7 +292,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.7";
+const APP_VERSION = "2.9.8";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4275,7 +4275,7 @@ function sapSuiviHTML(){
       ${kpi("À enlever chez Cruard",tot+" sapins",REAL.map(s=>{ let n=0; SAP_LINES.forEach(L=>{ n+=((recap[L.k]||{}).par||{})[s.k]||0; }); return n?esc(s.short)+" "+n:""; }).filter(Boolean).join(" · ")||"aucune commande")}
       ${kpi("Chauffeur",rc&&rc.done?"✅ "+esc(rc.by||""):"—",rc&&rc.done?"récupéré "+SAP_LINES.reduce((a,L)=>a+(((rc.lines||{})[L.k]||{}).pris!=null?Number(rc.lines[L.k].pris):((recap[L.k]||{}).tot||0)),0)+" · "+new Date(rc.at).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"pas encore récupéré")}
     </div>
-    <div class="cx" style="overflow:hidden;margin-bottom:14px"><div class="cx-h"><h3>🏪 Magasins</h3><span class="sp"></span><button class="tbtn s" onclick="sapView='test';renderSapins()">🧪 Faire un test A→Z</button></div>
+    <div class="cx" style="overflow:hidden;margin-bottom:14px"><div class="cx-h"><h3>🏪 Magasins</h3><span class="sp"></span>${rc||((S.livr||{})[d])?`<button class="tbtn s" style="color:var(--dan)" onclick="sapCancelRecup('${d}')">↩ Annuler la récupération chauffeur</button> `:""}<button class="tbtn s" onclick="sapView='test';renderSapins()">🧪 Faire un test A→Z</button></div>
       <table class="tb"><tr><th>Magasin</th><th>Commande</th><th style="text-align:center">Sapins</th><th style="text-align:center">Livré (chauffeur)</th><th>Réception</th><th>BL-facture</th><th></th></tr>${rowsCmd}</table></div>
     <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>🌲 À enlever chez Cruard (étiquettes)</h3><span class="sp"></span><span class="sub">« 1er choix » = Morvan · « Extra » = Jutland</span></div>
       <table class="tb"><tr><th>Étiquette</th><th>Gamme Cruard</th><th style="text-align:center">Total</th>${REAL.map(s=>`<th style="text-align:center">${esc(s.short)}</th>`).join("")}<th style="text-align:center">Récupéré</th></tr>${rowsL}</table></div>`;
@@ -4386,6 +4386,12 @@ function sapManualCmd(d, sk){
     try{ await dbCentrale.ref("sapins/cmd/"+d+"/"+sk).set({ reel, by:sapWho(), at:Date.now(), master:true, src:"console" }); await dbCentrale.ref("sapins/cmd_hist/"+d+"/"+sk).push({ reel, by:sapWho(), at:Date.now(), src:"console" }); m.remove(); toastC("✅ Commande "+st.short+" : "+sapSum(reel)+" sapins"); }catch(e){ alert(e.message); } };
   const del=m.querySelector("#sapMcDel"); if(del) del.onclick=async()=>{ if(!confirm("Supprimer cette commande ? La prévision repartira par défaut.")) return; await dbCentrale.ref("sapins/cmd/"+d+"/"+sk).remove(); m.remove(); toastC("Revenu à la prévision"); };
 }
+/* Master : annule la récupération (et les livraisons) du chauffeur pour une date — ex. validée par erreur */
+async function sapCancelRecup(d){
+  const S=sapS(), nRec=Object.keys(((S.recep||{})[d])||{}).length;
+  if(!confirm("Annuler la récupération chauffeur du "+sapDayFr(d,true)+" ?\n\nLe chauffeur devra tout refaire (récupéré, livraisons)."+(nRec?"\n⚠️ "+nRec+" réception(s) magasin déjà faite(s) : elles sont gardées.":""))) return;
+  try{ const prev=(S.recup||{})[d]||null; if(prev) await dbCentrale.ref("sapins/recup_hist/"+d).push(Object.assign({},prev,{cancelledAt:Date.now(),cancelledBy:sapWho()}));
+    await dbCentrale.ref("sapins/recup/"+d).remove(); await dbCentrale.ref("sapins/livr/"+d).remove(); toastC("↩ Récupération du "+sapDayFr(d)+" annulée"); }catch(e){ alert(e.message); } }
 function sapCfg(path, v){ dbCentrale.ref("sapins/config/"+path).set(v).then(()=>toastC("✅ Enregistré")).catch(e=>alert(e.message)); }
 function sapPrix(k, f, v){ const n=v===""?null:Math.round(Number(String(v).replace(",","."))*100)/100; sapCfg("prix/"+k+"/"+f, n); }
 function sapToggleDate(d, on){ dbCentrale.ref("sapins/config/recups/"+d).set({ on:!!on, by:sapWho(), at:Date.now() }).then(()=>toastC(on?"✅ Récupération cochée":"Récupération retirée")); }
