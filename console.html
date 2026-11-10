@@ -292,7 +292,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.6";
+const APP_VERSION = "2.9.7";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4154,6 +4154,8 @@ function sapRecap(n1, config, date, cmds, receps){
   });
   return out;
 }
+/* URL /exec « publique » : enlève le préfixe de domaine Workspace (/a/probon.fr/) qui force une connexion Google. */
+function sapExecUrl(u){ return String(u||"").trim().replace(/script\.google\.com\/a\/(?:macros\/)?[^\/]+\/(?:macros\/)?s\//, "script.google.com/macros/s/"); }
 /* Quantités qui partent pour un magasin : commande validée (ou saisie console) sinon la prévision. { L:n } */
 function sapEffLines(n1, config, d, sk, cmds, receps){
   var c = ((cmds||{})[d]||{})[sk], out = {};
@@ -4216,8 +4218,8 @@ var SAP_CITATIONS = [
 
 let sapView="suivi", sapDate="";
 function sapS(){ return centraleState.sapins||{}; }
-function sapUrl(){ return ((sapS().meta)||{}).url||""; }
-async function sapPost(body){ const u=sapUrl(); if(!u) throw new Error("URL du serveur Sapins non renseignée (onglet Réglages)."); const r=await fetch(u,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)}); return await r.json(); }
+function sapUrl(){ return sapExecUrl(((sapS().meta)||{}).url||""); }
+async function sapPost(body){ const u=sapUrl(); if(!u) throw new Error("URL du serveur Sapins non renseignée (onglet Réglages)."); let r; try{ r=await fetch(u,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)}); }catch(e){ throw new Error("Serveur Sapins injoignable. Dans script.google.com › Déployer › Gérer les déploiements, l'accès doit être « Tout le monde »."); } try{ return await r.json(); }catch(e){ throw new Error("Serveur Sapins injoignable. Dans script.google.com › Déployer › Gérer les déploiements, l'accès doit être « Tout le monde »."); } }
 function sapWho(){ return RESP_NAMES[String(ME_EMAIL||"").toLowerCase()]||ME_EMAIL||"Console"; }
 function sapChipH(k){ const L=sapLine(k); if(!L) return ""; return `<span style="display:inline-block;background:${L.hex};color:${L.ink};${L.c==="blanc"?"border:1.5px solid #999;":""}border-radius:7px;padding:2px 8px;font-weight:800;font-size:11.5px;white-space:nowrap">${L.t} ${L.c.toUpperCase()}</span>`; }
 function sapStoreH(k){ const s=sapStore(k); return `<span style="display:inline-block;background:${s.color};color:#fff;border-radius:7px;padding:2px 9px;font-weight:800;font-size:12px">${esc(s.short)}</span>`; }
