@@ -292,7 +292,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.4";
+const APP_VERSION = "2.9.6";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4044,9 +4044,9 @@ var SAP_STORES = [
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] },
   { k:"TOL", label:"PRIBON TOLBIAC", short:"Tolbiac", col:"TOLBIAC", cols:["tolbiac","pribon tolbiac","tol"], mail:"tolbiac@pribon.org", color:"#0A84FF",
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] },
-  { k:"BIC", label:"PRIBON BICHAT", short:"Bichat", col:"BICHAT", cols:["bichat","pribon bichat","bic"], mail:"bichat@pribon.org", color:"#FF1F8E",
+  { k:"BIC", consoleCmd:true, label:"PRIBON BICHAT", short:"Bichat", col:"BICHAT", cols:["bichat","pribon bichat","bic"], mail:"bichat@pribon.org", color:"#FF1F8E",
     lines:["M80","M100","M125","M150","M175","M200"], noProp:true }, // Morvan uniquement, PAS de proposition (pas d'historique)
-  { k:"KBG", label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.fr", color:"#7C3AED",
+  { k:"KBG", masterCmd:true, label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.fr", color:"#7C3AED",
     lines:["M80","M100","M125","M150"] },                          // Morvan uniquement, sans remplacement
   // 🧪 Magasin TEST : n'existe que sur les journées de test (Console › 🎄 Sapins › 🧪 Test). Tous les mails → hg@ + rr@.
   { k:"TST", label:"🧪 MAGASIN TEST", short:"Test", col:"TEST", cols:["test"], mail:"hg@probon.fr,rr@pribon.org", color:"#455A64", test:true,
@@ -4149,10 +4149,17 @@ function sapRecap(n1, config, date, cmds, receps){
   SAP_LINES.forEach(function(L){ out[L.k] = { tot:0, par:{} }; });
   sapStoresFor(config, date).forEach(function(s){
     var c = ((cmds||{})[date]||{})[s.k]; var p = sapPlan(n1, config, date, s.k, cmds, receps); if (!p) return;
-    var validated = !!(c && c.at);   // pas de commande validée = 0 sapin
-    p.lines.forEach(function(o){ var q = validated ? (o.reel!=null?o.reel:0) : 0; if (q>0){ out[o.k].tot += q; out[o.k].par[s.k] = q; } });
+    var validated = !!(c && c.at);   // pas de commande validée = la PRÉVISION part (Bichat : 0, commande saisie dans la console)
+    p.lines.forEach(function(o){ var q = validated ? (o.reel!=null?o.reel:0) : (o.theo||0); if (q>0){ out[o.k].tot += q; out[o.k].par[s.k] = q; } });
   });
   return out;
+}
+/* Quantités qui partent pour un magasin : commande validée (ou saisie console) sinon la prévision. { L:n } */
+function sapEffLines(n1, config, d, sk, cmds, receps){
+  var c = ((cmds||{})[d]||{})[sk], out = {};
+  if (c && c.at){ Object.keys(c.reel||{}).forEach(function(k){ var n = sapNum(c.reel[k]); if (n) out[k] = n; }); return out; }
+  var p = sapPlan(n1, config, d, sk, cmds, receps); if (!p) return out;
+  p.lines.forEach(function(o){ if (o.theo) out[o.k] = o.theo; }); return out;
 }
 /* Ce que le magasin doit recevoir : la livraison validée par le chauffeur (sapins/livr), sinon la répartition prévue (recup.dispatch). */
 function sapAttendu(recups, livrs, d, sk){ var l = ((livrs||{})[d]||{})[sk]; if (l && l.lines) return l.lines; var rc = (recups||{})[d]; return (rc && rc.dispatch) ? (rc.dispatch[sk] || {}) : null; }
@@ -4246,11 +4253,11 @@ function sapSuiviHTML(){
   // commandes par magasin
   const REAL=sapStoresFor(cfg,d);
   const rowsCmd=REAL.map(s=>{ const c=(cmds[d]||{})[s.k]||null, p=sapPlan(n1,cfg,d,s.k,cmds,receps); const theo=p.lines.reduce((a,o)=>a+o.theo,0);
-    const q=c&&c.at?p.lines.reduce((a,o)=>a+(o.reel!=null?o.reel:0),0):0, r=(receps[d]||{})[s.k]||null, lv=((S.livr||{})[d]||{})[s.k]||null, dp=lv&&lv.lines?sapSum(lv.lines):(rc&&rc.dispatch?sapSum(rc.dispatch[s.k]):null), b=((S.bl||{})[d]||{})[s.k]||null;
-    const st=!(c&&c.at)?`<span class="pill" style="background:#fff3e0;color:#e65100">⏳ pas commandé = 0</span>`:`<span class="pill pg">✅ ${esc(c.by||"")}${c.master?" (master)":""}</span>`;
+    const q=sapSum(sapEffLines(n1,cfg,d,s.k,cmds,receps)), r=(receps[d]||{})[s.k]||null, lv=((S.livr||{})[d]||{})[s.k]||null, dp=lv&&lv.lines?sapSum(lv.lines):(rc&&rc.dispatch?sapSum(rc.dispatch[s.k]):null), b=((S.bl||{})[d]||{})[s.k]||null;
+    const st=!(c&&c.at)?(s.consoleCmd?`<span class="pill" style="background:#fff3e0;color:#e65100">✏️ à saisir ici</span>`:`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision (part seule)</span>`):c.auto?`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision figée</span>`:`<span class="pill pg">✅ ${esc(c.src==="console"?"console · ":"")}${esc(c.by||"")}${c.master?" (master)":""}</span>`;
     const rec=!r?(dp?`<span class="pill" style="background:#fff3e0;color:#e65100">📦 à réceptionner (magasin)</span>`:"—"):`<span class="pill ${r.coherent===false?"":"pg"}" style="${r.coherent===false?"background:#fdecea;color:#c62828":""}">${r.coherent===false?"⚠️":"✅"} ${sapSum(r.lines)} reçus</span><div class="t2">${esc(r.by||"")}${r.chauffeur?" · chauffeur "+esc(r.chauffeur):""}${r.note?" · « "+esc(r.note)+" »":""}</div>`;
     return `<tr><td>${sapStoreH(s.k)}</td><td>${st}${c&&c.at?`<div class="t2">${new Date(c.at).toLocaleString("fr-FR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>`:""}</td><td style="text-align:center"><b style="font-size:16px">${q||"—"}</b><div class="t2">${s.noProp?"sans proposition":"proposition "+theo}</div></td><td style="text-align:center">${dp==null?"—":`<b>${dp}</b>`}<div class="t2">${lv?("déposé "+esc(lv.by||"")+(lv.ecart?" ⚠️ ≠ prévu"+(lv.confirmedBy?" (code "+esc(lv.confirmedBy)+")":""):"")):(dp==null?"":"prévu")}</div></td><td>${rec}</td><td>${b?(b.error?`<span style="color:var(--dan)">⚠️ ${esc(b.error)}</span>`:`<a href="${esc(b.url||"#")}" target="_blank">${esc(b.num)}</a> · ${sapEur(b.ttc)}${b.paid?` <span class="pill pg">payé</span>`:""}`):"—"}</td>
-      <td><button class="tbtn s" onclick="sapDetail('${d}','${s.k}')">Détail</button></td></tr>`; }).join("");
+      <td style="white-space:nowrap"><button class="tbtn s ${s.consoleCmd?"p":""}" onclick="sapManualCmd('${d}','${s.k}')">✏️ Commande</button> <button class="tbtn s" onclick="sapDetail('${d}','${s.k}')">Détail</button></td></tr>`; }).join("");
   // Cruard : par ligne
   const rowsL=SAP_LINES.map(L=>{ const r=recap[L.k]||{tot:0,par:{}}, l=(rc&&rc.lines||{})[L.k]||{}; if(!r.tot && l.pris==null && L.resa) return "";
     const pris=l.pris!=null?Number(l.pris):null;
@@ -4262,7 +4269,7 @@ function sapSuiviHTML(){
       <input type="date" id="sapAddD" style="padding:5px;border:1px solid var(--line);border-radius:8px"><button class="tbtn s" onclick="sapAddDate()">+ Ajouter un jour</button></div><div style="margin-top:6px">${pick}</div></div>
     <div class="fr-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       ${kpi("Récupération",esc(sapDayFr(d,true)),`couvre du ${esc(sapDayFr(per.du))} au ${esc(sapDayFr(per.au))} · ventes 2025 du ${esc(sapDayFr(ref.du))} au ${esc(sapDayFr(ref.au))}`)}
-      ${kpi("Commandes",left>0?"⏰ "+sapFmtLeft(left):"🔒 figées",left>0?"jusqu'au "+esc(sapDayFr(sapAddDays(d,-1)))+" minuit · pas validé = 0":"mail Rungis "+(((S.mails||{})["rungis_"+d])?"envoyé "+new Date(S.mails["rungis_"+d]).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"le jour J à 2h"))}
+      ${kpi("Commandes",left>0?"⏰ "+sapFmtLeft(left):"🔒 figées",left>0?"jusqu'au "+esc(sapDayFr(sapAddDays(d,-1)))+" minuit · sinon la prévision part":"mail Rungis "+(((S.mails||{})["rungis_"+d])?"envoyé "+new Date(S.mails["rungis_"+d]).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"le jour J à 2h"))}
       ${kpi("À enlever chez Cruard",tot+" sapins",REAL.map(s=>{ let n=0; SAP_LINES.forEach(L=>{ n+=((recap[L.k]||{}).par||{})[s.k]||0; }); return n?esc(s.short)+" "+n:""; }).filter(Boolean).join(" · ")||"aucune commande")}
       ${kpi("Chauffeur",rc&&rc.done?"✅ "+esc(rc.by||""):"—",rc&&rc.done?"récupéré "+SAP_LINES.reduce((a,L)=>a+(((rc.lines||{})[L.k]||{}).pris!=null?Number(rc.lines[L.k].pris):((recap[L.k]||{}).tot||0)),0)+" · "+new Date(rc.at).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"pas encore récupéré")}
     </div>
@@ -4278,14 +4285,14 @@ function sapDetail(d, sk){
   m.onclick=e=>{ if(e.target===m) m.remove(); };
   m.innerHTML=`<div class="cx" style="max-width:860px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3>${sapStoreH(sk)} · récup du ${esc(sapDayFr(d,true))}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <table class="tb"><tr><th>Ligne</th><th>Ventes 2025</th><th>Besoin</th><th>Inventaire</th><th>Proposition</th><th>Commande</th><th>Livré</th><th>Reçu</th></tr>${rows}</table>
-    <div style="padding:10px 16px" class="t2">Mini de présentation : ${p.mini} · coef ${p.coef}${sk==="BIC"?" · Bichat : pas de proposition, commande saisie par le magasin":""}</div>
+    <div style="padding:10px 16px" class="t2">Mini de présentation : ${p.mini} · coef ${p.coef}${sk==="BIC"?" · Bichat : pas de proposition, commande saisie dans la console (✏️ Commande)":""}</div>
     ${r.at&&r.coherent===false&&!r.vu?`<div style="padding:0 16px 14px"><button class="tbtn s p" onclick="dbCentrale.ref('sapins/recep/${d}/${sk}/vu').set({at:Date.now(),by:sapWho()}).then(()=>{this.closest('.modal-back').remove();toastC('Écart vu');})">✓ Écart vu / traité</button></div>`:""}</div>`;
   document.body.appendChild(m);
 }
 function sapSaisonHTML(){
   const S=sapS(), cfg=S.config||{}, act=sapDates();
   const cards=SAP_STORES.filter(s=>!s.test).map(s=>{ let cmd=0, recu=0, ttc=0, paye=0, ecarts=0, nb=0;
-    const rows=act.map(d=>{ const c=((S.cmd||{})[d]||{})[s.k], r=((S.recep||{})[d]||{})[s.k], b=((S.bl||{})[d]||{})[s.k]; const q=c&&c.at?sapSum(c.reel):0; if(!q&&!r) return "";
+    const rows=act.map(d=>{ const c=((S.cmd||{})[d]||{})[s.k], r=((S.recep||{})[d]||{})[s.k], b=((S.bl||{})[d]||{})[s.k]; const q=sapSum(sapEffLines(S.n1,cfg,d,s.k,S.cmd||{},S.recep||{})); if(!q&&!r) return "";
       cmd+=q; if(r){ recu+=sapSum(r.lines); if(r.coherent===false) ecarts++; } if(b&&!b.error){ ttc+=Number(b.ttc)||0; if(b.paid) paye+=Number(b.ttc)||0; nb++; }
       return `<tr><td>${esc(sapDayFr(d))}</td><td style="text-align:center">${q||"—"}</td><td style="text-align:center">${r?sapSum(r.lines)+(r.coherent===false?" ⚠️":""):"—"}</td><td>${b&&!b.error?`<a href="${esc(b.url||"#")}" target="_blank">${esc(b.num)}</a>`:(b&&b.error?"⚠️ prix":"—")}</td><td style="text-align:right">${b&&!b.error?sapEur(b.ttc):""}</td>
         <td>${b&&b.error?`<button class="tbtn s" onclick="sapPost({action:'sapin-bl',date:'${d}',store:'${s.k}'}).then(j=>toastC(j.ok?'📄 BL envoyé':'⚠️ '+(j.error||''))).catch(e=>alert(e.message))">Renvoyer</button>`:""}${b&&!b.error?(b.paid?`<span class="pill pg">✅ payé</span> <button class="tbtn s" title="Annuler" onclick="sapPaid('${d}','${s.k}',false)">↩</button>`:`<button class="tbtn s p" onclick="sapPaid('${d}','${s.k}',true)">Marquer payé</button>`):""}</td></tr>`; }).join("");
@@ -4317,7 +4324,7 @@ function sapReglagesHTML(){
       <button class="tbtn s" onclick="sapPost({action:'sapin-test',kind:'rappel'}).then(j=>toastC(j.ok?'🧪 Rappel test envoyé à hg@':'Erreur '+j.error)).catch(e=>alert(e.message))">🧪 Rappel 48 h test</button></div>
     <div class="cx" style="padding:14px 16px;line-height:2"><b>✉️ Adresses des magasins</b> (rappel 48 h, réception manquante, BL-facture)<br>
       ${SAP_STORES.filter(s=>!s.test).map(s=>`${sapStoreH(s.k)} ${inp("sapM"+s.k, mails[s.k]!=null?mails[s.k]:s.mail, "", `sapCfg('mails/${s.k}',this.value.trim())`,260)}`).join("<br>")}</div>
-    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Bichat : pas de proposition, le magasin saisit sa commande. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
+    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Par défaut, c'est la <b>prévision</b> qui part (le magasin peut la modifier et valider jusqu'à la veille minuit). <b>Bichat</b> : commande saisie ici (✏️ Commande dans « Récup &amp; suivi »). <b>Kelbongoo</b> : seul le master modifie. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
   </div>`;
 }
 /* ---------- 🧪 TEST A → Z : journée fictive, MAGASIN TEST seul, tous les mails à hg@ + rr@ ---------- */
@@ -4349,7 +4356,7 @@ function sapTestHTML(){
   const step=(n,titre,expl,etat,action)=>`<tr><td style="font-size:22px;font-weight:900;text-align:center;width:44px">${n}</td><td><b>${titre}</b><div class="t2" style="line-height:1.5">${expl}</div></td><td>${etat}</td><td style="text-align:right;white-space:nowrap">${action||""}</td></tr>`;
   const rows=[
     step(1,"Rappel 48 h au magasin","Le mail que les magasins reçoivent 2 jours avant.", mails["rappel_"+d]?ok("envoyé"):wait("—"), btn("rappel","Envoyer le rappel")),
-    step(2,"Commande du magasin","<b>La Centrale</b> → 🎄 Sapins → <b>Connexion master (Google)</b> → bouton <b>Test</b> → Commande → <b>Valider la commande</b>.", c&&c.at?ok(sapSum(c.reel)+" sapins · "+esc(c.by||"")):wait("pas commandé = 0"), ""),
+    step(2,"Commande du magasin test","Sans rien faire, la <b>prévision</b> part. Pour mettre tes propres quantités : <b>✏️ Saisir les quantités</b> (ou La Centrale → master → <b>Test</b> → Commande).", c&&c.at?ok(sapSum(c.reel)+" sapins · "+esc(c.by||"")):`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision ${sapSum(sapEffLines(S.n1,cfg,d,"TST",S.cmd||{},S.recep||{}))}</span>`, `<button class="tbtn s p" onclick="sapManualCmd('${d}','TST')">✏️ Saisir les quantités</button>`),
     step(3,"Minuit + mail Rungis de 2 h","Fige la commande et envoie tout de suite le mail « SAPINS À RÉCUPÉRER CHEZ CRUARD ».", mails["rungis_"+d]?ok("envoyé "+new Date(mails["rungis_"+d]).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})):wait("—"), btn("rungis","Figer + envoyer",true)),
     step(4,"Chauffeur chez Cruard","Appli <b>Kelbongoo</b> → 🎄 Sapins (🧪) → saisir ce qui est pris → <b>Récupération terminée</b>.", rc&&rc.done?ok("récupéré par "+esc(rc.by||"")):wait("—"), ""),
     step("4b","Chauffeur au magasin","Kelbongoo → <b>À livrer</b> → choisir <b>Test</b> → compteurs → <b>Valider la livraison</b>. Change un nombre pour voir la popup + code chauffeur.", lvT&&lvT.at?(lvT.ecart?`<span class="pill" style="background:#fdecea;color:#c62828">⚠️ ≠ prévu · ${esc(lvT.confirmedBy||"")}</span>`:ok(sapSum(lvT.lines)+" déposés")):wait("—"), ""),
@@ -4360,6 +4367,22 @@ function sapTestHTML(){
   return head+`${sansPrix.length?`<div class="cx" style="padding:10px 16px;margin-bottom:14px;border-left:4px solid var(--dan)">⚠️ Prix de vente manquant pour ${sansPrix.map(k=>sapChipH(k)+" "+esc(sapLine(k).o)).join(" · ")} → le BL-facture sera bloqué. À remplir dans <a href="#" onclick="sapView='prix';renderSapins();return false">💶 Prix & factures</a>.</div>`:""}
     <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>🧪 Journée de test du ${esc(sapDayFr(d,true))}</h3><span class="sp"></span>${btn("reset","↺ Tout remettre à zéro")} <button class="tbtn s" onclick="sapTestDelete('${d}')">🗑 Supprimer</button></div>
       <table class="tb">${rows}</table></div>`;
+}
+/* ✏️ Commande saisie dans la console (Bichat, magasin test, ou correction master) */
+function sapManualCmd(d, sk){
+  const S=sapS(), cfg=S.config||{}, st=sapStore(sk), c=((S.cmd||{})[d]||{})[sk]||{}, eff=sapEffLines(S.n1,cfg,d,sk,S.cmd||{},S.recep||{});
+  const locked=sapLocked(cfg,S.cmd||{},d,Date.now());
+  const rows=st.lines.filter(k=>!sapLine(k).resa).map(k=>`<tr><td>${sapChipH(k)} ${esc(sapLine(k).o==="MORVAN"?"Morvan":"Jutland")}</td><td><input type="number" min="0" step="1" data-k="${k}" value="${eff[k]||0}" style="width:80px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:15px"></td></tr>`).join("");
+  const m=document.createElement("div"); m.className="modal-back"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
+  m.onclick=e=>{ if(e.target===m) m.remove(); };
+  m.innerHTML=`<div class="cx" style="max-width:480px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3>✏️ ${sapStoreH(sk)} · récup du ${esc(sapDayFr(d,true))}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    ${locked&&!sapIsTest(cfg,d)?`<div style="padding:8px 16px;color:var(--dan);font-weight:700">⚠️ Commande déjà figée (mail Rungis peut-être parti).</div>`:""}
+    <table class="tb">${rows}</table>
+    <div style="padding:12px 16px;display:flex;gap:8px"><button class="tbtn p" id="sapMcOk">💾 Enregistrer la commande</button>${c.at&&!c.auto?`<button class="tbtn s" id="sapMcDel">Revenir à la prévision</button>`:""}</div></div>`;
+  document.body.appendChild(m);
+  m.querySelector("#sapMcOk").onclick=async()=>{ const reel={}; m.querySelectorAll("input[data-k]").forEach(i=>{ const n=Math.max(0,Math.round(Number(i.value)||0)); reel[i.dataset.k]=n; });
+    try{ await dbCentrale.ref("sapins/cmd/"+d+"/"+sk).set({ reel, by:sapWho(), at:Date.now(), master:true, src:"console" }); await dbCentrale.ref("sapins/cmd_hist/"+d+"/"+sk).push({ reel, by:sapWho(), at:Date.now(), src:"console" }); m.remove(); toastC("✅ Commande "+st.short+" : "+sapSum(reel)+" sapins"); }catch(e){ alert(e.message); } };
+  const del=m.querySelector("#sapMcDel"); if(del) del.onclick=async()=>{ if(!confirm("Supprimer cette commande ? La prévision repartira par défaut.")) return; await dbCentrale.ref("sapins/cmd/"+d+"/"+sk).remove(); m.remove(); toastC("Revenu à la prévision"); };
 }
 function sapCfg(path, v){ dbCentrale.ref("sapins/config/"+path).set(v).then(()=>toastC("✅ Enregistré")).catch(e=>alert(e.message)); }
 function sapPrix(k, f, v){ const n=v===""?null:Math.round(Number(String(v).replace(",","."))*100)/100; sapCfg("prix/"+k+"/"+f, n); }
