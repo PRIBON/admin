@@ -292,7 +292,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.1";
+const APP_VERSION = "2.9.2";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -1824,8 +1824,8 @@ function renderMulti(){
           <input id="morder_${s.code}" type="file" accept=".xlsx,.xls" style="display:none" onchange="onMultiOrder('${s.code}',this.files[0])"/>
         </div>
         <div class="field"><label>2️⃣ Bon de livraison (BL)</label>
-          <div class="drop ${st.blFile?'has':''}" onclick="document.getElementById('mbl_${s.code}').click()">${st.blFile?'✓ '+esc(st.blFile.name):'📄 Charger le BL (.csv / .txt / .pdf)'}</div>
-          <input id="mbl_${s.code}" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onMultiBL('${s.code}',this.files[0])"/>
+          <div class="drop ${st.blFile?'has':''}" onclick="document.getElementById('mbl_${s.code}').click()">${st.blFile?'✓ '+esc(st.blFile.name):'📄 Charger le BL (.pdf / .xlsx / .csv / .txt)'}</div>
+          <input id="mbl_${s.code}" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onMultiBL('${s.code}',this.files[0])"/>
         </div>
         <div class="field"><label>Fournisseur</label><input style="width:100%" value="${esc(st.supplier||'')}" oninput="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{supplier:this.value})" placeholder="Déduit de la commande / BL…"/></div>
         <div class="field"><label>Livraison prévue</label><input type="date" style="width:100%" value="${esc(st.deliveryDate||'')}" onchange="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{deliveryDate:this.value})"/></div>
@@ -1889,7 +1889,7 @@ function renderSimple(){
     <h2 style="margin-top:0">Charger BL + bon de commande</h2>
     <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5 <b>ou Agidra</b>, quantité commandée, conditionnement).<br><b>2.</b> BL = livraison / n° BL — <b>optionnel</b> (ex. Agidra : la facture arrive après → charge la commande seule).<br><b>3.</b> Avec BL : rapprochement automatique. Sans BL : la commande sert de document à pointer.</p>
     <div class="field"><label>1️⃣ Bon de commande</label><div class="drop" id="sorderDrop" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
-    <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div class="drop" id="sblDrop" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.csv / .txt / .pdf)</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
+    <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div class="drop" id="sblDrop" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.pdf / .xlsx / .csv / .txt)</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
     <div id="snote" style="margin-top:10px"></div>
     <div class="field" style="margin-top:12px"><label>Magasin</label><select id="sstore" style="width:100%">${opts}</select></div>
     <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Déduit de la commande / BL…"/></div>
