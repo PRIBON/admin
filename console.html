@@ -292,7 +292,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.8";
+const APP_VERSION = "2.9.9";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4156,6 +4156,52 @@ function sapRecap(n1, config, date, cmds, receps){
 }
 /* URL /exec « publique » : enlève le préfixe de domaine Workspace (/a/probon.fr/) qui force une connexion Google. */
 function sapExecUrl(u){ return String(u||"").trim().replace(/script\.google\.com\/a\/(?:macros\/)?[^\/]+\/(?:macros\/)?s\//, "script.google.com/macros/s/"); }
+/* ---------- Calendrier des récupérations (Console + appli Rungis) ---------- */
+// Mois à afficher : du mois de la 1re récup au mois de la fin de saison. cells = null (case vide) ou "AAAA-MM-JJ" ; semaine qui commence le lundi.
+function sapCalMonths(n1, config){
+  var all = sapActiveDates(n1, config, "").concat(((n1&&n1.calendar)||[]).map(function(c){ return c.date; })).sort();
+  var a = all[0] || sapToday(), b = (n1 && n1.finSaison) || all[all.length-1] || a, out = [];
+  var y = +a.slice(0,4), m = +a.slice(5,7) - 1, yb = +b.slice(0,4), mb = +b.slice(5,7) - 1;
+  while (y < yb || (y === yb && m <= mb)){
+    var first = new Date(y, m, 1), n = new Date(y, m+1, 0).getDate(), off = (first.getDay()+6)%7, cells = [];
+    for (var i=0;i<off;i++) cells.push(null);
+    for (var d=1; d<=n; d++) cells.push(y+"-"+(m<9?"0":"")+(m+1)+"-"+(d<10?"0":"")+d);
+    out.push({ y:y, m:m, label:["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"][m]+" "+y, cells:cells });
+    m++; if (m > 11){ m = 0; y++; }
+  }
+  return out;
+}
+function sapToday(){ var t = new Date(); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0"); }
+/* Ajouter / retirer / déplacer un jour de récup. Renvoie { ok, error, patch } : patch = chemins sous « sapins/ » pour un update multi-chemins.
+   Règles : on ajoute seulement un jour futur (commande encore ouverte) ; on retire seulement un jour non figé ;
+   on peut DÉPLACER un jour figé (Rungis ne peut pas y aller) tant que le chauffeur n'a rien récupéré : les commandes figées suivent. */
+function sapDayOps(n1, config, cmds, recups, op, from, to, who, src, now){
+  now = now || Date.now(); var act = sapActiveDates(n1, config, ""), P = {}, at = now;
+  var fut = function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(d||"") && sapDeadline(d) > now; };
+  if (op === "add"){
+    if (!fut(to)) return { ok:false, error:"Choisis un jour à venir (au plus tôt après-demain)." };
+    if (act.indexOf(to) >= 0) return { ok:false, error:"C'est déjà un jour de récupération." };
+    P["config/recups/"+to] = { on:true, by:who, at:at, src:src, added:true };
+    return { ok:true, patch:P };
+  }
+  if (act.indexOf(from) < 0) return { ok:false, error:"Ce n'est pas un jour de récupération." };
+  if (((recups||{})[from]||{}).done) return { ok:false, error:"Le chauffeur a déjà noté la récupération de ce jour." };
+  if (op === "remove"){
+    if (sapLocked(config, cmds, from, now)) return { ok:false, error:"Commande déjà figée : déplace le jour au lieu de le retirer." };
+    P["config/recups/"+from] = { on:false, by:who, at:at, src:src, removed:true };
+    return { ok:true, patch:P };
+  }
+  if (op === "move"){
+    if (!fut(to) && !(sapLocked(config, cmds, from, now) && to > sapToday())) return { ok:false, error:"Choisis un jour à venir." };
+    if (act.indexOf(to) >= 0) return { ok:false, error:"Ce jour est déjà un jour de récupération." };
+    P["config/recups/"+from] = { on:false, by:who, at:at, src:src, movedTo:to };
+    P["config/recups/"+to]   = { on:true, by:who, at:at, src:src, movedFrom:from };
+    var c = (cmds||{})[from]; if (c){ P["cmd/"+to] = c; P["cmd/"+from] = null; }
+    P["recap/"+from] = null;
+    return { ok:true, patch:P };
+  }
+  return { ok:false, error:"opération inconnue" };
+}
 /* Quantités qui partent pour un magasin : commande validée (ou saisie console) sinon la prévision. { L:n } */
 function sapEffLines(n1, config, d, sk, cmds, receps){
   var c = ((cmds||{})[d]||{})[sk], out = {};
@@ -4224,6 +4270,32 @@ function sapWho(){ return RESP_NAMES[String(ME_EMAIL||"").toLowerCase()]||ME_EMA
 function sapChipH(k){ const L=sapLine(k); if(!L) return ""; return `<span style="display:inline-block;background:${L.hex};color:${L.ink};${L.c==="blanc"?"border:1.5px solid #999;":""}border-radius:7px;padding:2px 8px;font-weight:800;font-size:11.5px;white-space:nowrap">${L.t} ${L.c.toUpperCase()}</span>`; }
 function sapStoreH(k){ const s=sapStore(k); return `<span style="display:inline-block;background:${s.color};color:#fff;border-radius:7px;padding:2px 9px;font-weight:800;font-size:12px">${esc(s.short)}</span>`; }
 function sapDates(){ const S=sapS(); return S.n1?sapActiveDates(S.n1,S.config||{}):[]; }
+/* ---------- 📅 Calendrier des récupérations : clic = afficher ; boutons = ajouter / retirer / déplacer ---------- */
+let sapCalSel="";
+function sapCalClick(k){ sapCalSel=k; if(sapDates().indexOf(k)>=0) sapDate=k; renderSapins(); }
+function sapCalHTML(d){
+  const S=sapS(), cfg=S.config||{}, n1=S.n1, act=sapDates(), today=sapToday(), sel=sapCalSel||d, now=Date.now(), rc=cfg.recups||{};
+  const cell=k=>{ if(!k) return `<div></div>`; const on=act.indexOf(k)>=0, past=k<today, o=rc[k]||{}, byR=o.src==="rungis", lock=on&&sapLocked(cfg,S.cmd||{},k,now);
+    return `<button onclick="sapCalClick('${k}')" style="position:relative;height:46px;border-radius:10px;border:1px solid ${on?"#C62828":"#dfe5e1"};background:${on?"#C62828":"#fff"};color:${on?"#fff":"#1c2b24"};font-weight:800;font-size:17px;cursor:pointer;opacity:${past&&k!==sel?.35:1};${k===sel?"outline:4px solid #F6C744;outline-offset:1px;":""}${k===today?"box-shadow:inset 0 0 0 2px #1c2b24;":""}">${+k.slice(8)}${byR?`<i style="position:absolute;top:2px;right:3px;font-style:normal;font-size:10px;background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 3px">R</i>`:""}${lock?`<span style="position:absolute;bottom:0;right:2px;font-size:10px">🔒</span>`:""}</button>`; };
+  const months=sapCalMonths(n1,cfg).map(m=>`<div><div style="font-weight:800;font-size:17px;margin-bottom:6px">${m.label}</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(w=>`<div style="font-size:13px;font-weight:800;color:var(--t2,#5f6f66);text-align:center">${w}</div>`).join("")}${m.cells.map(cell).join("")}</div></div>`).join("");
+  const on=act.indexOf(sel)>=0, o=rc[sel]||{};
+  const who=o.at?`<div style="background:#FFF8E1;border:1px solid #F6C744;border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px">✏️ ${o.movedFrom?"Déplacé du "+esc(sapDayFr(o.movedFrom))+" — ":o.movedTo?"Déplacé au "+esc(sapDayFr(o.movedTo))+" — ":o.added?"Ajouté — ":o.removed?"Retiré — ":o.on===false?"Retiré — ":"Modifié — "}par <b>${esc(o.by||"?")}</b>${o.src==="rungis"?" <b>(Rungis)</b>":""} le ${new Date(o.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
+  const acts=!sel?"":on?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px"><b style="font-size:16px">${esc(sapDayFr(sel,true))}</b><span class="pill" style="background:#C62828;color:#fff">Récupération</span><span class="sp"></span>
+      <button class="tbtn s" style="color:var(--dan);border-color:var(--dan)" onclick="sapDayOp('remove','${sel}')">✕ Retirer ce jour</button>
+      <input type="date" id="sapMoveTo" style="padding:5px;border:1px solid var(--line);border-radius:8px"><button class="tbtn s p" onclick="sapDayOp('move','${sel}',(document.getElementById('sapMoveTo')||{}).value)">⇄ Déplacer au jour choisi</button></div>`
+    :`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px"><b style="font-size:16px">${esc(sapDayFr(sel,true))}</b><span class="t2">pas de récupération ce jour</span><span class="sp"></span>${sel>today?`<button class="tbtn s p" onclick="sapDayOp('add',null,'${sel}')">＋ Ajouter une récupération ce jour</button>`:""}</div>`;
+  return `<div class="cx" style="padding:16px 18px;margin-bottom:14px"><div style="display:flex;align-items:baseline;gap:10px"><b style="font-size:18px">📅 Calendrier des récupérations</b><span class="t2">${act.length} jours · clic = voir le jour</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-top:10px">${months}</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#5f6f66;font-weight:700;margin-top:10px"><span>🟥 jour de récupération</span><span>🟨 contour = jour affiché</span><span><b style="background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 3px">R</b> modifié par Rungis</span><span>🔒 commande figée</span></div>
+    ${acts}${who}</div>`;
+}
+async function sapDayOp(op, from, to){
+  const S=sapS(), r=sapDayOps(S.n1, S.config||{}, S.cmd||{}, S.recup||{}, op, from, to, sapWho(), "console", Date.now());
+  if(!r.ok){ alert(r.error); return; }
+  const msg=op==="add"?"Ajouter une récupération le "+sapDayFr(to,true)+" ?":op==="remove"?"Retirer la récupération du "+sapDayFr(from,true)+" ?":"Déplacer la récupération du "+sapDayFr(from,true)+" au "+sapDayFr(to,true)+" ?\nLes commandes suivent ; Rungis et les magasins reçoivent un mail.";
+  if(!confirm(msg)) return;
+  try{ await dbCentrale.ref("sapins").update(r.patch); sapCalSel=op==="remove"?from:to; if(op!=="remove") sapDate=to; toastC("📅 Calendrier mis à jour"); }catch(e){ alert(e.message); }
+}
 function sapCurDate(){ const a=sapDates(); if(sapDate && a.indexOf(sapDate)>=0) return sapDate; const now=Date.now(); return a.find(d=>sapDeadline(d)>now) || a[a.length-1] || ""; }
 function sapFmtLeft(ms){ if(ms<=0) return "figée"; const h=Math.floor(ms/3600e3), m=Math.floor((ms%3600e3)/60e3); return (h>=48?Math.floor(h/24)+" j ":"")+(h>=48?(h%24)+" h":h+" h "+String(m).padStart(2,"0")); }
 function sapCount(){ // compteur du menu : réceptions incohérentes non vues + BL non payés
@@ -4247,9 +4319,8 @@ function renderSapins(){
 function sapSuiviHTML(){
   const S=sapS(), cfg=S.config||{}, n1=S.n1, d=sapCurDate(), now=Date.now();
   const cal=(n1.calendar||[]).map(c=>c.date), extra=Object.keys(cfg.recups||{}).filter(x=>cal.indexOf(x)<0 && !sapIsTest(cfg,x)), all=cal.concat(extra).sort();
-  const pick=all.map(x=>{ const on=sapDates().indexOf(x)>=0; return `<label style="display:inline-flex;align-items:center;gap:6px;border:1.5px solid ${x===d?"#c62828":"var(--line)"};background:${x===d?"#fff5f5":"#fff"};border-radius:10px;padding:6px 10px;margin:3px;cursor:pointer;font-weight:700;font-size:13px">
-      <input type="checkbox" ${on?"checked":""} onclick="event.stopPropagation();sapToggleDate('${x}',this.checked)"> <span onclick="sapDate='${x}';renderSapins()">${esc(sapDayFr(x))}${sapDeadline(x)<=now?" 🔒":""}</span></label>`; }).join("");
-  if(!d) return `<div class="cx" style="padding:14px"><b>📅 Calendrier des récupérations Rungis</b> — coche les jours<br>${pick}</div><div class="empty">Aucune récupération cochée.</div>`;
+  const calH=sapCalHTML(d);
+  if(!d || (sapCalSel && sapCalSel!==d)) return calH+(d?"":`<div class="empty">Aucune récupération : touche un jour puis « ＋ Ajouter ».</div>`);
   const per=sapPeriod(n1,cfg,d), cmds=S.cmd||{}, receps=S.recep||{}, rc=(S.recup||{})[d]||null, recap=((S.recap||{})[d]||{}).lines || sapRecap(n1,cfg,d,cmds,receps);
   const tot=SAP_LINES.reduce((a,L)=>a+((recap[L.k]||{}).tot||0),0), left=sapDeadline(d)-now;
   // commandes par magasin
@@ -4267,8 +4338,7 @@ function sapSuiviHTML(){
       <td style="text-align:center">${pris==null?"—":`<b style="color:${pris<r.tot?"var(--dan)":"#2e7d32"}">${pris}</b>`}${l.rempl?`<div class="t2">+${l.rempl} ${esc(sapLine(sapOther(L.k)).t)} ${esc(sapLine(sapOther(L.k)).o.toLowerCase())}</div>`:""}${l.sans?`<div class="t2">sans rempl.</div>`:""}</td></tr>`; }).join("");
   const kpi=(lbl,v,sub)=>`<div class="cx fr-kpi"><div class="eyebrow">${lbl}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
   const ref=sapRefRange(n1,per);
-  return `<div class="cx" style="padding:12px 14px;margin-bottom:14px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>📅 Calendrier des récupérations Rungis</b><span class="t2">coche = Rungis va chez Cruard ce jour-là (rappel aux magasins 48 h avant, commande jusqu'à la veille minuit, mail Rungis le jour J à 2h)</span><span class="sp"></span>
-      <input type="date" id="sapAddD" style="padding:5px;border:1px solid var(--line);border-radius:8px"><button class="tbtn s" onclick="sapAddDate()">+ Ajouter un jour</button></div><div style="margin-top:6px">${pick}</div></div>
+  return `${calH}
     <div class="fr-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
       ${kpi("Récupération",esc(sapDayFr(d,true)),`couvre du ${esc(sapDayFr(per.du))} au ${esc(sapDayFr(per.au))} · ventes 2025 du ${esc(sapDayFr(ref.du))} au ${esc(sapDayFr(ref.au))}`)}
       ${kpi("Commandes",left>0?"⏰ "+sapFmtLeft(left):"🔒 figées",left>0?"jusqu'au "+esc(sapDayFr(sapAddDays(d,-1)))+" minuit · sinon la prévision part":"mail Rungis "+(((S.mails||{})["rungis_"+d])?"envoyé "+new Date(S.mails["rungis_"+d]).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"le jour J à 2h"))}
