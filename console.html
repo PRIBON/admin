@@ -292,7 +292,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.9";
+const APP_VERSION = "2.9.10";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4044,7 +4044,7 @@ var SAP_STORES = [
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] },
   { k:"TOL", label:"PRIBON TOLBIAC", short:"Tolbiac", col:"TOLBIAC", cols:["tolbiac","pribon tolbiac","tol"], mail:"tolbiac@pribon.org", color:"#0A84FF",
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] },
-  { k:"BIC", consoleCmd:true, label:"PRIBON BICHAT", short:"Bichat", col:"BICHAT", cols:["bichat","pribon bichat","bic"], mail:"bichat@pribon.org", color:"#FF1F8E",
+  { k:"BIC", label:"PRIBON BICHAT", short:"Bichat", col:"BICHAT", cols:["bichat","pribon bichat","bic"], mail:"bichat@pribon.org", color:"#FF1F8E",
     lines:["M80","M100","M125","M150","M175","M200"], noProp:true }, // Morvan uniquement, PAS de proposition (pas d'historique)
   { k:"KBG", masterCmd:true, label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.fr", color:"#7C3AED",
     lines:["M80","M100","M125","M150"] },                          // Morvan uniquement, sans remplacement
@@ -4176,7 +4176,7 @@ function sapToday(){ var t = new Date(); return t.getFullYear()+"-"+String(t.get
    Règles : on ajoute seulement un jour futur (commande encore ouverte) ; on retire seulement un jour non figé ;
    on peut DÉPLACER un jour figé (Rungis ne peut pas y aller) tant que le chauffeur n'a rien récupéré : les commandes figées suivent. */
 function sapDayOps(n1, config, cmds, recups, op, from, to, who, src, now){
-  now = now || Date.now(); var act = sapActiveDates(n1, config, ""), P = {}, at = now;
+  now = now || Date.now(); var act = sapActiveDates(n1, config, "all"), P = {}, at = now;
   var fut = function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(d||"") && sapDeadline(d) > now; };
   if (op === "add"){
     if (!fut(to)) return { ok:false, error:"Choisis un jour à venir (au plus tôt après-demain)." };
@@ -4196,6 +4196,7 @@ function sapDayOps(n1, config, cmds, recups, op, from, to, who, src, now){
     if (act.indexOf(to) >= 0) return { ok:false, error:"Ce jour est déjà un jour de récupération." };
     P["config/recups/"+from] = { on:false, by:who, at:at, src:src, movedTo:to };
     P["config/recups/"+to]   = { on:true, by:who, at:at, src:src, movedFrom:from };
+    var of = (config.recups||{})[from] || {}; if (of.test){ P["config/recups/"+to].test = true; P["config/recups/"+to].testRungis = !!of.testRungis; P["config/recups/"+from].test = true; }
     var c = (cmds||{})[from]; if (c){ P["cmd/"+to] = c; P["cmd/"+from] = null; }
     P["recap/"+from] = null;
     return { ok:true, patch:P };
@@ -4279,6 +4280,7 @@ function sapCalHTML(d){
     return `<button onclick="sapCalClick('${k}')" style="position:relative;height:46px;border-radius:10px;border:1px solid ${on?"#C62828":"#dfe5e1"};background:${on?"#C62828":"#fff"};color:${on?"#fff":"#1c2b24"};font-weight:800;font-size:17px;cursor:pointer;opacity:${past&&k!==sel?.35:1};${k===sel?"outline:4px solid #F6C744;outline-offset:1px;":""}${k===today?"box-shadow:inset 0 0 0 2px #1c2b24;":""}">${+k.slice(8)}${byR?`<i style="position:absolute;top:2px;right:3px;font-style:normal;font-size:10px;background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 3px">R</i>`:""}${lock?`<span style="position:absolute;bottom:0;right:2px;font-size:10px">🔒</span>`:""}</button>`; };
   const months=sapCalMonths(n1,cfg).map(m=>`<div><div style="font-weight:800;font-size:17px;margin-bottom:6px">${m.label}</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(w=>`<div style="font-size:13px;font-weight:800;color:var(--t2,#5f6f66);text-align:center">${w}</div>`).join("")}${m.cells.map(cell).join("")}</div></div>`).join("");
   const on=act.indexOf(sel)>=0, o=rc[sel]||{};
+  const conf=o.confirmed?`<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px">✅ Confirmé par Rungis (mail 2 h) le ${new Date(o.confirmed.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
   const who=o.at?`<div style="background:#FFF8E1;border:1px solid #F6C744;border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px">✏️ ${o.movedFrom?"Déplacé du "+esc(sapDayFr(o.movedFrom))+" — ":o.movedTo?"Déplacé au "+esc(sapDayFr(o.movedTo))+" — ":o.added?"Ajouté — ":o.removed?"Retiré — ":o.on===false?"Retiré — ":"Modifié — "}par <b>${esc(o.by||"?")}</b>${o.src==="rungis"?" <b>(Rungis)</b>":""} le ${new Date(o.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
   const acts=!sel?"":on?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px"><b style="font-size:16px">${esc(sapDayFr(sel,true))}</b><span class="pill" style="background:#C62828;color:#fff">Récupération</span><span class="sp"></span>
       <button class="tbtn s" style="color:var(--dan);border-color:var(--dan)" onclick="sapDayOp('remove','${sel}')">✕ Retirer ce jour</button>
@@ -4287,7 +4289,7 @@ function sapCalHTML(d){
   return `<div class="cx" style="padding:16px 18px;margin-bottom:14px"><div style="display:flex;align-items:baseline;gap:10px"><b style="font-size:18px">📅 Calendrier des récupérations</b><span class="t2">${act.length} jours · clic = voir le jour</span></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-top:10px">${months}</div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#5f6f66;font-weight:700;margin-top:10px"><span>🟥 jour de récupération</span><span>🟨 contour = jour affiché</span><span><b style="background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 3px">R</b> modifié par Rungis</span><span>🔒 commande figée</span></div>
-    ${acts}${who}</div>`;
+    ${acts}${who}${conf}</div>`;
 }
 async function sapDayOp(op, from, to){
   const S=sapS(), r=sapDayOps(S.n1, S.config||{}, S.cmd||{}, S.recup||{}, op, from, to, sapWho(), "console", Date.now());
@@ -4327,10 +4329,10 @@ function sapSuiviHTML(){
   const REAL=sapStoresFor(cfg,d);
   const rowsCmd=REAL.map(s=>{ const c=(cmds[d]||{})[s.k]||null, p=sapPlan(n1,cfg,d,s.k,cmds,receps); const theo=p.lines.reduce((a,o)=>a+o.theo,0);
     const q=sapSum(sapEffLines(n1,cfg,d,s.k,cmds,receps)), r=(receps[d]||{})[s.k]||null, lv=((S.livr||{})[d]||{})[s.k]||null, dp=lv&&lv.lines?sapSum(lv.lines):(rc&&rc.dispatch?sapSum(rc.dispatch[s.k]):null), b=((S.bl||{})[d]||{})[s.k]||null;
-    const st=!(c&&c.at)?(s.consoleCmd?`<span class="pill" style="background:#fff3e0;color:#e65100">✏️ à saisir ici</span>`:`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision (part seule)</span>`):c.auto?`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision figée</span>`:`<span class="pill pg">✅ ${esc(c.src==="console"?"console · ":"")}${esc(c.by||"")}${c.master?" (master)":""}</span>`;
+    const st=!(c&&c.at)?(s.noProp?`<span class="pill" style="background:#fff3e0;color:#e65100">⏳ pas commandé = 0</span>`:`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision (part seule)</span>`):c.auto?`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision figée</span>`:`<span class="pill pg">✅ ${esc(c.src==="console"?"console · ":"")}${esc(c.by||"")}${c.master?" (master)":""}</span>`;
     const rec=!r?(dp?`<span class="pill" style="background:#fff3e0;color:#e65100">📦 à réceptionner (magasin)</span>`:"—"):`<span class="pill ${r.coherent===false?"":"pg"}" style="${r.coherent===false?"background:#fdecea;color:#c62828":""}">${r.coherent===false?"⚠️":"✅"} ${sapSum(r.lines)} reçus</span><div class="t2">${esc(r.by||"")}${r.chauffeur?" · chauffeur "+esc(r.chauffeur):""}${r.note?" · « "+esc(r.note)+" »":""}</div>`;
     return `<tr><td>${sapStoreH(s.k)}</td><td>${st}${c&&c.at?`<div class="t2">${new Date(c.at).toLocaleString("fr-FR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>`:""}</td><td style="text-align:center"><b style="font-size:16px">${q||"—"}</b><div class="t2">${s.noProp?"sans proposition":"proposition "+theo}</div></td><td style="text-align:center">${dp==null?"—":`<b>${dp}</b>`}<div class="t2">${lv?("déposé "+esc(lv.by||"")+(lv.ecart?" ⚠️ ≠ prévu"+(lv.confirmedBy?" (code "+esc(lv.confirmedBy)+")":""):"")):(dp==null?"":"prévu")}</div></td><td>${rec}</td><td>${b?(b.error?`<span style="color:var(--dan)">⚠️ ${esc(b.error)}</span>`:`<a href="${esc(b.url||"#")}" target="_blank">${esc(b.num)}</a> · ${sapEur(b.ttc)}${b.paid?` <span class="pill pg">payé</span>`:""}`):"—"}</td>
-      <td style="white-space:nowrap"><button class="tbtn s ${s.consoleCmd?"p":""}" onclick="sapManualCmd('${d}','${s.k}')">✏️ Commande</button> <button class="tbtn s" onclick="sapDetail('${d}','${s.k}')">Détail</button></td></tr>`; }).join("");
+      <td style="white-space:nowrap"><button class="tbtn s" onclick="sapManualCmd('${d}','${s.k}')">✏️ Commande</button> <button class="tbtn s" onclick="sapDetail('${d}','${s.k}')">Détail</button></td></tr>`; }).join("");
   // Cruard : par ligne
   const rowsL=SAP_LINES.map(L=>{ const r=recap[L.k]||{tot:0,par:{}}, l=(rc&&rc.lines||{})[L.k]||{}; if(!r.tot && l.pris==null && L.resa) return "";
     const pris=l.pris!=null?Number(l.pris):null;
@@ -4396,7 +4398,7 @@ function sapReglagesHTML(){
       <button class="tbtn s" onclick="sapPost({action:'sapin-test',kind:'rappel'}).then(j=>toastC(j.ok?'🧪 Rappel test envoyé à hg@':'Erreur '+j.error)).catch(e=>alert(e.message))">🧪 Rappel 48 h test</button></div>
     <div class="cx" style="padding:14px 16px;line-height:2"><b>✉️ Adresses des magasins</b> (rappel 48 h, réception manquante, BL-facture)<br>
       ${SAP_STORES.filter(s=>!s.test).map(s=>`${sapStoreH(s.k)} ${inp("sapM"+s.k, mails[s.k]!=null?mails[s.k]:s.mail, "", `sapCfg('mails/${s.k}',this.value.trim())`,260)}`).join("<br>")}</div>
-    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Par défaut, c'est la <b>prévision</b> qui part (le magasin peut la modifier et valider jusqu'à la veille minuit). <b>Bichat</b> : commande saisie ici (✏️ Commande dans « Récup &amp; suivi »). <b>Kelbongoo</b> : seul le master modifie. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
+    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Par défaut, c'est la <b>prévision</b> qui part (le magasin peut la modifier et valider jusqu'à la veille minuit). <b>Bichat</b> : pas de prévision, le magasin choisit ses sapins dans la Centrale (sinon 0). ✏️ Commande permet une correction master. <b>Kelbongoo</b> : seul le master modifie. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
   </div>`;
 }
 /* ---------- 🧪 TEST A → Z : journée fictive, MAGASIN TEST seul, tous les mails à hg@ + rr@ ---------- */
@@ -4406,7 +4408,7 @@ function sapTestCur(){ const a=sapTestDates(); return a.indexOf(sapTestD)>=0?sap
 function sapTestCreate(){ const v=(document.getElementById("sapTestIn")||{}).value, S=sapS(), cal=((S.n1||{}).calendar||[]).map(c=>c.date), rc=(S.config||{}).recups||{};
   if(!/^\d{4}-\d{2}-\d{2}$/.test(v||"")){ alert("Choisis une date."); return; }
   if(cal.indexOf(v)>=0 || (rc[v] && !rc[v].test)){ alert("C'est une vraie date de récupération : choisis un autre jour pour le test."); return; }
-  dbCentrale.ref("sapins/config/recups/"+v).set({ on:true, test:true, by:sapWho(), at:Date.now() }).then(()=>{ sapTestD=v; toastC("🧪 Journée de test créée"); }); }
+  dbCentrale.ref("sapins/config/recups/"+v).set({ on:true, test:true, testRungis:!!(document.getElementById("sapTestRg")||{}).checked, by:sapWho(), at:Date.now() }).then(()=>{ sapTestD=v; toastC("🧪 Journée de test créée"); }); }
 async function sapTestStep(step, d){
   if(step==="reset" && !confirm("Effacer commande, récupération, réception et BL de cette journée de test ?")) return;
   try { const j=await sapPost({ action:"sapin-test-step", step, date:d }); toastC(j.ok?("🧪 "+(j.msg||"OK")):("⚠️ "+(j.error||"erreur"))); } catch(e){ alert(e.message); } }
@@ -4418,7 +4420,7 @@ function sapTestHTML(){
   const tdates=sapTestDates().map(x=>`<button class="tbtn s ${x===d?"p":""}" onclick="sapTestD='${x}';renderSapins()">🧪 ${esc(sapDayFr(x))}</button>`).join(" ");
   const head=`<div class="cx" style="padding:14px 16px;margin-bottom:14px;line-height:1.6"><b>🧪 Test de A à Z</b> — une journée fictive, avec le <b>MAGASIN TEST</b> seul. Les vrais magasins ne voient rien.
       <b>Tous les mails</b> (Rungis de 2 h, rappel, alertes, BL-facture, réception non faite) partent <b>uniquement à hg@probon.fr et rr@pribon.org</b>, avec « [TEST] » dans l'objet.
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${tdates||"<span class='t2'>Aucune journée de test.</span>"}<span class="sp"></span><input type="date" id="sapTestIn" style="padding:5px;border:1px solid var(--line);border-radius:8px"><button class="tbtn s p" onclick="sapTestCreate()">+ Créer une journée de test</button></div></div>`;
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">${tdates||"<span class='t2'>Aucune journée de test.</span>"}<span class="sp"></span><input type="date" id="sapTestIn" style="padding:5px;border:1px solid var(--line);border-radius:8px"><label class="t2" style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="sapTestRg" checked> Rungis reçoit le mail de 2 h (marqué TEST)</label><button class="tbtn s p" onclick="sapTestCreate()">+ Créer une journée de test</button></div></div>`;
   if(!d) return head;
   const lvT=((S.livr||{})[d]||{}).TST||null;
   const c=((S.cmd||{})[d]||{}).TST||null, rc=(S.recup||{})[d]||null, r=((S.recep||{})[d]||{}).TST||null, b=((S.bl||{})[d]||{}).TST||null;
@@ -4428,8 +4430,8 @@ function sapTestHTML(){
   const step=(n,titre,expl,etat,action)=>`<tr><td style="font-size:22px;font-weight:900;text-align:center;width:44px">${n}</td><td><b>${titre}</b><div class="t2" style="line-height:1.5">${expl}</div></td><td>${etat}</td><td style="text-align:right;white-space:nowrap">${action||""}</td></tr>`;
   const rows=[
     step(1,"Rappel 48 h au magasin","Le mail que les magasins reçoivent 2 jours avant.", mails["rappel_"+d]?ok("envoyé"):wait("—"), btn("rappel","Envoyer le rappel")),
-    step(2,"Commande du magasin test","Sans rien faire, la <b>prévision</b> part. Pour mettre tes propres quantités : <b>✏️ Saisir les quantités</b> (ou La Centrale → master → <b>Test</b> → Commande).", c&&c.at?ok(sapSum(c.reel)+" sapins · "+esc(c.by||"")):`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision ${sapSum(sapEffLines(S.n1,cfg,d,"TST",S.cmd||{},S.recep||{}))}</span>`, `<button class="tbtn s p" onclick="sapManualCmd('${d}','TST')">✏️ Saisir les quantités</button>`),
-    step(3,"Minuit + mail Rungis de 2 h","Fige la commande et envoie tout de suite le mail « SAPINS À RÉCUPÉRER CHEZ CRUARD ».", mails["rungis_"+d]?ok("envoyé "+new Date(mails["rungis_"+d]).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})):wait("—"), btn("rungis","Figer + envoyer",true)),
+    step(2,"Commande du magasin test","<b>La Centrale</b> → 🎄 Sapins → <b>Connexion master</b> → <b>Test</b> → Commande (on peut aussi y créer le jour test). Sans rien faire, la prévision part. Ou ici : <b>✏️ Saisir les quantités</b>.", c&&c.at?ok(sapSum(c.reel)+" sapins · "+esc(c.by||"")):`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision ${sapSum(sapEffLines(S.n1,cfg,d,"TST",S.cmd||{},S.recep||{}))}</span>`, `<button class="tbtn s p" onclick="sapManualCmd('${d}','TST')">✏️ Saisir les quantités</button>`),
+    step(3,"Minuit + mail Rungis de 2 h","Se fait tout seul (minuit puis 2 h le jour J). Ce bouton le fait tout de suite. Dans le mail : <b>Confirmer</b> ou <b>Changer le jour</b>.", mails["rungis_"+d]?ok("envoyé "+new Date(mails["rungis_"+d]).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})):wait("—"), btn("rungis","Figer + envoyer",true)),
     step(4,"Chauffeur chez Cruard","Appli <b>Kelbongoo</b> → 🎄 Sapins (🧪) → saisir ce qui est pris → <b>Récupération terminée</b>.", rc&&rc.done?ok("récupéré par "+esc(rc.by||"")):wait("—"), ""),
     step("4b","Chauffeur au magasin","Kelbongoo → <b>À livrer</b> → choisir <b>Test</b> → compteurs → <b>Valider la livraison</b>. Change un nombre pour voir la popup + code chauffeur.", lvT&&lvT.at?(lvT.ecart?`<span class="pill" style="background:#fdecea;color:#c62828">⚠️ ≠ prévu · ${esc(lvT.confirmedBy||"")}</span>`:ok(sapSum(lvT.lines)+" déposés")):wait("—"), ""),
     step(5,"Réception du magasin","<b>La Centrale</b> → 🎄 Sapins → master → <b>Test</b> → <b>Réception</b> → compter → <b>Valider la réception</b>.", r&&r.at?(r.coherent===false?`<span class="pill" style="background:#fdecea;color:#c62828">⚠️ écart · « ${esc(r.note||"")} »</span>`:ok(sapSum(r.lines)+" reçus")):wait("—"), ""),
