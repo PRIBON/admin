@@ -221,6 +221,110 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 .blf-log{font-size:12.5px}.blf-log div{padding:6px 0;border-bottom:1px dashed var(--line)}
 @media (max-width:1300px){ .fr-kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
 @media (max-width:1100px){ .side{width:64px;padding:14px 8px} .side .brand div,.side-sec,.side button.tab span.lbl,.side .cnt,.side-foot div{display:none} .main{margin-left:64px} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2,.grid-r{grid-template-columns:1fr} }
+
+/* ===== v2.10 — Menu téléphone (tiroir) ===== */
+#navBtn{display:none}
+#navBack{display:none}
+@media (max-width:760px){
+  #navBtn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:20px;flex:0 0 44px;cursor:pointer}
+  .side{width:min(300px,86vw);padding:18px 12px 14px;transform:translateX(-105%);transition:transform .22s ease;z-index:120;box-shadow:0 0 40px rgba(0,0,0,.35)}
+  body.nav-open .side{transform:none}
+  .side .brand div,.side-foot div{display:block}.side-sec{display:block}.side button.tab span.lbl{display:inline}.side .cnt{display:inline-block}
+  .side button.tab{padding:12px 12px;font-size:15.5px}.side button.tab .em{font-size:19px;width:26px;flex-basis:26px}
+  body.nav-open #navBack{display:block;position:fixed;inset:0;background:rgba(10,20,14,.5);z-index:110}
+  .main{margin-left:0}
+  .topbar{padding:0 10px;gap:8px;height:56px}
+  .crumb{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+  .topbar .sp{display:none}
+  .live-badge{font-size:0;padding:8px;gap:0}.live-badge .ldot{width:9px;height:9px}
+  #btnRefresh{font-size:0;gap:0;padding:0;width:44px;height:44px;justify-content:center;border-radius:12px}#btnRefresh svg{width:19px!important;height:19px!important}
+  .wrap{padding:12px 10px 80px}
+}
+/* ===== v2.10 — 🎄 Sapins : refonte (téléphone d'abord) ===== */
+.sx{--fir:#123B2C;--berry:#B3261E;--gold:#F6C744;--kbg:#6D28D9}
+.sx-top{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+.sx-top h1{margin:0;font-size:22px;letter-spacing:-.02em}
+.sx-kbg{display:grid;grid-template-columns:1fr;gap:8px}
+.sx-kbg button{border:none;border-radius:14px;min-height:50px;padding:0 16px;font:800 14.5px Inter,sans-serif;letter-spacing:.01em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.sx-kbg .c{background:var(--kbg);color:#fff;box-shadow:0 3px 0 #4C1D95}
+.sx-kbg .r{background:#F3EEFE;color:#4C1D95;box-shadow:inset 0 0 0 2px #C4B5FD}
+.sx-kbg button:active{transform:translateY(2px);box-shadow:none}
+.sx-nav{position:sticky;top:56px;z-index:30;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:var(--fir);border-radius:16px;padding:5px;margin-bottom:14px;box-shadow:0 6px 16px rgba(18,59,44,.18)}
+.sx-nav button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 2px 6px;border-radius:12px;color:#BFD6CB;font:700 11.5px Inter,sans-serif;text-align:center;min-width:0}
+.sx-nav button i{font-style:normal;font-size:19px;line-height:1.1}
+.sx-nav button.on{background:#fff;color:var(--fir)}
+.sx-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:14px;box-shadow:var(--sh)}
+.sx-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.sx-h b{font-size:17px;letter-spacing:-.01em}.sx-h span{font-size:12.5px;color:var(--mute);font-weight:600}
+.sx-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.sx-cal .w{text-align:center;font-size:11.5px;font-weight:700;color:var(--mute);padding-bottom:2px}
+.sx-cal button{all:unset;box-sizing:border-box;cursor:pointer;position:relative;height:46px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font:700 16px Inter,sans-serif;color:#8d9892;line-height:1;min-width:0}
+.sx-cal button small{font-size:9.5px;font-weight:700;margin-top:2px}
+.sx-cal button.past{color:#cdd3cf}
+.sx-cal button.today{box-shadow:inset 0 0 0 2px var(--ink);color:var(--ink)}
+.sx-cal button.on{background:var(--berry);color:#fff;font-size:19px;font-weight:800;box-shadow:0 3px 0 #7A1F18}
+.sx-cal button.on.past{background:#D9A5A1;box-shadow:none}
+.sx-cal button.on.lk{background:#8E2A24}
+.sx-cal button.sel{outline:3px solid var(--gold);outline-offset:2px}
+.sx-cal button:not(.on).sel{background:#FFF8E1;color:var(--ink)}
+.sx-cal button em{position:absolute;top:2px;right:3px;font-style:normal;font-size:9.5px;font-weight:800;line-height:1}
+.sx-cal button em.r{background:var(--gold);color:#3a2a00;border-radius:4px;padding:1px 3px}
+.sx-leg{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);font-weight:600;margin-top:10px}
+.sx-leg i{display:inline-block;width:12px;height:12px;border-radius:4px;vertical-align:-1px;margin-right:5px}
+.sx-day{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+.sx-day .t{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sx-day .t b{font-size:19px;letter-spacing:-.01em;text-transform:capitalize}
+.sx-tag{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.sx-tag.red{background:var(--berry);color:#fff}.sx-tag.grey{background:#EEF1EF;color:#4c5a52}.sx-tag.ok{background:#E6F4EA;color:#17512F}.sx-tag.warn{background:#FFF3E0;color:#B34700}.sx-tag.bad{background:#FDECEA;color:#B3261E}
+.sx-note{border-radius:12px;padding:9px 12px;font-size:13px;margin-top:8px;line-height:1.4}
+.sx-note.y{background:#FFF8E1;border:1px solid #F1D98A}.sx-note.g{background:#E8F5E9;border:1px solid #A5D6A7}
+.sx-more{margin-top:10px}
+.sx-more summary{cursor:pointer;font-weight:700;font-size:13.5px;color:var(--ink2);padding:8px 0;list-style:none}
+.sx-more summary::before{content:"✏️ "}.sx-more[open] summary{color:var(--ink)}
+.sx-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sx-btn{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;padding:0 14px;border-radius:12px;font:700 14px Inter,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1.5px solid var(--line2);background:#fff;color:var(--ink);text-align:center}
+.sx-btn.p{background:var(--fir);border-color:var(--fir);color:#fff}.sx-btn.d{color:var(--dan);border-color:#f0c9c9}.sx-btn.k{background:var(--kbg);border-color:var(--kbg);color:#fff}
+.sx-acts input[type=date]{min-height:44px;border:1.5px solid var(--line2);border-radius:12px;padding:0 10px;font:600 14px Inter,sans-serif;flex:1 1 150px;min-width:0}
+.sx-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.sx-kpi{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px}
+.sx-kpi .l{font-size:11.5px;font-weight:700;color:var(--mute)}
+.sx-kpi .v{font-size:19px;font-weight:800;letter-spacing:-.02em;margin-top:3px;line-height:1.15;overflow-wrap:anywhere}
+.sx-kpi .s{font-size:12px;color:var(--ink2);margin-top:4px;line-height:1.35}
+.sx-sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 2px 10px}.sx-sec b{font-size:17px}.sx-sec .sp{flex:1}
+.sx-stores{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px}
+.sx-store{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;border-left:6px solid var(--c,#999)}
+.sx-store .h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sx-store .h b{font-size:17px}.sx-store .h .sp{flex:1}
+.sx-store .q{display:flex;align-items:baseline;gap:8px;margin:8px 0 2px}
+.sx-store .q b{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1}.sx-store .q span{font-size:14px;font-weight:700}.sx-store .q small{font-size:12.5px;color:var(--mute);margin-left:auto}
+.sx-store dl{margin:10px 0 0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13.5px}
+.sx-store dt{color:var(--mute);font-weight:600}.sx-store dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.sx-store .a{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.sx-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.sx .cx{max-width:100%}.sx .cx-h{flex-wrap:wrap}.sx input,.sx select{max-width:100%}
+.sx .cx:has(table){overflow-x:auto!important}
+@media (max-width:760px){
+  .sx table.tb{min-width:540px}.sx table.tb.cr{min-width:0}.sx table.tb.cr th,.sx table.tb.cr td{padding:8px 6px}.sx .hide-m{display:none}
+  .sx .grid2,.sx .grid-r,.sx .fr-kpis{grid-template-columns:minmax(0,1fr)!important}
+  .sx .grid2>*,.sx .grid-r>*{min-width:0}
+  .sx .cx input:not([type=number]):not([type=checkbox]):not([type=date]){width:100%!important;box-sizing:border-box}
+  .sx table.tb.cr span{font-size:10.5px!important;padding:2px 5px!important}
+  .sx .tbtn{min-height:40px}.sx .tbtn.s{font-size:13px;padding:8px 12px}
+  .sx input:not([type=checkbox]):not([type=radio]),.sx select{min-height:42px;font-size:16px!important}
+  .modal-back.sx-m{align-items:flex-end!important}
+  .modal-back.sx-m>.cx{width:100%!important;max-width:100%!important;max-height:92vh!important;border-radius:20px 20px 0 0!important}
+  .modal-back.sx-m input[type=number]{width:104px!important;min-height:48px;font-size:19px!important;font-weight:800;text-align:center}
+  .modal-back.sx-m .tbtn{min-height:46px;font-size:14.5px;flex:1;justify-content:center}
+}
+@media (min-width:761px){
+  .sx-top{flex-direction:row;align-items:center;justify-content:space-between}
+  .sx-kbg{grid-template-columns:auto auto}
+  .sx-nav{top:60px;display:inline-grid;grid-auto-flow:column;grid-template-columns:none}
+  .sx-nav button{flex-direction:row;gap:7px;padding:9px 16px;font-size:13.5px}.sx-nav button i{font-size:16px}
+  .sx-cols{display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:16px;align-items:start}
+  .sx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sx-stores{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+}
 </style>
 </head>
 <body>
@@ -261,8 +365,10 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
     <div class="side-foot"><span class="side-av" id="sideAv">·</span><div><span id="whoami"></span><small id="sideDate"></small></div>
       <button class="tbtn s" style="margin-left:auto;background:transparent;border-color:rgba(255,255,255,.12);color:#9fb098" title="Se déconnecter" onclick="consoleLogout()"><svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></svg></button></div>
   </nav>
+  <div id="navBack" onclick="document.body.classList.remove('nav-open')"></div>
   <div class="main">
     <div class="topbar">
+      <button id="navBtn" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')">☰</button>
       <div class="crumb" id="crumb"></div>
       <div class="sp"></div>
       <span class="live-badge" id="liveBadge"><span class="ldot"></span>Live</span>
@@ -292,7 +398,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.9.12";
+const APP_VERSION = "2.10.0";
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -472,7 +578,7 @@ function start(email){
     dbCentrale.ref("rungis_notes").orderByKey().startAt(isoDay(Date.now()-7*86400000)).on("value",snap=>{ centraleState.rungisNotes=snap.val()||{}; dashTick(true); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
   // Onglets (menu latéral)
-  document.querySelectorAll(".side .tab").forEach(b=>b.onclick=()=>{ if(b.dataset.cview) centraleView=b.dataset.cview; switchTab(b.dataset.tab, b.dataset.key); });
+  document.querySelectorAll(".side .tab").forEach(b=>b.onclick=()=>{ document.body.classList.remove("nav-open"); if(b.dataset.cview) centraleView=b.dataset.cview; switchTab(b.dataset.tab, b.dataset.key); });
   renderMulti(); renderMsg();
   apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; }).catch(()=>{});
   // Écouteurs live : réceptions + documents + messages de chaque magasin
@@ -4279,20 +4385,24 @@ let sapCalSel="";
 function sapCalClick(k){ sapCalSel=k; if(sapDates().indexOf(k)>=0) sapDate=k; renderSapins(); }
 function sapCalHTML(d){
   const S=sapS(), cfg=S.config||{}, n1=S.n1, act=sapDates(), today=sapToday(), sel=sapCalSel||d, now=Date.now(), rc=cfg.recups||{};
-  const cell=k=>{ if(!k) return `<div></div>`; const on=act.indexOf(k)>=0, past=k<today, o=rc[k]||{}, byR=o.src==="rungis", lock=on&&sapLocked(cfg,S.cmd||{},k,now);
-    return `<button onclick="sapCalClick('${k}')" style="position:relative;height:46px;border-radius:10px;border:1px solid ${on?"#C62828":"#dfe5e1"};background:${on?"#C62828":"#fff"};color:${on?"#fff":"#1c2b24"};font-weight:800;font-size:17px;cursor:pointer;opacity:${past&&k!==sel?.35:1};${k===sel?"outline:4px solid #F6C744;outline-offset:1px;":""}${k===today?"box-shadow:inset 0 0 0 2px #1c2b24;":""}">${+k.slice(8)}${byR?`<i style="position:absolute;top:2px;right:3px;font-style:normal;font-size:10px;background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 3px">R</i>`:""}${lock?`<span style="position:absolute;bottom:0;right:2px;font-size:10px">🔒</span>`:""}</button>`; };
-  const months=sapCalMonths(n1,cfg).map(m=>`<div><div style="font-weight:800;font-size:17px;margin-bottom:6px">${m.label}</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(w=>`<div style="font-size:13px;font-weight:800;color:var(--t2,#5f6f66);text-align:center">${w}</div>`).join("")}${m.cells.map(cell).join("")}</div></div>`).join("");
+  const mon=k=>{ const p=k.split("-"), dt=new Date(+p[0],+p[1]-1,+p[2],12); return sapAddDays(k,-((dt.getDay()+6)%7)); };
+  const first=act[0]||today, last=[act[act.length-1]||today,(n1&&n1.finSaison)||"",sel||""].sort().pop();
+  let start=mon(first<today?first:today); if(sel&&sel<start) start=mon(sel);
+  let end=sapAddDays(mon(last),6); if(end<sapAddDays(start,27)) end=sapAddDays(start,27);
+  const MO=["janv.","févr.","mars","avril","mai","juin","juil.","août","sept.","oct.","nov.","déc."], MOL=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  let cells=""; for(let k=start,i=0;k<=end&&i<140;k=sapAddDays(k,1),i++){ const on=act.indexOf(k)>=0, o=rc[k]||{}, lock=on&&sapLocked(cfg,S.cmd||{},k,now), dn=+k.slice(8);
+    cells+=`<button onclick="sapCalClick('${k}')" class="${on?"on ":""}${k<today?"past ":""}${k===today?"today ":""}${lock?"lk ":""}${k===sel?"sel":""}" aria-label="${esc(sapDayFr(k,true))}">${dn}${dn===1||k===start?`<small>${MO[+k.slice(5,7)-1]}</small>`:""}${o.src==="rungis"?`<em class="r">R</em>`:lock?`<em>🔒</em>`:""}</button>`; }
+  const m0=+start.slice(5,7)-1, m1=+end.slice(5,7)-1;
   const on=act.indexOf(sel)>=0, o=rc[sel]||{};
-  const conf=o.confirmed?`<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px">✅ Confirmé par Rungis (mail 2 h) le ${new Date(o.confirmed.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
-  const who=o.at?`<div style="background:#FFF8E1;border:1px solid #F6C744;border-radius:10px;padding:8px 12px;font-size:13px;margin-top:10px">✏️ ${o.movedFrom?"Déplacé du "+esc(sapDayFr(o.movedFrom))+" — ":o.movedTo?"Déplacé au "+esc(sapDayFr(o.movedTo))+" — ":o.added?"Ajouté — ":o.removed?"Retiré — ":o.on===false?"Retiré — ":"Modifié — "}par <b>${esc(o.by||"?")}</b>${o.src==="rungis"?" <b>(Rungis)</b>":""} le ${new Date(o.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
-  const acts=!sel?"":on?`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px"><b style="font-size:16px">${esc(sapDayFr(sel,true))}</b><span class="pill" style="background:#C62828;color:#fff">Récupération</span><span class="sp"></span>
-      <button class="tbtn s" style="color:var(--dan);border-color:var(--dan)" onclick="sapDayOp('remove','${sel}')">✕ Retirer ce jour</button>
-      <input type="date" id="sapMoveTo" style="padding:5px;border:1px solid var(--line);border-radius:8px"><button class="tbtn s p" onclick="sapDayOp('move','${sel}',(document.getElementById('sapMoveTo')||{}).value)">⇄ Déplacer au jour choisi</button></div>`
-    :`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px"><b style="font-size:16px">${esc(sapDayFr(sel,true))}</b><span class="t2">pas de récupération ce jour</span><span class="sp"></span>${sel>today?`<button class="tbtn s p" onclick="sapDayOp('add',null,'${sel}')">＋ Ajouter une récupération ce jour</button>`:""}</div>`;
-  return `<div class="cx" style="padding:16px 18px;margin-bottom:14px"><div style="display:flex;align-items:baseline;gap:10px"><b style="font-size:18px">📅 Calendrier des récupérations</b><span class="t2">${act.length} jours · clic = voir le jour</span></div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px;margin-top:10px">${months}</div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#5f6f66;font-weight:700;margin-top:10px"><span>🟥 jour de récupération</span><span>🟨 contour = jour affiché</span><span><b style="background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 3px">R</b> modifié par Rungis</span><span>🔒 commande figée</span></div>
-    ${acts}${who}${conf}</div>`;
+  const conf=o.confirmed?`<div class="sx-note g">✅ Confirmé par Rungis (mail de 2 h) le ${new Date(o.confirmed.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
+  const who=o.at?`<div class="sx-note y">${o.movedFrom?"Déplacé du "+esc(sapDayFr(o.movedFrom))+" — ":o.movedTo?"Déplacé au "+esc(sapDayFr(o.movedTo))+" — ":o.added?"Ajouté — ":o.removed?"Retiré — ":o.on===false?"Retiré — ":"Modifié — "}par <b>${esc(o.by||"?")}</b>${o.src==="rungis"?" <b>(Rungis)</b>":""} le ${new Date(o.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>`:"";
+  const day=!sel?"":`<div class="sx-day"><div class="t"><b>${esc(sapDayFr(sel,true))}</b>${on?`<span class="sx-tag red">Récupération</span>${sapLocked(cfg,S.cmd||{},sel,now)?`<span class="sx-tag grey">🔒 commandes parties</span>`:""}`:`<span class="sx-tag grey">pas de récupération</span>`}</div>${who}${conf}
+    ${on?`<details class="sx-more"><summary>Changer ce jour</summary><div class="sx-acts"><input type="date" id="sapMoveTo" aria-label="Nouveau jour"><button class="sx-btn p" onclick="sapDayOp('move','${sel}',(document.getElementById('sapMoveTo')||{}).value)">⇄ Déplacer à ce jour</button><button class="sx-btn d" onclick="sapDayOp('remove','${sel}')">✕ Retirer la récupération</button></div></details>`
+      :(sel>today?`<div class="sx-acts" style="margin-top:10px"><button class="sx-btn p" style="flex:1" onclick="sapDayOp('add',null,'${sel}')">＋ Ajouter une récupération ce jour</button></div>`:"")}</div>`;
+  return `<div class="sx-card"><div class="sx-h"><b>${m0===m1?MOL[m0]:MOL[m0]+" – "+MOL[m1]} ${end.slice(0,4)}</b><span>${act.length} récupérations · touche un jour</span></div>
+    <div class="sx-cal">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(w=>`<div class="w">${w}</div>`).join("")}${cells}</div>
+    <div class="sx-leg"><span><i style="background:#B3261E"></i>récupération</span><span><i style="box-shadow:inset 0 0 0 2px #1f1d1a"></i>aujourd'hui</span><span>🔒 commandes parties</span><span><b style="background:#F6C744;color:#3a2a00;border-radius:4px;padding:0 4px">R</b> changé par Rungis</span></div>
+    ${day}</div>`;
 }
 async function sapDayOp(op, from, to){
   const S=sapS(), r=sapDayOps(S.n1, S.config||{}, S.cmd||{}, S.recup||{}, op, from, to, sapWho(), "console", Date.now());
@@ -4311,55 +4421,56 @@ function renderSapins(){
   const S=sapS();
   if(!S.n1){ el.innerHTML=`<div class="page-h"><div><h1>🎄 Sapins</h1><div class="sub">Commandes magasins · récupération Rungis chez Cruard · réceptions · BL-factures PROBON RUNGIS</div></div></div>
     <div class="cx" style="padding:16px">⚠️ Le serveur Sapins n'a pas encore lu le classeur de Raimbaud (<code>sapins/n1</code> vide).<br>Installe l'Apps Script « Sapins Probon Rungis » (fonction <b>installer()</b>), puis colle son URL /exec ci-dessous.</div>${sapReglagesHTML()}`; return; }
-  const seg=(k,l)=>`<button class="${sapView===k?"on":""}" onclick="sapView='${k}';renderSapins()">${l}</button>`;
+  const seg=(k,ic,l)=>`<button class="${sapView===k?"on":""}" onclick="sapView='${k}';renderSapins()"><i>${ic}</i>${l}</button>`;
   let main="";
   if(sapView==="suivi") main=sapSuiviHTML();
   else if(sapView==="saison") main=sapSaisonHTML();
   else if(sapView==="prix") main=sapPrixHTML();
   else if(sapView==="test") main=sapTestHTML();
   else main=sapReglagesHTML();
-  el.innerHTML=`<div class="page-h"><div><h1>🎄 Sapins de Noël</h1><div class="sub">Commandes magasins (Centrale) · récupération chez Cruard (chauffeur Rungis) · livraison chauffeur · réception magasin · BL-factures PROBON RUNGIS</div></div><span class="sp"></span>
-    <button onclick="sapKbgCmd()" style="background:#7C3AED;color:#fff;border:none;border-radius:12px;padding:12px 18px;font-weight:800;font-size:15px;cursor:pointer;margin-right:10px;box-shadow:0 3px 0 #4C1D95">🎄 COMMANDE SAPIN KELBONGOO</button>
-    <span class="seg">${seg("suivi","📅 Récup & suivi")}${seg("saison","🏪 Par magasin")}${seg("prix","💶 Prix & factures")}${seg("test","🧪 Test A→Z")}${seg("regl","⚙️ Réglages")}</span></div>${main}`;
+  el.innerHTML=`<div class="sx"><div class="sx-top"><h1>🎄 Sapins de Noël</h1>
+      <div class="sx-kbg"><button class="c" onclick="sapKbgCmd()">🎄 COMMANDE SAPIN KELBONGOO</button><button class="r" onclick="sapKbgRecep()">📦 RÉCEPTION KELBONGOO</button></div></div>
+    <nav class="sx-nav" aria-label="Sapins">${seg("suivi","📅","Suivi")}${seg("saison","🏪","Magasins")}${seg("prix","💶","Prix")}${seg("test","🧪","Test")}${seg("regl","⚙️","Réglages")}</nav>${main}</div>`;
 }
 function sapSuiviHTML(){
   const S=sapS(), cfg=S.config||{}, n1=S.n1, d=sapCurDate(), now=Date.now();
-  const cal=(n1.calendar||[]).map(c=>c.date), extra=Object.keys(cfg.recups||{}).filter(x=>cal.indexOf(x)<0 && !sapIsTest(cfg,x)), all=cal.concat(extra).sort();
   const calH=sapCalHTML(d);
   if(!d || (sapCalSel && sapCalSel!==d)) return calH+(d?"":`<div class="empty">Aucune récupération : touche un jour puis « ＋ Ajouter ».</div>`);
   const per=sapPeriod(n1,cfg,d), cmds=S.cmd||{}, receps=S.recep||{}, rc=(S.recup||{})[d]||null, recap=((S.recap||{})[d]||{}).lines || sapRecap(n1,cfg,d,cmds,receps);
   const tot=SAP_LINES.reduce((a,L)=>a+((recap[L.k]||{}).tot||0),0), left=sapDeadline(d)-now;
-  // commandes par magasin
   const REAL=sapStoresFor(cfg,d);
-  const rowsCmd=REAL.map(s=>{ const c=(cmds[d]||{})[s.k]||null, p=sapPlan(n1,cfg,d,s.k,cmds,receps); const theo=p.lines.reduce((a,o)=>a+o.theo,0);
+  const cards=REAL.map(s=>{ const c=(cmds[d]||{})[s.k]||null, p=sapPlan(n1,cfg,d,s.k,cmds,receps); const theo=p.lines.reduce((a,o)=>a+o.theo,0);
     const q=sapSum(sapEffLines(n1,cfg,d,s.k,cmds,receps)), r=(receps[d]||{})[s.k]||null, lv=((S.livr||{})[d]||{})[s.k]||null, dp=lv&&lv.lines?sapSum(lv.lines):(rc&&rc.dispatch?sapSum(rc.dispatch[s.k]):null), b=((S.bl||{})[d]||{})[s.k]||null;
-    const st=!(c&&c.at)?((s.noProp||s.manualCmd)?`<span class="pill" style="background:#fff3e0;color:#e65100">⏳ pas commandé = 0</span>`:`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision (part seule)</span>`):c.auto?`<span class="pill" style="background:#eef2f7;color:#333">📊 prévision figée</span>`:`<span class="pill pg">✅ ${esc(c.src==="console"?"console · ":"")}${esc(c.by||"")}${c.master?" (master)":""}</span>`;
-    const rec=!r?(dp?`<span class="pill" style="background:#fff3e0;color:#e65100">📦 à réceptionner (magasin)</span>`:"—"):`<span class="pill ${r.coherent===false?"":"pg"}" style="${r.coherent===false?"background:#fdecea;color:#c62828":""}">${r.coherent===false?"⚠️":"✅"} ${sapSum(r.lines)} reçus</span><div class="t2">${esc(r.by||"")}${r.chauffeur?" · chauffeur "+esc(r.chauffeur):""}${r.note?" · « "+esc(r.note)+" »":""}</div>`;
-    return `<tr><td>${sapStoreH(s.k)}</td><td>${st}${c&&c.at?`<div class="t2">${new Date(c.at).toLocaleString("fr-FR",{weekday:"short",hour:"2-digit",minute:"2-digit"})}</div>`:""}</td><td style="text-align:center"><b style="font-size:16px">${q||"—"}</b><div class="t2">${s.noProp?"sans proposition":"proposition "+theo}</div></td><td style="text-align:center">${dp==null?"—":`<b>${dp}</b>`}<div class="t2">${lv?("déposé "+esc(lv.by||"")+(lv.ecart?" ⚠️ ≠ prévu"+(lv.confirmedBy?" (code "+esc(lv.confirmedBy)+")":""):"")):(dp==null?"":"prévu")}</div></td><td>${rec}</td><td>${b?(b.error?`<span style="color:var(--dan)">⚠️ ${esc(b.error)}</span>`:`<a href="${esc(b.url||"#")}" target="_blank">${esc(b.num)}</a> · ${sapEur(b.ttc)}${b.paid?` <span class="pill pg">payé</span>`:""}`):"—"}</td>
-      <td style="white-space:nowrap"><button class="tbtn s" onclick="sapManualCmd('${d}','${s.k}')">✏️ Commande</button> <button class="tbtn s" onclick="sapDetail('${d}','${s.k}')">Détail</button></td></tr>`; }).join("");
-  // Cruard : par ligne
-  const rowsL=SAP_LINES.map(L=>{ const r=recap[L.k]||{tot:0,par:{}}, l=(rc&&rc.lines||{})[L.k]||{}; if(!r.tot && l.pris==null && L.resa) return "";
+    const st=!(c&&c.at)?((s.noProp||s.manualCmd)?`<span class="sx-tag warn">⏳ pas commandé = 0</span>`:`<span class="sx-tag grey">📊 prévision (part seule)</span>`):c.auto?`<span class="sx-tag grey">📊 prévision partie</span>`:`<span class="sx-tag ok">✅ ${esc(c.src==="console"?"console · ":"")}${esc(c.by||"")}${c.master?" (master)":""}</span>`;
+    const rec=!r?(dp?`<span class="sx-tag warn">📦 à réceptionner</span>`:"—"):`<span class="sx-tag ${r.coherent===false?"bad":"ok"}">${r.coherent===false?"⚠️":"✅"} ${sapSum(r.lines)} reçus</span> <span class="t2">${esc(r.by||"")}${r.note?" · « "+esc(r.note)+" »":""}</span>`;
+    const liv=dp==null?"—":`<b>${dp}</b> <span class="t2">${lv?("déposé par "+esc(lv.by||"")+(lv.ecart?" ⚠️ ≠ prévu"+(lv.confirmedBy?" (code "+esc(lv.confirmedBy)+")":""):"")):"prévu"}</span>`;
+    const bl=b?(b.error?`<span style="color:var(--dan)">⚠️ ${esc(b.error)}</span>`:`<a href="${esc(b.url||"#")}" target="_blank">${esc(b.num)}</a> · ${sapEur(b.ttc)}${b.paid?` <span class="sx-tag ok">payé</span>`:""}`):"—";
+    return `<div class="sx-store" style="--c:${s.color}"><div class="h"><b>${esc(s.short)}</b><span class="sp"></span>${st}</div>
+      <div class="q"><b>${q||0}</b><span>sapins</span><small>${s.noProp?"sans proposition":"proposition "+theo}</small></div>
+      <dl><dt>Livré</dt><dd>${liv}</dd><dt>Réception</dt><dd>${rec}</dd><dt>BL-facture</dt><dd>${bl}</dd></dl>
+      <div class="a"><button class="sx-btn ${s.manualCmd?"k":""}" onclick="sapManualCmd('${d}','${s.k}')">✏️ Commande</button><button class="sx-btn" onclick="sapDetail('${d}','${s.k}')">Détail</button></div></div>`; }).join("");
+  const rowsL=SAP_LINES.map(L=>{ const r=recap[L.k]||{tot:0,par:{}}, l=(rc&&rc.lines||{})[L.k]||{}; if(!r.tot && l.pris==null) return "";
     const pris=l.pris!=null?Number(l.pris):null;
-    return `<tr style="${L.resa?"background:#f5f5f5":""}"><td>${sapChipH(L.k)}</td><td class="t1">${esc(L.cr)}</td><td style="text-align:center;font-size:16px"><b>${r.tot||"·"}</b></td>${REAL.map(s=>`<td style="text-align:center">${r.par[s.k]||"·"}</td>`).join("")}
+    return `<tr><td>${sapChipH(L.k)}</td><td class="t1 hide-m">${esc(L.cr)}</td><td style="text-align:center;font-size:16px"><b>${r.tot||"·"}</b></td>${REAL.map(s=>`<td style="text-align:center">${r.par[s.k]||"·"}</td>`).join("")}
       <td style="text-align:center">${pris==null?"—":`<b style="color:${pris<r.tot?"var(--dan)":"#2e7d32"}">${pris}</b>`}${l.rempl?`<div class="t2">+${l.rempl} ${esc(sapLine(sapOther(L.k)).t)} ${esc(sapLine(sapOther(L.k)).o.toLowerCase())}</div>`:""}${l.sans?`<div class="t2">sans rempl.</div>`:""}</td></tr>`; }).join("");
-  const kpi=(lbl,v,sub)=>`<div class="cx fr-kpi"><div class="eyebrow">${lbl}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
+  const kpi=(lbl,v,sub)=>`<div class="sx-kpi"><div class="l">${lbl}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`;
   const ref=sapRefRange(n1,per);
-  return `${calH}
-    <div class="fr-kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
-      ${kpi("Récupération",esc(sapDayFr(d,true)),`couvre du ${esc(sapDayFr(per.du))} au ${esc(sapDayFr(per.au))} · ventes 2025 du ${esc(sapDayFr(ref.du))} au ${esc(sapDayFr(ref.au))}`)}
-      ${kpi("Commandes",left>0?"⏰ "+sapFmtLeft(left):"🔒 figées",left>0?"jusqu'au "+esc(sapDayFr(sapAddDays(d,-1)))+" minuit · sinon la prévision part":"mail Rungis "+(((S.mails||{})["rungis_"+d])?"envoyé "+new Date(S.mails["rungis_"+d]).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"le jour J à 2h"))}
+  return `<div class="sx-cols"><div>${calH}</div><div>
+    <div class="sx-kpis">
       ${kpi("À enlever chez Cruard",tot+" sapins",REAL.map(s=>{ let n=0; SAP_LINES.forEach(L=>{ n+=((recap[L.k]||{}).par||{})[s.k]||0; }); return n?esc(s.short)+" "+n:""; }).filter(Boolean).join(" · ")||"aucune commande")}
-      ${kpi("Chauffeur",rc&&rc.done?"✅ "+esc(rc.by||""):"—",rc&&rc.done?"récupéré "+SAP_LINES.reduce((a,L)=>a+(((rc.lines||{})[L.k]||{}).pris!=null?Number(rc.lines[L.k].pris):((recap[L.k]||{}).tot||0)),0)+" · "+new Date(rc.at).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"pas encore récupéré")}
-    </div>
-    <div class="cx" style="overflow:hidden;margin-bottom:14px"><div class="cx-h"><h3>🏪 Magasins</h3><span class="sp"></span>${rc||((S.livr||{})[d])?`<button class="tbtn s" style="color:var(--dan)" onclick="sapCancelRecup('${d}')">↩ Annuler la récupération chauffeur</button> `:""}<button class="tbtn s" onclick="sapView='test';renderSapins()">🧪 Faire un test A→Z</button></div>
-      <table class="tb"><tr><th>Magasin</th><th>Commande</th><th style="text-align:center">Sapins</th><th style="text-align:center">Livré (chauffeur)</th><th>Réception</th><th>BL-facture</th><th></th></tr>${rowsCmd}</table></div>
-    <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>🌲 À enlever chez Cruard (étiquettes)</h3><span class="sp"></span><span class="sub">« 1er choix » = Morvan · « Extra » = Jutland</span></div>
-      <table class="tb"><tr><th>Étiquette</th><th>Gamme Cruard</th><th style="text-align:center">Total</th>${REAL.map(s=>`<th style="text-align:center">${esc(s.short)}</th>`).join("")}<th style="text-align:center">Récupéré</th></tr>${rowsL}</table></div>`;
+      ${kpi("Commandes",left>0?"⏰ "+sapFmtLeft(left):"🔒 parties",left>0?"jusqu'à "+esc(sapDayFr(sapAddDays(d,-1)))+" minuit":"mail Rungis "+(((S.mails||{})["rungis_"+d])?"envoyé à "+new Date(S.mails["rungis_"+d]).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"le jour J à 2 h"))}
+      ${kpi("Chauffeur",rc&&rc.done?"✅ "+esc(rc.by||""):"pas encore",rc&&rc.done?"récupéré "+SAP_LINES.reduce((a,L)=>a+(((rc.lines||{})[L.k]||{}).pris!=null?Number(rc.lines[L.k].pris):((recap[L.k]||{}).tot||0)),0)+" · "+new Date(rc.at).toLocaleString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"rien de récupéré")}
+      ${kpi("Sapins à vendre",`${esc(sapDayFr(per.du))} → ${esc(sapDayFr(per.au))}`,`ventes 2025 du ${esc(sapDayFr(ref.du))} au ${esc(sapDayFr(ref.au))}`)}
+    </div></div></div>
+    <div class="sx-sec"><b>🏪 Magasins · ${esc(sapDayFr(d,true))}</b><span class="sp"></span>${rc||((S.livr||{})[d])?`<button class="sx-btn d" onclick="sapCancelRecup('${d}')">↩ Annuler la récupération chauffeur</button>`:""}</div>
+    <div class="sx-stores">${cards}</div>
+    <div class="sx-sec"><b>🌲 À enlever chez Cruard</b><span class="sp"></span><span class="t2">1er choix = Morvan · Extra = Jutland</span></div>
+    <div class="sx-card" style="padding:0;overflow:hidden"><div class="sx-scroll">${rowsL?`<table class="tb cr"><tr><th>Étiquette</th><th class="hide-m">Gamme Cruard</th><th style="text-align:center">Total</th>${REAL.map(s=>`<th style="text-align:center">${esc(s.short.slice(0,4))}</th>`).join("")}<th style="text-align:center">Pris</th></tr>${rowsL}</table>`:`<div class="empty">Aucun sapin commandé pour ce jour.</div>`}</div></div>`;
 }
 function sapDetail(d, sk){
   const S=sapS(), cfg=S.config||{}, p=sapPlan(S.n1,cfg,d,sk,S.cmd||{},S.recep||{}), rc=(S.recup||{})[d]||{}, disp=sapAttendu(S.recup,S.livr,d,sk)||{}, r=((S.recep||{})[d]||{})[sk]||{};
   const rows=p.lines.map(o=>`<tr><td>${sapChipH(o.k)} ${esc(sapLine(o.k).o)}</td><td style="text-align:center">${Math.round(o.ventes*10)/10}</td><td style="text-align:center">${Math.round(o.besoin*100)/100}</td><td style="text-align:center">${o.stockSaisi==null?(sk==="KBG"?"calc. "+o.stockCalc:"—"):o.stockSaisi}</td><td style="text-align:center">${o.theo}</td><td style="text-align:center"><b>${o.reel==null?"—":o.reel}</b></td><td style="text-align:center">${disp[o.k]||"·"}</td><td style="text-align:center;${r.lines&&Number(r.lines[o.k]||0)!==Number(disp[o.k]||0)?"color:var(--dan);font-weight:800":""}">${r.lines?(r.lines[o.k]||0):"·"}</td></tr>`).join("");
-  const m=document.createElement("div"); m.className="modal-back"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
+  const m=document.createElement("div"); m.className="modal-back sx-m"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
   m.onclick=e=>{ if(e.target===m) m.remove(); };
   m.innerHTML=`<div class="cx" style="max-width:860px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3>${sapStoreH(sk)} · récup du ${esc(sapDayFr(d,true))}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     <table class="tb"><tr><th>Ligne</th><th>Ventes 2025</th><th>Besoin</th><th>Inventaire</th><th>Proposition</th><th>Commande</th><th>Livré</th><th>Reçu</th></tr>${rows}</table>
@@ -4398,11 +4509,11 @@ function sapReglagesHTML(){
       ${meta.suiviUrl?`📊 <a href="${esc(meta.suiviUrl)}" target="_blank">Classeur de suivi réel (créé par l'appli)</a><br>`:""}
       📗 Classeur de Raimbaud : lu seulement (jamais modifié) · dernière lecture ${S.n1&&S.n1.syncedAt?new Date(S.n1.syncedAt).toLocaleString("fr-FR"):"—"}<br>
       <button class="tbtn s" onclick="sapPost({action:'sapin-sync'}).then(j=>toastC(j.ok?'✅ Ventes 2025 relues':'Erreur '+j.error)).catch(e=>alert(e.message))">🔄 Relire le classeur de Raimbaud</button>
-      <span class="t2">Mail Rungis le jour J à 2h → gestion@probon.fr, st@, fl@, rr@</span><br>
+      <span class="t2">Mail Rungis le jour J à 2h → gestion@probon.fr, st@, fl@, achat@</span><br>
       <button class="tbtn s" onclick="sapPost({action:'sapin-test',kind:'rappel'}).then(j=>toastC(j.ok?'🧪 Rappel test envoyé à hg@':'Erreur '+j.error)).catch(e=>alert(e.message))">🧪 Rappel 48 h test</button></div>
     <div class="cx" style="padding:14px 16px;line-height:2"><b>✉️ Adresses des magasins</b> (rappel 48 h, réception manquante, BL-facture)<br>
       ${SAP_STORES.filter(s=>!s.test).map(s=>`${sapStoreH(s.k)} ${inp("sapM"+s.k, mails[s.k]!=null?mails[s.k]:s.mail, "", `sapCfg('mails/${s.k}',this.value.trim())`,260)}`).join("<br>")}</div>
-    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Par défaut, c'est la <b>prévision</b> qui part (le magasin peut la modifier et valider jusqu'à la veille minuit). <b>Bichat</b> : pas de prévision, le magasin choisit ses sapins dans la Centrale (sinon 0). ✏️ Commande permet une correction master. <b>Kelbongoo</b> : seul le master modifie. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
+    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Par défaut, c'est la <b>prévision</b> qui part (le magasin peut la modifier et valider jusqu'à la veille minuit). <b>Bichat</b> : pas de prévision, le magasin choisit ses sapins dans la Centrale (sinon 0). ✏️ Commande permet une correction master. <b>Kelbongoo</b> : jamais avec un code (la colonne KELBONGOO n'ouvre pas les sapins) ; la commande et la réception se font ici, avec les deux boutons violets. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
   </div>`;
 }
 /* ---------- 🧪 TEST A → Z : journée fictive, MAGASIN TEST seul, tous les mails à hg@ + rr@ ---------- */
@@ -4447,25 +4558,50 @@ function sapTestHTML(){
       <table class="tb">${rows}</table></div>`;
 }
 /* ✏️ Commande saisie dans la console (Bichat, magasin test, ou correction master) */
-/* Kelbongoo : commande faite ici par le master (jamais dans La Centrale avec un code). On choisit d'abord le jour. */
+/* Kelbongoo : commande ET réception faites ici par le master (jamais dans La Centrale avec un code). On choisit d'abord le jour. */
+function sapKbgPick(title, intro, days, row, fn){
+  const m=document.createElement("div"); m.className="modal-back sx-m"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
+  m.onclick=e=>{ if(e.target===m) m.remove(); };
+  const btn=d=>{ const r=row(d); return `<button onclick="this.closest('.modal-back').remove();${fn}('${d}','KBG')" style="display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;text-align:left;border:none;border-radius:14px;padding:13px 14px;margin-bottom:8px;cursor:pointer;background:${r.ok?"#E6F4EA":"#B3261E"};color:${r.ok?"#17512F":"#fff"};font:800 16px Inter,sans-serif">
+      <span style="flex:1;min-width:0">${esc(sapDayFr(d,true))}<small style="display:block;font-weight:600;font-size:12.5px;opacity:.92;margin-top:2px">${r.sub}</small></span><span style="font-size:13.5px;text-align:right">${r.st}</span></button>`; };
+  m.innerHTML=`<div class="cx" style="max-width:520px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3 style="font-size:16px">${title}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    <div style="padding:10px 14px 14px"><div style="font-size:13.5px;color:#5f6f66;margin-bottom:10px">${intro}</div>${days.length?days.map(btn).join(""):`<div class="empty">Aucun jour pour l'instant.</div>`}</div></div>`;
+  document.body.appendChild(m);
+}
 function sapKbgCmd(){
   const S=sapS(), cfg=S.config||{}, now=Date.now(), days=sapDates().filter(d=>!sapIsTest(cfg,d) && !sapLocked(cfg,S.cmd||{},d,now));
-  const m=document.createElement("div"); m.className="modal-back"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
+  sapKbgPick("🎄 Commande sapin Kelbongoo","Pour Kelbongoo rien ne part tout seul : <b>sans commande = 0 sapin</b>. Choisis le jour de récupération.",days,d=>{ const c=((S.cmd||{})[d]||{}).KBG, ok=!!(c&&c.at&&!c.auto);
+    return { ok, sub:"à commander avant "+esc(sapDayFr(sapAddDays(d,-1),true))+" minuit", st:ok?"✅ "+sapSum(c.reel||{})+" sapins":"⏳ pas commandé<br>proposition "+sapSum(sapPropLines(S.n1,cfg,d,"KBG",S.cmd||{},S.recep||{})) }; },"sapManualCmd");
+}
+function sapKbgExpected(d){ const S=sapS(), c=((S.cmd||{})[d]||{}).KBG||{}; return sapAttendu(S.recup,S.livr,d,"KBG") || (c.at&&!c.auto?c.reel:null) || {}; }
+function sapKbgRecep(){
+  const S=sapS(), cfg=S.config||{}, today=sapToday(), days=sapDates().filter(d=>!sapIsTest(cfg,d) && d<=today && (sapSum(sapKbgExpected(d))>0 || ((S.recep||{})[d]||{}).KBG)).reverse();
+  sapKbgPick("📦 Réception sapins Kelbongoo","Compte les sapins déposés par le chauffeur, puis valide. Si le nombre est différent, un mail part à rr@ pour recompter.",days,d=>{ const r=((S.recep||{})[d]||{}).KBG, e=sapSum(sapKbgExpected(d));
+    return { ok:!!(r&&r.at), sub:"attendu : "+e+" sapins", st:r&&r.at?(r.coherent===false?"⚠️ ":"✅ ")+sapSum(r.lines)+" reçus":"📦 à réceptionner" }; },"sapManualRecep");
+}
+function sapManualRecep(d, sk){
+  const S=sapS(), st=sapStore(sk), r0=((S.recep||{})[d]||{})[sk]||null, lv=((S.livr||{})[d]||{})[sk]||null, exp=sk==="KBG"?sapKbgExpected(d):(sapAttendu(S.recup,S.livr,d,sk)||{});
+  const keys=Array.from(new Set(st.lines.concat(Object.keys(exp)))).filter(k=>sapNum(exp[k])>0 || (r0&&r0.lines&&sapNum(r0.lines[k])>0));
+  const rows=keys.map(k=>`<tr><td>${sapChipH(k)} ${esc(sapLine(k).o==="MORVAN"?"Morvan":"Jutland")}</td><td style="text-align:center" class="t2">attendu <b>${sapNum(exp[k])}</b></td><td><input type="number" min="0" step="1" inputmode="numeric" data-k="${k}" value="${r0&&r0.lines?sapNum(r0.lines[k]):sapNum(exp[k])}" style="width:80px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:15px"></td></tr>`).join("");
+  const m=document.createElement("div"); m.className="modal-back sx-m"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
   m.onclick=e=>{ if(e.target===m) m.remove(); };
-  const btn=d=>{ const c=((S.cmd||{})[d]||{}).KBG, ok=c&&c.at&&!c.auto, prop=sapSum(sapPropLines(S.n1,cfg,d,"KBG",S.cmd||{},S.recep||{}));
-    return `<button onclick="this.closest('.modal-back').remove();sapManualCmd('${d}','KBG')" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;background:${ok?"#E8F5E9":"#C62828"};color:${ok?"#1B5E20":"#fff"};font-size:16px;font-weight:800">
-      <span style="flex:1">${esc(sapDayFr(d,true))}<small style="display:block;font-weight:600;font-size:12.5px;opacity:.9">à commander avant ${esc(sapDayFr(sapAddDays(d,-1),true))} minuit</small></span>
-      <span style="font-size:14px">${ok?"✅ commandé : "+sapSum(c.reel||{})+" sapins":"⏳ pas commandé = 0 · proposition "+prop}</span></button>`; };
-  m.innerHTML=`<div class="cx" style="max-width:520px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3>🎄 Commande sapin Kelbongoo</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
-    <div style="padding:6px 16px 14px"><div style="font-size:13.5px;color:#5f6f66;margin-bottom:10px">Pour Kelbongoo rien ne part tout seul : <b>sans commande = 0 sapin</b>. Choisis le jour de récupération.</div>${days.length?days.map(btn).join(""):`<div class="empty">Aucun jour ouvert à la commande.</div>`}</div></div>`;
+  m.innerHTML=`<div class="cx" style="max-width:480px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3 style="font-size:16px">📦 Réception ${esc(st.short)} · ${esc(sapDayFr(d,true))}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
+    ${r0&&r0.at?`<div style="padding:8px 16px;font-size:13.5px;background:#E8F5E9">Déjà réceptionné par ${esc(r0.by||"?")} (${sapSum(r0.lines)} sapins). Tu peux corriger.</div>`:""}
+    ${rows?`<table class="tb">${rows}</table><div style="padding:12px 16px;display:flex;gap:8px"><button class="tbtn p" id="sapMrOk">✅ Valider la réception</button></div>`:`<div class="empty">Rien d'attendu pour ce jour.</div>`}</div>`;
   document.body.appendChild(m);
+  const ok=m.querySelector("#sapMrOk"); if(ok) ok.onclick=async()=>{ const lines={}; m.querySelectorAll("input[data-k]").forEach(i=>{ lines[i.dataset.k]=Math.max(0,Math.round(Number(i.value)||0)); });
+    const coherent=keys.every(k=>sapNum(lines[k])===sapNum(exp[k]));
+    if(!coherent && !confirm("Tu as bien recompté ?\n\nReçu "+sapSum(lines)+" · attendu "+sapSum(exp)+".\nOK = j'ai recompté, j'enregistre (un mail part à rr@).")) return;
+    try{ if(r0) await dbCentrale.ref("sapins/recep_hist/"+d+"/"+sk).push(Object.assign({},r0,{replacedAt:Date.now(),replacedBy:sapWho()}));
+      await dbCentrale.ref("sapins/recep/"+d+"/"+sk).set({ lines, expected:exp, by:sapWho(), at:Date.now(), coherent, note:"", src:"console", master:true, alertSent:null, chauffeur:(lv&&lv.by)||(r0&&r0.chauffeur)||null });
+      m.remove(); toastC((coherent?"✅ Réception ":"⚠️ Réception avec écart ")+st.short+" : "+sapSum(lines)+" sapins"); }catch(e){ alert(e.message); } };
 }
 function sapManualCmd(d, sk){
   const S=sapS(), cfg=S.config||{}, st=sapStore(sk), c=((S.cmd||{})[d]||{})[sk]||{};
   const eff=(st.manualCmd && !(c.at&&!c.auto)) ? sapPropLines(S.n1,cfg,d,sk,S.cmd||{},S.recep||{}) : sapEffLines(S.n1,cfg,d,sk,S.cmd||{},S.recep||{});
   const locked=sapLocked(cfg,S.cmd||{},d,Date.now());
   const rows=st.lines.filter(k=>!sapLine(k).resa).map(k=>`<tr><td>${sapChipH(k)} ${esc(sapLine(k).o==="MORVAN"?"Morvan":"Jutland")}</td><td><input type="number" min="0" step="1" data-k="${k}" value="${eff[k]||0}" style="width:80px;padding:6px;border:1px solid var(--line);border-radius:8px;font-size:15px"></td></tr>`).join("");
-  const m=document.createElement("div"); m.className="modal-back"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
+  const m=document.createElement("div"); m.className="modal-back sx-m"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
   m.onclick=e=>{ if(e.target===m) m.remove(); };
   m.innerHTML=`<div class="cx" style="max-width:480px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3>✏️ ${sapStoreH(sk)} · récup du ${esc(sapDayFr(d,true))}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
     ${locked&&!sapIsTest(cfg,d)?`<div style="padding:8px 16px;color:var(--dan);font-weight:700">⚠️ Commande déjà figée (mail Rungis peut-être parti).</div>`:""}
