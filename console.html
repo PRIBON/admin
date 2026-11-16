@@ -398,7 +398,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.11.0"; // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.11.1"; // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4191,14 +4191,14 @@ var SAP_STORES = [
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] },
   { k:"BIC", label:"PRIBON BICHAT", short:"Bichat", col:"BICHAT", cols:["bichat","pribon bichat","bic"], mail:"bichat@pribon.org", color:"#FF1F8E",
     lines:["M80","M100","M125","M150","M175","M200"], noProp:true }, // Morvan uniquement, PAS de proposition (pas d'historique)
-  { k:"KBG", masterCmd:true, manualCmd:true, label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.fr", color:"#7C3AED",
+  { k:"KBG", masterCmd:true, manualCmd:true, label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.org", color:"#7C3AED",
     lines:["M80","M100","M125","M150"] },                          // Morvan uniquement, sans remplacement
   // 🧪 Magasin TEST : n'existe que sur les journées de test (Console › 🎄 Sapins › 🧪 Test). Tous les mails → hg@ + rr@.
-  { k:"TST", label:"🧪 MAGASIN TEST", short:"Test", col:"TEST", cols:["test"], mail:"hg@probon.fr,rr@pribon.org", color:"#455A64", test:true,
+  { k:"TST", label:"🧪 MAGASIN TEST", short:"Test", col:"TEST", cols:["test"], mail:"hg@probon.org,rr@pribon.org", color:"#455A64", test:true,
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] }
 ];
 var SAP_MINI_DEF = { ROB:3, TOL:1, BIC:1, KBG:2, TST:3 };
-var SAP_TEST_TO = "hg@probon.fr,rr@pribon.org";
+var SAP_TEST_TO = "hg@probon.org,rr@pribon.org";
 function sapLine(k){ for (var i=0;i<SAP_LINES.length;i++) if (SAP_LINES[i].k===k) return SAP_LINES[i]; return null; }
 function sapStore(k){ for (var i=0;i<SAP_STORES.length;i++) if (SAP_STORES[i].k===k) return SAP_STORES[i]; return null; }
 function sapOther(k){ return k.charAt(0)==="M" ? "J"+k.slice(1) : "M"+k.slice(1); }   // même taille, autre gamme
@@ -4486,7 +4486,7 @@ function sapSuiviHTML(){
     const bl=b?(b.error?`<span style="color:var(--dan)">⚠️ ${esc(b.error)}</span>`:`<a href="${esc(b.url||"#")}" target="_blank">${esc(b.num)}</a> · ${sapEur(b.ttc)}${b.paid?` <span class="sx-tag ok">payé</span>`:""}`):"—";
     return `<div class="sx-store" style="--c:${s.color}"><div class="h"><b>${esc(s.short)}</b><span class="sp"></span>${st}</div>
       <div class="q"><b>${q||0}</b><span>sapins</span><small>${s.noProp?"sans proposition":"proposition "+theo}</small></div>
-      <dl><dt>Livré</dt><dd>${liv}</dd><dt>Réception</dt><dd>${rec}</dd><dt>BL-facture</dt><dd>${bl}</dd></dl>
+      <dl>${s.manualCmd?"":`<dt>Inventaire</dt><dd>${c&&c.inv&&c.inv.at?`<span class="sx-tag ok">📋 fait</span> <span class="t2">${esc(c.inv.by||"")} · ${new Date(c.inv.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</span>`:(c&&c.at&&!c.auto?`<span class="sx-tag ok">📋 avec la commande</span>`:`<span class="sx-tag bad">📋 pas fait</span>`)}</dd>`}<dt>Livré</dt><dd>${liv}</dd><dt>Réception</dt><dd>${rec}</dd><dt>BL-facture</dt><dd>${bl}</dd></dl>
       <div class="a"><button class="sx-btn ${s.manualCmd?"k":""}" onclick="sapManualCmd('${d}','${s.k}')">✏️ Commande</button><button class="sx-btn" onclick="sapDetail('${d}','${s.k}')">Détail</button></div></div>`; }).join("");
   const rowsL=SAP_LINES.map(L=>{ const r=recap[L.k]||{tot:0,par:{}}, l=(rc&&rc.lines||{})[L.k]||{}; if(!r.tot && l.pris==null) return "";
     const pris=l.pris!=null?Number(l.pris):null;
@@ -4548,11 +4548,17 @@ function sapReglagesHTML(){
       ${meta.suiviUrl?`📊 <a href="${esc(meta.suiviUrl)}" target="_blank">Classeur de suivi réel (créé par l'appli)</a><br>`:""}
       📗 Classeur de Raimbaud : lu seulement (jamais modifié) · dernière lecture ${S.n1&&S.n1.syncedAt?new Date(S.n1.syncedAt).toLocaleString("fr-FR"):"—"}<br>
       <button class="tbtn s" onclick="sapPost({action:'sapin-sync'}).then(j=>toastC(j.ok?'✅ Ventes 2025 relues':'Erreur '+j.error)).catch(e=>alert(e.message))">🔄 Relire le classeur de Raimbaud</button>
-      <span class="t2">Mail Rungis le jour J à 2h → gestion@probon.fr, st@, fl@, achat@</span><br>
+      <span class="t2">Mail Rungis le jour J à 2h → gestion@probon.org, st@, fl@, achat@</span><br>
       <button class="tbtn s" onclick="sapPost({action:'sapin-test',kind:'rappel'}).then(j=>toastC(j.ok?'🧪 Rappel test envoyé à hg@':'Erreur '+j.error)).catch(e=>alert(e.message))">🧪 Rappel 48 h test</button></div>
     <div class="cx" style="padding:14px 16px;line-height:2"><b>✉️ Adresses des magasins</b> (rappel 48 h, réception manquante, BL-facture)<br>
       ${SAP_STORES.filter(s=>!s.test).map(s=>`${sapStoreH(s.k)} ${inp("sapM"+s.k, mails[s.k]!=null?mails[s.k]:s.mail, "", `sapCfg('mails/${s.k}',this.value.trim())`,260)}`).join("<br>")}</div>
-    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». Par défaut, c'est la <b>prévision</b> qui part (le magasin peut la modifier et valider jusqu'à la veille minuit). <b>Bichat</b> : pas de prévision, le magasin choisit ses sapins dans la Centrale (sinon 0). ✏️ Commande permet une correction master. <b>Kelbongoo</b> : jamais avec un code (la colonne KELBONGOO n'ouvre pas les sapins) ; la commande et la réception se font ici, avec les deux boutons violets. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
+    <div class="cx" style="padding:14px 16px;line-height:1.9"><b>🏷️ Codes article PDV des sapins</b> <span class="t2">(EAN ou code article Progmag)</span><br>
+      <span class="t2" style="line-height:1.4;display:block;margin-bottom:6px">Servent au <b>.txt G5</b> envoyé au magasin après sa réception et au <b>stock théorique</b> lu dans PDV. Sans code : le .txt attend (mail à rr@ + hg@).</span>
+      ${SAP_LINES.map(L=>`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px"><span style="min-width:170px">${sapChipH(L.k)} ${esc(L.o==="MORVAN"?"Morvan":"Jutland")}</span>${inp("sapCode"+L.k, ((cfg.codes||{})[L.k])||"", "code article", `sapCfg('codes/${L.k}',this.value.trim()||null)`,190)}</div>`).join("")}</div>
+    <div class="cx" style="padding:14px 16px;line-height:1.9"><b>📦 Stock théorique PDV reçu</b><br>
+      ${SAP_STORES.filter(s=>!s.test && !s.manualCmd).map(s=>{ const x=(S.stock||{})[s.k]; return `${sapStoreH(s.k)} ${x&&x.at?("mis à jour "+new Date(x.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})+(Date.now()-x.at>3*3600e3?' <span class="sx-tag warn">ancien</span>':' <span class="sx-tag ok">OK</span>')):'<span class="sx-tag grey">jamais reçu</span>'}`; }).join("<br>")}
+      <div class="t2" style="line-height:1.4;margin-top:6px">Envoyé toutes les 15 min par le petit script <b>sapins_stock.ps1</b> posé sur le serveur Progmag de chaque magasin.</div></div>
+    <div class="cx" style="padding:14px 16px;font-size:13px;line-height:1.6"><b>🔐 Codes magasin</b><br>Le code d'un salarié ouvre les magasins cochés dans ses colonnes du <b>REGISTRE APPLI PRIBON</b> — les mêmes que pour la réception : <b>KELBONGOO (G) · BICHAT (H) · ROBESPIERRE (I) · TOLBIAC (J)</b>. Rien à ajouter. Le master (voit et commande pour tous) se connecte dans la Centrale par « 🔑 Connexion master (Google) ». La veille de la livraison, le magasin fait son <b>inventaire</b> (obligatoire, alerte à 19 h sinon) ; ensuite la <b>prévision</b> part toute seule à minuit, sauf s'il change ses quantités (commande sous la prévision → mail rr@ + achat@). <b>Bichat</b> : pas de prévision, le magasin choisit ses sapins dans la Centrale (sinon 0). ✏️ Commande permet une correction master. <b>Kelbongoo</b> : jamais avec un code (la colonne KELBONGOO n'ouvre pas les sapins) ; la commande et la réception se font ici, avec les deux boutons violets. Le chauffeur (case « Retour PDP ») confirme avec son code si ce qu’il dépose n’est pas ce qui était prévu.</div>
   </div>`;
 }
 /* ---------- 🧪 TEST A → Z : journée fictive, MAGASIN TEST seul, tous les mails à hg@ + rr@ ---------- */
