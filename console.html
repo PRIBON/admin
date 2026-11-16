@@ -398,7 +398,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.11.0"; // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -518,12 +518,51 @@ function checkVersion(){
 }
 
 /* ============================ AUTH ============================ */
-function onCredential(resp){
+/* v2.11.0 — CONNEXION SÉCURISÉE (étape A). Chaque base : connexion ANONYME (seule, elle n'ouvre rien) ;
+   le serveur du registre vérifie le compte Google et ouvre une SESSION responsable (12 h) dans les 3 bases.
+   Les règles des bases (étape B) n'acceptent que ces sessions. Aucun secret, aucune adresse autorisée ici. */
+function fbApp(cfg,name){ try{ return firebase.app(name); }catch(e){ return firebase.initializeApp(cfg,name); } }
+async function anonToken(app){
+  if(!app || !app.auth) return "";
+  const a=app.auth();
+  for(let i=0;i<2;i++){
+    try{ if(!a.currentUser) await a.signInAnonymously(); return a.currentUser ? await a.currentUser.getIdToken() : ""; }
+    catch(e){ console.warn("[connexion] anonyme", e&&e.code); if(e&&e.code==="auth/operation-not-allowed") return ""; try{ await a.signOut(); }catch(_){} }
+  }
+  return "";
+}
+async function sessTokens(){
+  const out={}, key={ ROBESPIERRE:"rob", BICHAT:"bic" };
+  try{ const t=await anonToken(fbApp(CENTRALE_FIREBASE_CONFIG,"CENTRALE")); if(t) out.prep=t; }catch(e){}
+  for(const s of readyStores()){ const k=key[s.code]; if(!k) continue; try{ const t=await anonToken(fbApp(s.firebaseConfig,s.code)); if(t) out[k]=t; }catch(e){} }
+  return out;
+}
+let SESS_OK=false;
+// Tous les appels aux scripts Google portent les jetons de la console (fb) : le serveur vérifie la session.
+(function(){
+  if (!window.fetch || window.__pribonFetch) return;
+  const orig=window.fetch.bind(window); window.__pribonFetch=true;
+  const key={ CENTRALE:"prep", ROBESPIERRE:"rob", BICHAT:"bic" };
+  window.fetch=async function(url,opt){
+    try{
+      if (typeof url==="string" && url.indexOf("script.google.com/macros/")>=0 && opt && String(opt.method||"").toUpperCase()==="POST" && typeof opt.body==="string" && opt.body.charAt(0)==="{"){
+        const b=JSON.parse(opt.body);
+        if(!b.fb){ const fb={};
+          for(const n of Object.keys(key)){ try{ const a=firebase.app(n).auth(); const u=a&&a.currentUser; if(u) fb[key[n]]=await u.getIdToken(); }catch(e){} }
+          if(Object.keys(fb).length) opt=Object.assign({},opt,{ body:JSON.stringify(Object.assign(b,{fb})) }); }
+      }
+    }catch(e){}
+    return orig(url,opt);
+  };
+})();
+async function onCredential(resp){
   ID_TOKEN=resp.credential;
+  document.getElementById("gateErr").textContent="Vérification…";
+  let fb={}; try{ fb=await sessTokens(); }catch(e){}
   fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"verify-responsable",idToken:ID_TOKEN})})
+    body:JSON.stringify({action:"verify-responsable",idToken:ID_TOKEN,fb})})
     .then(r=>r.json()).then(j=>{
-      if(j&&j.allowed){ start(j.email); }
+      if(j&&j.allowed){ document.getElementById("gateErr").textContent=""; SESS_OK=!!(j.sessions&&j.sessions.prep); start(j.email); try{ document.getElementById("sideVer").textContent="Responsable · v"+APP_VERSION+(SESS_OK?" 🔒":" 🔓"); }catch(e){} }
       else document.getElementById("gateErr").textContent="Accès refusé : "+((j&&j.email)||"")+" n'est pas autorisé.";
     }).catch(e=>document.getElementById("gateErr").textContent="Erreur : "+e.message);
 }
@@ -548,14 +587,14 @@ function start(email){
   // Init une app Firebase par magasin configuré
   readyStores().forEach(s=>{
     try{
-      const appF=firebase.initializeApp(s.firebaseConfig, s.code);
+      const appF=fbApp(s.firebaseConfig, s.code);
       dbByStore[s.code]=firebase.database(appF);
       state[s.code]={receptions:{},docs:{},broadcasts:{}};
     }catch(e){ console.error("Firebase "+s.code, e); }
   });
   // Connexion au projet CENTRALE (app Dispatch palette) — lecture des commandes dispatchées.
   try{
-    const appC=firebase.initializeApp(CENTRALE_FIREBASE_CONFIG,"CENTRALE");
+    const appC=fbApp(CENTRALE_FIREBASE_CONFIG,"CENTRALE");
     dbCentrale=firebase.database(appC);
     dbCentrale.ref("dispatch").on("value",snap=>{ centraleState.dispatch=snap.val()||{}; renderCentrale(); renderSuivi(); if(document.getElementById("blDispModal")) renderDispatchBL(); });
     dbCentrale.ref("picking").on("value",snap=>{ centraleState.picking=snap.val()||{}; renderCentrale(); renderSuivi(); });
@@ -4924,7 +4963,7 @@ function renderKbgLive(){
       </div>
     </div>`;
 }
-function consoleLogout(){ if(!confirm("Se déconnecter de la console ?")) return; try{ google.accounts.id.disableAutoSelect(); }catch(e){} location.reload(); }
+function consoleLogout(){ if(!confirm("Se déconnecter de la console ?")) return; try{ google.accounts.id.disableAutoSelect(); }catch(e){} try{ firebase.apps.forEach(a=>{ if(a.name!=="KBG" && a.auth) a.auth().signOut(); }); }catch(e){} setTimeout(()=>location.reload(),300); }
 
 </script>
 </body>
