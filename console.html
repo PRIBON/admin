@@ -421,7 +421,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.13.3"; // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.14.0"; // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -5099,7 +5099,7 @@ window.addEventListener("message",function(e){
 const MENAGE_URL = "https://script.google.com/macros/s/AKfycbwmqzL-bcriCwUQ2Aqn6CL09HQkPPgZl8hiC0DG4yf-Wy00f5DN4LGbnYpPyqqXaOuc/exec";   // ← URL /exec du script Ménage (voir INSTALLATION)
 const MN = { view:"cal", mois:new Date().toISOString().slice(0,7), data:null, loading:false, err:"", journal:null };
 const MN_JOURS=["","Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
-const MN_TXT={ ok:"Passé", extra:"Passé (hors planning)", ok_sans_depart:"Passé · départ non pointé", en_cours:"En cours", absent:"PAS PASSÉ·E", annule:"Annulé", a_renseigner:"À renseigner", prevu:"Prévu" };
+const MN_TXT={ ok:"Passé", extra:"Passé (hors planning)", ok_sans_depart:"Passé · départ non pointé", en_cours:"En cours", absent:"PAS PASSÉ·E", annule:"Fermé (payé)", a_renseigner:"À renseigner", prevu:"Prévu" };
 const MN_VERDICT={ ok:["OK pour payer","g"], ok_sans_tarif:["OK (pas de tarif)","g"], absences_non_deduites:["Paiement total malgré absences","r"], ecart:["Montant trop élevé","r"], absences_a_verifier:["Absences à vérifier","y"], a_verifier:["À vérifier","y"] };
 const mnReady=()=> MENAGE_URL && MENAGE_URL.indexOf("__A_REMPLIR__")<0;
 const mnEur=(n)=> (Math.round((+n||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
@@ -5178,13 +5178,13 @@ function mnCalHtml(){
       const hrs = p.arriveeAt? mnHH(p.arriveeAt)+(p.departAt?"→"+mnHH(p.departAt):"") : "";
       cells.push(`<div class="mn-d ${c.statut}${c.date===today?" today":""}" title="${esc(c.date+(t?" · "+t:"")+(p.note?" · "+p.note:""))}" onclick="mnEditDay('${esc(L.lieu.code)}','${c.date}')">
         <span class="n">${+c.date.slice(8,10)}</span>${t?`<span class="t">${esc(t)}</span>`:""}${hrs?`<span class="t">${esc(hrs)}</span>`:""}${p.note?`<span class="nt">📝</span>`:""}</div>`); });
-    const nr = s.nonRenseignes ? `<button class="tbtn s" onclick="mnBulkOk('${esc(L.lieu.code)}')">✓ Marquer les ${s.nonRenseignes} jours « à renseigner » comme passés</button>`:"";
+    const nr = s.nonRenseignes ? `<button class="tbtn s" onclick="mnBulkOk('${esc(L.lieu.code)}')">✓ Marquer les ${s.nonRenseignes} jours sans pointage comme passés</button>`:"";
     return `<div class="cx" style="margin-bottom:16px;overflow:hidden">
       <div class="cx-h" style="flex-wrap:wrap"><h3 style="font-size:15px">${esc(L.lieu.nom||L.lieu.code)}</h3><span class="t2">${esc(L.lieu.societe||"prestataire ?")} · ${(L.lieu.jours||[]).map(j=>MN_JOURS[j]).join(", ")||"jours non réglés"}</span><span class="sp"></span>
-        <span class="mn-stat b">📅 ${s.prevus} prévus</span><span class="mn-stat y">✓ ${s.effectues} passé${s.effectues>1?"s":""}</span><span class="mn-stat r">✗ ${s.absents} absent${s.absents>1?"s":""}</span>${s.nonRenseignes?`<span class="mn-stat g">? ${s.nonRenseignes} à renseigner</span>`:""}</div>
+        <span class="mn-stat b">📅 ${s.prevus} prévus</span><span class="mn-stat y">✓ ${s.effectues} passé${s.effectues>1?"s":""}</span><span class="mn-stat r">✗ ${s.absents} absent${s.absents>1?"s":""}</span>${s.nonRenseignes?`<span class="mn-stat g">dont ${s.nonRenseignes} sans pointage</span>`:""}</div>
       ${nr?`<div style="padding:10px 16px 0">${nr}</div>`:""}
       <div class="mn-cal">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(h=>`<div class="h">${h}</div>`).join("")}${cells.join("")}</div>
-      <div class="mn-leg"><span><i style="background:#f5c400"></i>Passé</span><span><i style="background:#c4170c;box-shadow:0 2px 0 #7d0d06"></i>Pas passé·e</span><span><i style="background:var(--info-s)"></i>Prévu</span><span><i style="background:#ffe9cc"></i>En cours</span><span><i style="border:1.5px dashed #ccc;background:#fff"></i>À renseigner (clique pour saisir)</span><span><i style="background:#eee"></i>Annulé</span></div>
+      <div class="mn-leg"><span><i style="background:#f5c400"></i>Passé</span><span><i style="background:#c4170c;box-shadow:0 2px 0 #7d0d06"></i>Pas passé·e</span><span><i style="background:var(--info-s)"></i>Prévu</span><span><i style="background:#ffe9cc"></i>En cours</span><span><i style="background:#eee"></i>Fermé (payé)</span><span>👆 clique sur un jour pour le corriger</span></div>
     </div>`; }).join("");
 }
 function mnFind(code,date){ const L=MN.data.lieux.find(x=>x.lieu.code===code); return { L, c:L && L.cal.find(x=>x.date===date) }; }
@@ -5196,7 +5196,7 @@ function mnEditDay(code,date){
   back.innerHTML=`<div class="modal-box" style="max-width:480px">
     <h2 style="margin:0;font-size:18px">${esc(L.lieu.nom||code)}</h2>
     <div class="t2" style="margin:2px 0 14px;text-transform:capitalize">${new Date(date+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})} · ${c&&c.prevu?"passage prévu":"pas prévu au planning"}</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">${opt("ok","✅ Passé","#e0b200")}${opt("absent","❌ Pas passé·e","#c4170c")}${opt("annule","🚫 Annulé","#888888")}</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">${opt("ok","✅ Passé","#e0b200")}${opt("absent","❌ Pas passé·e","#c4170c")}${opt("annule","🏪 Fermé (payé)","#888888")}</div>
     <div class="mn-form" style="padding:0;grid-template-columns:1fr 1fr 1fr">
       <label>Arrivée<input type="time" id="mnA" value="${p.arriveeAt?mnHH(p.arriveeAt):""}"></label>
       <label>Départ<input type="time" id="mnD" value="${p.departAt?mnHH(p.departAt):""}"></label>
@@ -5218,7 +5218,7 @@ function mnEditDay(code,date){
 function mnRadio(inp){ const box=inp.closest(".modal-box"); const col={ok:"#e0b200",absent:"#c4170c",annule:"#888888"};
   box.querySelectorAll(".mnr").forEach(d=>{ const on=d.dataset.v===inp.value; d.style.borderColor=on?col[d.dataset.v]:"#e8e3da"; d.style.background=on?col[d.dataset.v]+"22":"#fff"; }); }
 async function mnBulkOk(code){
-  const {L}=mnFind(code, MN.mois+"-01"); const days=L.cal.filter(c=>c.statut==="a_renseigner").map(c=>c.date);
+  const {L}=mnFind(code, MN.mois+"-01"); const days=L.cal.filter(c=>c.statut==="absent" && !c.p).map(c=>c.date);
   if(!days.length) return;
   if(!confirm(`${L.lieu.nom} — marquer ${days.length} jour(s) comme PASSÉS ?\n\n${days.map(mnDM).join(", ")}\n\n(Les jours où l'agent n'est pas venu : clique dessus ensuite et mets « Pas passé·e ».)`)) return;
   const ini=prompt("Tes initiales (traçabilité) :","")||"";
@@ -5240,7 +5240,7 @@ function mnFactHtml(){
     else if(f && f.verdict==="ecart") alert=`<div class="mn-alert r">⚠️ Montant facturé ${mnEur(f.montantHT)} HT au lieu de ${mnEur(f.attenduHT)} HT attendu (+${mnEur(f.ecartHT)}).</div>`;
     else if(f && /^ok/.test(f.verdict||"")) alert=`<div class="mn-alert g">✅ Facture cohérente avec les passages : OK pour payer.</div>`;
     else if(!f && s.absents) alert=`<div class="mn-alert y">🧾 Facture pas encore chargée · ${s.absents} absence${s.absents>1?"s":""} à déduire ce mois.</div>`;
-    if(s.nonRenseignes) alert+=`<div class="mn-alert y" style="margin-top:0">❓ ${s.nonRenseignes} jour(s) non renseigné(s) : complète le calendrier avant de payer.</div>`;
+    if(s.nonRenseignes) alert+=`<div class="mn-alert y" style="margin-top:0">❓ Dont ${s.nonRenseignes} jour(s) où rien n'a été pointé (comptés « pas passé·e ») : vérifie avant d'envoyer le mail.</div>`;
     const pc=v?(v[1]==="g"?["acc-s","acc-d"]:v[1]==="r"?["dan-s","dan"]:["warn-s","warn"]):null;
     return `<div class="cx" style="margin-bottom:14px;overflow:hidden">
       <div class="cx-h" style="flex-wrap:wrap"><h3 style="font-size:15px">${esc(L.lieu.nom||L.lieu.code)}</h3><span class="t2">${esc(L.lieu.societe||"")}${L.lieu.contactEmail?" · "+esc(L.lieu.contactEmail):" · ⚠️ email prestataire manquant"}</span><span class="sp"></span>

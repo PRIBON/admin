@@ -125,7 +125,7 @@ function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
 const { useState, useEffect, useRef } = React;
 
 /* ============================ CONFIGURATION =========================== */
-const APP_VERSION = "2.2.2"; // 2.2.2 = Ménage : délai max 60 s + messages clairs // 2.2.1 = sécurité : plus aucune adresse affichée sur la page de connexion · jeton console par message ciblé // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
+const APP_VERSION = "2.3.0"; // 2.3.0 = bouton « Agent pas venu·e » · rien pointé = pas passé · « Fermé » = annulé par le magasin // 2.2.2 = Ménage : délai max 60 s + messages clairs // 2.2.1 = sécurité : plus aucune adresse affichée sur la page de connexion · jeton console par message ciblé // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
 
 // MÊME Client ID OAuth que les autres pages PRIBON.
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
@@ -162,7 +162,7 @@ const JOURS=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche
 const hhmm=(ms)=> ms ? new Date(+ms).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
 const dayLong=(iso)=> new Date(iso+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
 const TACHES=["Sols","Vitres","Sanitaires","Réserve","Poubelles","Chambre froide","Bureau","Vitrine"];
-const STATUT_TXT={ ok:"Passé ✓", extra:"Passé (hors planning)", ok_sans_depart:"Passé (départ non pointé)", en_cours:"En cours", absent:"Pas passé·e", annule:"Annulé / prévenu", a_renseigner:"Non renseigné", prevu:"Prévu" };
+const STATUT_TXT={ ok:"Passé ✓", extra:"Passé (hors planning)", ok_sans_depart:"Passé (départ non pointé)", en_cours:"En cours", absent:"Pas passé·e", annule:"Magasin fermé", a_renseigner:"Non renseigné", prevu:"Prévu" };
 
 /* ============================ LOGIN GOOGLE =========================== */
 function GoogleLogin({ onToken }){
@@ -255,7 +255,7 @@ function MiniCal({ days, today, onPick }){
           {+iso.slice(8,10)}{iso.slice(8,10)==="01" && <span className="d">{new Date(iso+"T12:00:00").toLocaleDateString("fr-FR",{month:"short"})}</span>}
         </div>); })}
     </div>
-    <div className="legend"><span><i style={{background:"#f5c400"}}/>Passé</span><span><i style={{background:"#c4170c"}}/>Pas passé·e</span><span><i style={{background:"#e1e8f5"}}/>Prévu</span><span><i style={{background:"#ffe9cc"}}/>En cours</span><span><i style={{background:"#eee"}}/>Annulé / non renseigné</span></div>
+    <div className="legend"><span><i style={{background:"#f5c400"}}/>Passé</span><span><i style={{background:"#c4170c"}}/>Pas passé·e</span><span><i style={{background:"#e1e8f5"}}/>Prévu</span><span><i style={{background:"#ffe9cc"}}/>En cours</span><span><i style={{background:"#eee"}}/>Fermé</span></div>
   </div>);
 }
 
@@ -268,7 +268,7 @@ function PastEditor({ p, busy, onSave, title }){
   const B=({v,l,c})=><button onClick={()=>setSt(v)} style={{flex:1,padding:"14px 6px",borderRadius:14,fontWeight:900,fontSize:15,border:"2px solid "+(st===v?c:"#e8e3da"),background:st===v?c+"22":"#fff"}}>{l}</button>;
   const inp={padding:10,borderRadius:10,border:"1.5px solid #e8e3da",fontSize:15,width:"100%"};
   return (<div className="box"><h3>{title||"Saisie master de ce jour"}</h3>
-    <div style={{display:"flex",gap:8}}><B v="ok" l="✅ Passé" c="#e0b200"/><B v="absent" l="❌ Pas passé·e" c="#c4170c"/><B v="annule" l="🚫 Annulé" c="#888888"/></div>
+    <div style={{display:"flex",gap:8}}><B v="ok" l="✅ Passé" c="#e0b200"/><B v="absent" l="❌ Pas passé·e" c="#c4170c"/><B v="annule" l="🏪 Fermé" c="#888888"/></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10}}>
       <label className="small-note" style={{margin:0}}>Arrivée<input type="time" value={a} onChange={e=>setA(e.target.value)} style={inp}/></label>
       <label className="small-note" style={{margin:0}}>Départ<input type="time" value={d} onChange={e=>setD(e.target.value)} style={inp}/></label>
@@ -289,7 +289,7 @@ function DayModal({ day, me, today, busy, onClose, onSave }){
   const [edit,setEdit]=useState(false);
   const dur = p.arriveeAt && p.departAt ? Math.round((p.departAt-p.arriveeAt)/60000) : 0;
   const COL={ ok:["#fff3c4","#6b4f00","✨ Passé"], extra:["#fff3c4","#6b4f00","✨ Passé (hors planning)"], ok_sans_depart:["#fff3c4","#6b4f00","✨ Passé (départ non pointé)"],
-    absent:["#fde0dd","#a3170c","❌ Pas passé·e"], annule:["#eeeeee","#666","🚫 Annulé / prévenu"], en_cours:["#ffe9cc","#a14d00","⏳ En cours"],
+    absent:["#fde0dd","#a3170c","❌ Pas passé·e"], annule:["#eeeeee","#666","🏪 Magasin fermé (passage payé)"], en_cours:["#ffe9cc","#a14d00","⏳ En cours"],
     a_renseigner:["#f1efe9","#777","❓ Pas encore renseigné"], prevu:["#e1e8f5","#2c4a8c","📅 Prévu"], "":["#f1efe9","#777","Pas de passage prévu"] }[st||""];
   return (<div style={{position:"fixed",inset:0,background:"rgba(20,30,25,.55)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
     <div onClick={e=>e.stopPropagation()} style={{background:"#f7f5f0",width:"100%",maxWidth:560,maxHeight:"92vh",overflowY:"auto",borderRadius:"24px 24px 0 0",padding:16,boxShadow:"0 -10px 40px rgba(0,0,0,.25)"}}>
@@ -298,6 +298,7 @@ function DayModal({ day, me, today, busy, onClose, onSave }){
         <button className="back" style={{background:"#e9e5dc",color:"#333"}} onClick={onClose}>✕</button></div>
       <div style={{background:COL[0],color:COL[1],borderRadius:18,padding:16,textAlign:"center",fontWeight:900,fontSize:20}}>{COL[2]}
         {day.prevu && <div style={{fontSize:12,fontWeight:700,opacity:.8,marginTop:4}}>passage prévu ce jour-là</div>}</div>
+      {st==="absent" && !day.p && <div className="small-note" style={{textAlign:"center"}}>🌙 Rien n'a été pointé ce jour-là : compté « pas passé·e ».</div>}
       {(p.arriveeAt||p.note||p.initiales) && <div className="box" style={{marginTop:12}}><div className="kv">
         {p.arriveeAt && <><span className="k">🙋 Arrivée</span><span className="v">{hhmm(p.arriveeAt)}</span></>}
         {p.departAt && <><span className="k">👋 Départ</span><span className="v">{hhmm(p.departAt)}</span></>}
@@ -399,7 +400,10 @@ function MenageScreen({ token, me, onBack, onAuthLost, fixedLieu }){
               {!arrived ? (<>
                 <button className="bigbtn arr" disabled={busy} onClick={()=>act("passage-arrivee",{},"🙋 Arrivée pointée")}>
                   <span className="em">🙋</span>Agent arrivé·e<small>Appuie dès que l'agent arrive</small></button>
-                <div style={{textAlign:"center"}}><button className="link" onClick={()=>{ const r=prompt("Pourquoi ? (ex : fermé, prestataire a prévenu)"); if(r!==null) act("passage-annule",{note:r||"Passage annulé / prévenu"},"Passage annulé"); }}>Passage annulé / prestataire a prévenu</button></div>
+                <button disabled={busy} onClick={()=>{ if(!confirm("L'agent n'est pas venu aujourd'hui ?\n\nLe passage sera déduit de la facture.")) return; const r=prompt("Une précision ? (facultatif — ex : a prévenu, malade…)",""); act("passage-absent",{note:r||"Agent pas venu·e"},"❌ Noté : agent pas venu·e"); }}
+                  style={{width:"100%",marginTop:12,padding:"16px 12px",borderRadius:18,border:"2.5px solid #d92d20",background:"#fff5f4",color:"#a3170c",fontSize:18,fontWeight:900}}>❌ Agent pas venu·e</button>
+                <div style={{textAlign:"center"}}><button className="link" onClick={()=>{ const r=prompt("Magasin fermé / annulé par le magasin ? Pourquoi (facultatif) :",""); if(r!==null) act("passage-annule",{note:r||"Annulé par le magasin (fermé)"},"🏪 Noté : magasin fermé"); }}>🏪 Magasin fermé ce jour-là (passage payé)</button></div>
+                <div className="small-note" style={{textAlign:"center",marginTop:4}}>Si rien n'est pointé à minuit, c'est compté « pas passé·e ».</div>
               </>) : (<>
                 <div style={{fontWeight:800,marginBottom:6}}>Qu'est-ce qui a été fait ?</div>
                 <div className="chips">{TACHES.map(t=><button key={t} className={"chip"+(taches.includes(t)?" on":"")} onClick={()=>setTaches(v=>v.includes(t)?v.filter(x=>x!==t):[...v,t])}>{taches.includes(t)?"✓ ":""}{t}</button>)}</div>
