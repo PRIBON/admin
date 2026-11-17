@@ -421,7 +421,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.13.1"; // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.13.2"; // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -5086,7 +5086,16 @@ function consoleLogout(){ if(!confirm("Se déconnecter de la console ?")) return
    v2.12.0 — MÉNAGE (passages agent, calendrier, factures prestataire)
    Données : Apps Script « PRIBON Ménage » (Google Sheet). Auth = idToken Google.
    ===================================================================== */
-try{ Object.defineProperty(window,"__pribonIdToken",{ get:()=>ID_TOKEN, configurable:true }); }catch(e){} // v2.13.0 : les vues magasin/réception intégrées reprennent la connexion
+// v2.13.2 — SÉCURITÉ : le jeton n'est plus exposé. Il est donné UNIQUEMENT, sur demande, aux écrans de la Vue appli
+// (iframes de cette page, même site, pages autorisées), par message ciblé.
+window.addEventListener("message",function(e){
+  try{
+    if(e.origin!==location.origin || !e.data || e.data.type!=="pribon-need-token" || !ID_TOKEN) return;
+    const fr=[...document.querySelectorAll("#tab-appview iframe")].find(f=>f.contentWindow===e.source); if(!fr) return;
+    const u=new URL(fr.src, location.href); if(u.origin!==location.origin || !/^\/(admin\/magasin\.html|Bichat\/|Robespierre\/)/i.test(u.pathname)) return;
+    e.source.postMessage({ type:"pribon-token", token:ID_TOKEN }, location.origin);
+  }catch(err){}
+});
 const MENAGE_URL = "https://script.google.com/macros/s/AKfycbwmqzL-bcriCwUQ2Aqn6CL09HQkPPgZl8hiC0DG4yf-Wy00f5DN4LGbnYpPyqqXaOuc/exec";   // ← URL /exec du script Ménage (voir INSTALLATION)
 const MN = { view:"cal", mois:new Date().toISOString().slice(0,7), data:null, loading:false, err:"", journal:null };
 const MN_JOURS=["","Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
