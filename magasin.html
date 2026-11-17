@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<title>PRIBON — Code magasin</title>
+<title>PRIBON — Connexion magasin</title>
 
 <script>
 function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
@@ -12,77 +12,158 @@ function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
 <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js" onerror="__cdnFB('https://unpkg.com/react-dom@18/umd/react-dom.production.min.js')"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.4/babel.min.js" onerror="__cdnFB('https://unpkg.com/@babel/standalone@7.26.4/babel.min.js')"></script>
 
-<!-- Google Identity Services : connexion 2FA du bureau du magasin (gmail du magasin) -->
+<!-- Google Identity Services : connexion du bureau du magasin (gmail du magasin) -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f4f5f7; color:#1a1a1a; }
+  :root{ --bg:#f7f5f0; --card:#fff; --ink:#1f1d1a; --soft:#57534d; --mute:#94908a; --line:#e8e3da;
+    --g:#1a4d2e; --g2:#4a7c3b; --gs:#ebf3e6; --y:#f5b400; --ys:#fff6d6; --r:#d92d20; --rs:#fde6e6; --b:#2c4a8c; --bs:#e1e8f5; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--ink); }
   button { font-family:inherit; cursor:pointer; border:none; }
-  .screen-center { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; }
-  .logo { font-size:26px; font-weight:800; color:#1a4d2e; margin-bottom:4px; text-align:center; }
-  .tag { color:#666; font-size:14px; margin-bottom:24px; text-align:center; }
-  .card { width:100%; max-width:420px; background:#fff; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.08); padding:24px; text-align:center; }
-  .btn-primary { width:100%; padding:14px; font-size:16px; font-weight:700; background:#1a4d2e; color:#fff; border-radius:8px; }
-  .btn-primary:active { background:#0d3d20; }
-  .btn-primary:disabled { background:#aaa; }
-  .btn-secondary { width:100%; padding:12px; font-size:14px; font-weight:600; background:#f0f0f0; color:#333; border-radius:8px; margin-top:10px; }
+  input, textarea { font-family:inherit; }
   .err { color:#d32f2f; font-size:13px; margin-top:10px; }
   .small-note { font-size:12px; color:#888; margin-top:12px; line-height:1.4; }
-  .code-box { font-size:56px; font-weight:900; letter-spacing:12px; color:#1a4d2e; background:#eaf3ec; border-radius:14px; padding:22px 10px; margin:8px 0 6px; }
-  .count { font-size:15px; font-weight:700; color:#e65100; }
-  .count.ok { color:#2e7d32; }
-  .store-name { font-size:15px; font-weight:800; color:#1a4d2e; margin-bottom:14px; }
   .ver-badge { position:fixed; bottom:6px; right:8px; font-size:10px; color:#9aa; }
-  .update-bar { position:fixed; top:0; left:0; right:0; z-index:300; background:#1a4d2e; color:#fff; padding:10px 14px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:13px; font-weight:600; }
-  .update-bar button { background:#fff; color:#1a4d2e; font-weight:800; padding:6px 14px; border-radius:6px; font-size:13px; }
+  .update-bar { position:fixed; top:0; left:0; right:0; z-index:300; background:var(--g); color:#fff; padding:10px 14px; display:flex; align-items:center; justify-content:center; gap:12px; font-size:13px; font-weight:600; }
+  .update-bar button { background:#fff; color:var(--g); font-weight:800; padding:6px 14px; border-radius:6px; font-size:13px; }
+
+  /* Accueil (comme La Centrale) */
+  .land { min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:26px 16px 50px; }
+  .land-logo { font-size:30px; font-weight:900; color:var(--g); letter-spacing:-.5px; text-align:center; margin-top:6px; }
+  .land-tag { color:#666; font-size:14px; margin:4px 0 22px; text-align:center; }
+  .who { display:inline-flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 8px 6px 14px; font-size:13px; font-weight:700; color:var(--g); margin-bottom:18px; }
+  .who button { background:#f1efe9; color:#555; font-size:12px; font-weight:700; padding:6px 10px; border-radius:999px; }
+  .mod-grid { display:grid; grid-template-columns:repeat(2,minmax(150px,1fr)); gap:14px; width:100%; max-width:600px; }
+  .mod-tile { position:relative; background:#fff; border:1.5px solid #e6e8ec; border-radius:20px; padding:16px 14px 18px; text-align:center; cursor:pointer; transition:transform .12s, box-shadow .12s; box-shadow:0 2px 10px rgba(0,0,0,.05); display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .mod-tile:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(0,0,0,.08); }
+  .mod-tile:active { transform:scale(.98); }
+  .mod-tile.code { border-top:5px solid var(--g2); background:linear-gradient(160deg,#fff,#f3f9ef); }
+  .mod-tile.menage { border-top:5px solid #1e88e5; background:linear-gradient(160deg,#fff,#eef6ff); }
+  .mod-tile.soon { opacity:.55; cursor:default; border-style:dashed; }
+  .mt-art { width:100%; height:96px; display:flex; align-items:center; justify-content:center; }
+  .mt-name { font-size:18px; font-weight:800; }
+  .mt-sub { font-size:12.5px; color:#777; line-height:1.35; }
+  .mt-badge { position:absolute; top:10px; right:10px; font-size:11px; font-weight:800; border-radius:999px; padding:4px 9px; }
+  .mt-badge.ok { background:#fff3c4; color:#7a5b00; } .mt-badge.todo { background:var(--bs); color:var(--b); }
+  .mt-badge.run { background:#ffe9cc; color:#a14d00; } .mt-badge.ko { background:var(--rs); color:var(--r); }
+
+  /* Carte générique */
+  .card { width:100%; max-width:440px; background:#fff; border-radius:18px; box-shadow:0 4px 16px rgba(0,0,0,.07); padding:24px; text-align:center; }
+  .btn-primary { width:100%; padding:15px; font-size:16px; font-weight:800; background:var(--g); color:#fff; border-radius:12px; }
+  .btn-primary:active { background:#0d3d20; } .btn-primary:disabled { background:#aaa; }
+  .btn-secondary { width:100%; padding:12px; font-size:14px; font-weight:700; background:#f0eee8; color:#333; border-radius:12px; margin-top:10px; }
+  .code-box { font-size:56px; font-weight:900; letter-spacing:12px; color:var(--g); background:#eaf3ec; border-radius:16px; padding:22px 10px; margin:8px 0 6px; }
+  .count { font-size:15px; font-weight:700; color:#e65100; } .count.ok { color:#2e7d32; }
+  .store-name { font-size:15px; font-weight:800; color:var(--g); margin-bottom:14px; }
+
+  /* Écran module */
+  .page { max-width:760px; margin:0 auto; padding:0 0 60px; }
+  .top { position:sticky; top:0; z-index:20; background:linear-gradient(135deg,#1a4d2e,#2f6b3f); color:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; box-shadow:0 2px 10px rgba(0,0,0,.12); }
+  .top.blue { background:linear-gradient(135deg,#0f4c81,#1e88e5); }
+  .top h1 { margin:0; font-size:18px; font-weight:800; } .top .sub { font-size:12px; opacity:.88; }
+  .top .back { background:rgba(255,255,255,.18); color:#fff; font-weight:800; padding:8px 12px; border-radius:10px; font-size:14px; }
+  .wrap { padding:14px; display:flex; flex-direction:column; gap:14px; }
+  .box { background:#fff; border:1px solid var(--line); border-radius:18px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .box h3 { margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--soft); }
+
+  /* Ménage — gros boutons */
+  .today { text-align:center; }
+  .today .day { font-size:22px; font-weight:900; text-transform:capitalize; }
+  .today .pv { display:inline-block; margin-top:6px; font-size:13px; font-weight:800; padding:5px 12px; border-radius:999px; }
+  .pv.yes { background:var(--bs); color:var(--b); } .pv.no { background:#f1efe9; color:#777; }
+  .bigbtn { width:100%; border-radius:22px; padding:26px 16px; font-size:24px; font-weight:900; color:#fff; display:flex; flex-direction:column; align-items:center; gap:6px; box-shadow:0 6px 0 rgba(0,0,0,.18), 0 10px 24px rgba(0,0,0,.12); transition:transform .08s, box-shadow .08s; }
+  .bigbtn:active { transform:translateY(4px); box-shadow:0 2px 0 rgba(0,0,0,.18); }
+  .bigbtn .em { font-size:44px; line-height:1; } .bigbtn small { font-size:13px; font-weight:700; opacity:.9; }
+  .bigbtn.arr { background:linear-gradient(160deg,#2fa84f,#1a7a38); }
+  .bigbtn.dep { background:linear-gradient(160deg,#2b7de9,#1458b8); }
+  .bigbtn:disabled { opacity:.6; }
+  .steps { display:flex; gap:8px; justify-content:center; margin:4px 0 14px; }
+  .step { flex:1; max-width:170px; border-radius:14px; padding:10px; font-size:13px; font-weight:800; background:#f1efe9; color:#999; }
+  .step.done { background:#fff3c4; color:#7a5b00; } .step.cur { background:var(--bs); color:var(--b); outline:2px solid #9bb7ea; }
+  .done-card { background:linear-gradient(160deg,#fff8d6,#ffeaa0); border:2px solid #f0c63a; border-radius:20px; padding:18px; text-align:center; }
+  .done-card .big { font-size:22px; font-weight:900; color:#6b4f00; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0; }
+  .chip { background:#f1efe9; color:#444; border-radius:999px; padding:9px 13px; font-size:14px; font-weight:700; }
+  .chip.on { background:var(--g); color:#fff; }
+  textarea.note { width:100%; min-height:84px; border:1.5px solid var(--line); border-radius:12px; padding:12px; font-size:16px; }
+  textarea.note:focus { outline:none; border-color:var(--g2); }
+  .ini { display:flex; gap:8px; align-items:center; justify-content:center; font-size:13px; color:#666; margin-top:10px; }
+  .ini input { width:80px; text-align:center; font-weight:800; font-size:16px; text-transform:uppercase; border:1.5px solid var(--line); border-radius:10px; padding:8px; }
+  .link { background:none; color:#777; text-decoration:underline; font-size:13px; padding:8px; }
+
+  /* Fiche prestataire */
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:14px; }
+  .kv .k { color:var(--mute); font-weight:600; } .kv .v { font-weight:700; word-break:break-word; }
+  .kv a { color:var(--b); }
+
+  /* Mini calendrier */
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .cal .h { font-size:11px; font-weight:800; color:var(--mute); text-align:center; }
+  .cell { aspect-ratio:1; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#bbb; background:#faf9f6; }
+  .cell.ok, .cell.extra, .cell.ok_sans_depart { background:linear-gradient(160deg,#ffe680,#f5c400); color:#5a4300; box-shadow:inset 0 -3px 0 rgba(0,0,0,.08); }
+  .cell.absent { background:linear-gradient(160deg,#ff6b5e,#c4170c); color:#fff; transform:perspective(200px) rotateX(8deg); box-shadow:0 5px 0 #7d0d06, 0 8px 14px rgba(196,23,12,.35); }
+  .cell.en_cours { background:#ffe9cc; color:#a14d00; outline:2px dashed #ff9800; }
+  .cell.prevu { background:var(--bs); color:var(--b); }
+  .cell.a_renseigner { background:#f1efe9; color:#999; outline:1px dashed #ccc; }
+  .cell.annule { background:repeating-linear-gradient(45deg,#eee,#eee 4px,#f8f8f8 4px,#f8f8f8 8px); color:#888; }
+  .cell.today { outline:3px solid var(--g2); }
+  .cell .d { font-size:10px; opacity:.85; }
+  .legend { display:flex; flex-wrap:wrap; gap:10px; font-size:12px; color:#666; margin-top:10px; }
+  .legend i { display:inline-block; width:14px; height:14px; border-radius:4px; vertical-align:-2px; margin-right:4px; }
+  .seg { display:flex; gap:6px; flex-wrap:wrap; }
+  .seg button { background:#f1efe9; color:#444; font-weight:800; padding:8px 12px; border-radius:10px; font-size:13px; }
+  .seg button.on { background:var(--g); color:#fff; }
+  .toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:#1f1d1a; color:#fff; padding:12px 18px; border-radius:12px; font-size:15px; font-weight:700; z-index:200; box-shadow:0 6px 20px rgba(0,0,0,.25); }
+  @media (max-width:520px){ .mod-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .mt-art{height:70px} .mt-name{font-size:15px} .bigbtn{font-size:21px;padding:22px 12px} }
 </style>
 </head>
 <body>
 <div id="root"><div style="max-width:440px;margin:80px auto;text-align:center;color:#666"><div style="font-size:34px">🏬</div><div style="margin-top:10px">Chargement…</div></div></div>
 
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useCallback } = React;
+const { useState, useEffect, useRef } = React;
 
 /* ============================ CONFIGURATION =========================== */
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "2.1.0"; // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
 
 // MÊME Client ID OAuth que les autres pages PRIBON.
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
-
-// MÊME Apps Script central que reception.html / superadmin.html / app vendeur.
+// MÊME Apps Script central que reception.html / superadmin.html / app vendeur (code magasin 3h).
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
+// Apps Script MÉNAGE (Sheet « PRIBON — Ménage »). À coller après déploiement (voir INSTALLATION).
+const MENAGE_URL = "https://script.google.com/macros/s/AKfycbwmqzL-bcriCwUQ2Aqn6CL09HQkPPgZl8hiC0DG4yf-Wy00f5DN4LGbnYpPyqqXaOuc/exec";
 
 const OAUTH_READY = () => OAUTH_CLIENT_ID && !OAUTH_CLIENT_ID.includes("__");
-const APPS_SCRIPT_READY = () => APPS_SCRIPT_URL && !APPS_SCRIPT_URL.includes("__A_REMPLIR__");
+const MENAGE_READY = () => MENAGE_URL && !MENAGE_URL.includes("__A_REMPLIR__");
 
 async function api(action, payload){
-  const res=await fetch(APPS_SCRIPT_URL,{ method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" },
-    body:JSON.stringify({ action, ...payload }) });
+  const res=await fetch(APPS_SCRIPT_URL,{ method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, ...payload }) });
   return await res.json();
 }
-
-async function fetchLatestVersion(){
-  if(!APPS_SCRIPT_READY()) return null;
-  try{ const j=await api("get-version",{}); return (j&&j.version)?String(j.version):null; }catch(e){ return null; }
+async function mapi(action, payload){
+  if(!MENAGE_READY()) throw new Error("Module Ménage pas encore branché (MENAGE_URL).");
+  const res=await fetch(MENAGE_URL,{ method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, ...payload }) });
+  const j=await res.json();
+  if(j && j.auth===false){ const e=new Error(j.error||"Session expirée"); e.auth=true; throw e; }
+  if(j && j.error) throw new Error(j.error);
+  return j;
 }
-function isNewer(a,b){
-  const pa=String(a).split(".").map(n=>parseInt(n,10)||0), pb=String(b).split(".").map(n=>parseInt(n,10)||0);
-  for(let i=0;i<Math.max(pa.length,pb.length);i++){ const x=pa[i]||0,y=pb[i]||0; if(y>x)return true; if(y<x)return false; }
-  return false;
-}
+async function fetchLatestVersion(){ try{ const j=await api("get-version",{}); return (j&&j.version)?String(j.version):null; }catch(e){ return null; } }
+function isNewer(a,b){ const pa=String(a).split(".").map(n=>parseInt(n,10)||0), pb=String(b).split(".").map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){ const x=pa[i]||0,y=pb[i]||0; if(y>x)return true; if(y<x)return false; } return false; }
 function reloadToLatest(latest){ try{ const u=new URL(location.href); u.searchParams.set("v",latest||String(Date.now())); location.replace(u.toString()); }catch(e){ location.reload(); } }
-
-function fmtCountdown(ms){
-  if(ms<=0) return "expiré";
-  const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
-  if(h>0) return h+"h"+String(m).padStart(2,"0");
-  return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
-}
+function fmtCountdown(ms){ if(ms<=0) return "expiré"; const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  if(h>0) return h+"h"+String(m).padStart(2,"0"); return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0"); }
+const JOURS=["","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+const hhmm=(ms)=> ms ? new Date(+ms).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "";
+const dayLong=(iso)=> new Date(iso+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+const TACHES=["Sols","Vitres","Sanitaires","Réserve","Poubelles","Chambre froide","Bureau","Vitrine"];
+const STATUT_TXT={ ok:"Passé ✓", extra:"Passé (hors planning)", ok_sans_depart:"Passé (départ non pointé)", en_cours:"En cours", absent:"Pas passé·e", annule:"Annulé / prévenu", a_renseigner:"Non renseigné", prevu:"Prévu" };
 
 /* ============================ LOGIN GOOGLE =========================== */
 function GoogleLogin({ onToken }){
-  const ref=useRef(); const [err,setErr]=useState("");
+  const ref=useRef();
   useEffect(()=>{
     if(!OAUTH_READY()) return;
     let tries=0; const t=setInterval(()=>{
@@ -95,96 +176,356 @@ function GoogleLogin({ onToken }){
     return ()=>clearInterval(t);
   },[]);
   if(!OAUTH_READY()) return <div className="err">Config OAuth manquante.</div>;
-  return (<div><div ref={ref} style={{display:"flex",justifyContent:"center"}}></div>{err&&<div className="err">{err}</div>}</div>);
+  return <div ref={ref} style={{display:"flex",justifyContent:"center"}}></div>;
 }
 
-/* ============================== APP ================================= */
-function App(){
-  const [token,setToken]=useState(null);
-  const [store,setStore]=useState(null);   // { storeCode, storeLabel, email }
-  const [session,setSession]=useState(null); // { code, expiresAt }
-  const [err,setErr]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [now,setNow]=useState(Date.now());
-  const [latest,setLatest]=useState(null);
+/* ============================ ILLUSTRATIONS =========================== */
+function ArtCle(){ return (
+  <svg viewBox="0 0 120 96" width="100%" height="96" aria-hidden="true">
+    <rect x="18" y="20" width="84" height="56" rx="12" fill="#eaf3ec" stroke="#4a7c3b" strokeWidth="2"/>
+    {[0,1,2,3].map(i=><rect key={i} x={28+i*18} y="36" width="12" height="24" rx="4" fill="#1a4d2e"/>)}
+    <circle cx="94" cy="20" r="13" fill="#f5b400" stroke="#b07f00" strokeWidth="2"/><text x="94" y="25" textAnchor="middle" fontSize="13" fontWeight="900" fill="#5a4300">3h</text>
+  </svg>); }
+function ArtBalai(){ return (
+  <svg viewBox="0 0 120 96" width="100%" height="96" aria-hidden="true">
+    <ellipse cx="60" cy="88" rx="44" ry="5" fill="#dbe8f7"/>
+    <rect x="70" y="6" width="7" height="60" rx="3" fill="#9a6b16" transform="rotate(18 73 36)"/>
+    <path d="M44 62 L78 62 L86 86 L36 86 Z" fill="#1e88e5"/>
+    {[0,1,2,3,4,5].map(i=><line key={i} x1={42+i*8} y1="68" x2={39+i*9} y2="86" stroke="#0f4c81" strokeWidth="2"/>)}
+    <circle cx="28" cy="40" r="6" fill="#bfe0ff"/><circle cx="18" cy="56" r="4" fill="#bfe0ff"/><circle cx="98" cy="30" r="5" fill="#bfe0ff"/>
+    <path d="M24 22 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" fill="#f5c400"/>
+  </svg>); }
 
-  // Horloge (compte à rebours)
+/* ============================ ÉCRAN CODE =========================== */
+function CodeScreen({ token, store, session, setSession, onBack, master }){
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [now,setNow]=useState(Date.now());
   useEffect(()=>{ const t=setInterval(()=>setNow(Date.now()),1000); return ()=>clearInterval(t); },[]);
-  // Vérif version
-  useEffect(()=>{ let stop=false; (async()=>{ const v=await fetchLatestVersion(); if(!stop&&v) setLatest(v); })(); return ()=>{ stop=true; }; },[]);
-  const updateAvailable = latest && isNewer(APP_VERSION, latest);
-
-  const onToken=async(idToken)=>{
-    setToken(idToken); setErr(""); setBusy(true);
-    try{
-      const j=await api("magasin-login",{ idToken });
-      if(j && j.allowed){ setStore({ storeCode:j.storeCode, storeLabel:j.storeLabel, email:j.email }); setSession(j.current||null); }
-      else setErr("Accès refusé"+((j&&j.email)?" : "+j.email:"")+" n'est pas un compte magasin autorisé.");
-    }catch(e){ setErr("Erreur : "+e.message); }
-    setBusy(false);
-  };
-
+  // Master : lit / génère le code du magasin choisi (action « admin-store-code » du script central).
+  const masterCall=async(generate)=>{ const j=await api("admin-store-code",{ idToken:token, storeCode:store.storeCode, generate:!!generate });
+    if(j && (j.error||j.ok===false)) throw new Error(/inconnue/i.test(j.error||"")?"Le script central n'a pas encore le patch « admin-store-code » (voir PATCH_script_central).":(j.error||"Erreur"));
+    return j; };
+  useEffect(()=>{ if(!master) return; setBusy(true); masterCall(false).then(j=>setSession(j.current||null)).catch(e=>setErr(e.message)).finally(()=>setBusy(false)); },[store.storeCode]);
+  const remaining = session ? (session.expiresAt - now) : 0; const active = session && remaining>0;
   const generate=async()=>{
-    if(!token) return; setBusy(true); setErr("");
-    try{
-      const j=await api("generate-store-code",{ idToken:token });
-      if(j && j.code){ setSession({ code:j.code, expiresAt:j.expiresAt }); }
-      else setErr(j && j.error ? j.error : "Génération impossible.");
-    }catch(e){ setErr("Erreur : "+e.message); }
+    setBusy(true); setErr("");
+    try{ const j= master ? await masterCall(true) : await api("generate-store-code",{ idToken:token });
+      if(j && j.code) setSession({ code:j.code, expiresAt:j.expiresAt }); else setErr(j && j.error ? j.error : "Génération impossible."); }
+    catch(e){ setErr("Erreur : "+e.message); }
     setBusy(false);
   };
-
-  const logout=()=>{ try{ google.accounts.id.disableAutoSelect(); }catch(e){} setToken(null); setStore(null); setSession(null); setErr(""); };
-
-  const remaining = session ? (session.expiresAt - now) : 0;
-  const active = session && remaining>0;
-
   return (
-    <div className="screen-center">
-      {updateAvailable && (
-        <div className="update-bar"><span>Nouvelle version {latest} disponible</span>
-          <button onClick={()=>reloadToLatest(latest)}>Mettre à jour</button></div>
-      )}
-
-      <div className="logo">🏬 PRIBON</div>
-      <div className="tag">Bureau magasin · code de réception</div>
-
-      {!store ? (
+    <div className="page">
+      <div className="top"><button className="back" onClick={onBack}>←</button><div><h1>🔑 Code réception</h1><div className="sub">{store.storeLabel}</div></div></div>
+      <div className="wrap" style={{alignItems:"center"}}>
         <div className="card">
-          <div style={{fontWeight:700,marginBottom:14}}>Connexion du magasin</div>
-          <GoogleLogin onToken={onToken}/>
-          {busy && <div className="small-note">Vérification…</div>}
-          {err && <div className="err">{err}</div>}
-          <div className="small-note">Connectez-vous avec le compte Google du magasin. Vous pourrez générer un code valable 3h à communiquer aux vendeurs.</div>
-        </div>
-      ) : (
-        <div className="card">
-          <div className="store-name">{store.storeLabel}</div>
-          {active ? (
-            <>
-              <div className="small-note" style={{marginTop:0}}>Code magasin actuel :</div>
-              <div className="code-box">{session.code}</div>
-              <div className={"count"+(remaining>30*60*1000?" ok":"")}>Valable encore {fmtCountdown(remaining)}</div>
-            </>
-          ) : (
-            <div className="small-note" style={{marginTop:0}}>Aucun code actif. Générez-en un pour la réception du jour.</div>
-          )}
-          <button className="btn-primary" style={{marginTop:16}} onClick={generate} disabled={busy}>
-            {busy?"…":(active?"Générer un nouveau code":"Générer un code (3h)")}
-          </button>
+          {active ? (<>
+            <div className="small-note" style={{marginTop:0}}>Code magasin actuel :</div>
+            <div className="code-box">{session.code}</div>
+            <div className={"count"+(remaining>30*60*1000?" ok":"")}>Valable encore {fmtCountdown(remaining)}</div>
+          </>) : <div className="small-note" style={{marginTop:0}}>Aucun code actif. Générez-en un pour la réception du jour.</div>}
+          <button className="btn-primary" style={{marginTop:16}} onClick={generate} disabled={busy}>{busy?"…":(active?"Générer un nouveau code":"Générer un code (3h)")}</button>
           {active && <div className="small-note">Communiquez ce code aux vendeurs qui font la réception. Le même code fonctionne pour plusieurs vendeurs. En générer un nouveau annule l'ancien.</div>}
           {err && <div className="err">{err}</div>}
-          <button className="btn-secondary" onClick={logout}>Se déconnecter</button>
         </div>
-      )}
-
-      <div className="ver-badge">v{APP_VERSION}</div>
+      </div>
     </div>
   );
 }
 
-const rootEl=document.getElementById("root");
-ReactDOM.createRoot(rootEl).render(<App/>);
+/* ============================ ÉCRAN MÉNAGE =========================== */
+function MiniCal({ days, today, onPick }){
+  if(!days || !days.length) return null;
+  const map={}; days.forEach(d=>{ map[d.date]=d; });
+  // 5 semaines : de lundi il y a 4 semaines à dimanche de cette semaine (+1)
+  const t=new Date(today+"T12:00:00"); const wd=(t.getDay()+6)%7; const start=new Date(t); start.setDate(t.getDate()-wd-28);
+  const cells=[]; for(let i=0;i<42;i++){ const d=new Date(start); d.setDate(start.getDate()+i); const iso=d.toISOString().slice(0,10); cells.push(iso); }
+  return (<div>
+    <div className="cal">{["L","M","M","J","V","S","D"].map((h,i)=><div key={i} className="h">{h}</div>)}
+      {cells.map(iso=>{ const x=map[iso]; const st=x?x.statut:""; return (
+        <div key={iso} className={"cell "+st+(iso===today?" today":"")} title={iso+(st?" — "+(STATUT_TXT[st]||st):"")} onClick={()=>onPick && x && onPick(x)} style={{cursor:onPick&&x?"pointer":"default"}}>
+          {+iso.slice(8,10)}{iso.slice(8,10)==="01" && <span className="d">{new Date(iso+"T12:00:00").toLocaleDateString("fr-FR",{month:"short"})}</span>}
+        </div>); })}
+    </div>
+    <div className="legend"><span><i style={{background:"#f5c400"}}/>Passé</span><span><i style={{background:"#c4170c"}}/>Pas passé·e</span><span><i style={{background:"#e1e8f5"}}/>Prévu</span><span><i style={{background:"#ffe9cc"}}/>En cours</span><span><i style={{background:"#eee"}}/>Annulé / non renseigné</span></div>
+  </div>);
+}
+
+// Master : saisie d'un jour passé (comme le magasin, mais avec les heures).
+function PastEditor({ p, busy, onSave }){
+  const st0 = p ? (p.statut==="absent"?"absent":p.statut==="annule"?"annule":(p.arriveeAt||p.statut==="ok")?"ok":"") : "";
+  const [st,setSt]=useState(st0); const [a,setA]=useState(p&&p.arriveeAt?hhmm(p.arriveeAt):""); const [d,setD]=useState(p&&p.departAt?hhmm(p.departAt):"");
+  const [n,setN]=useState((p&&p.note)||""); const [i,setI]=useState((p&&p.initiales)||"");
+  useEffect(()=>{ setSt(st0); setA(p&&p.arriveeAt?hhmm(p.arriveeAt):""); setD(p&&p.departAt?hhmm(p.departAt):""); setN((p&&p.note)||""); setI((p&&p.initiales)||""); },[p&&p.id, p&&p.majAt]);
+  const B=({v,l,c})=><button onClick={()=>setSt(v)} style={{flex:1,padding:"14px 6px",borderRadius:14,fontWeight:900,fontSize:15,border:"2px solid "+(st===v?c:"#e8e3da"),background:st===v?c+"22":"#fff"}}>{l}</button>;
+  const inp={padding:10,borderRadius:10,border:"1.5px solid #e8e3da",fontSize:15,width:"100%"};
+  return (<div className="box"><h3>Saisie master de ce jour</h3>
+    <div style={{display:"flex",gap:8}}><B v="ok" l="✅ Passé" c="#e0b200"/><B v="absent" l="❌ Pas passé·e" c="#c4170c"/><B v="annule" l="🚫 Annulé" c="#888888"/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10}}>
+      <label className="small-note" style={{margin:0}}>Arrivée<input type="time" value={a} onChange={e=>setA(e.target.value)} style={inp}/></label>
+      <label className="small-note" style={{margin:0}}>Départ<input type="time" value={d} onChange={e=>setD(e.target.value)} style={inp}/></label>
+      <label className="small-note" style={{margin:0}}>Initiales<input value={i} maxLength={4} onChange={e=>setI(e.target.value.toUpperCase())} style={inp}/></label>
+    </div>
+    <textarea className="note" style={{marginTop:10}} value={n} onChange={e=>setN(e.target.value)} placeholder="Ce qui a été fait / remarque"/>
+    <button className="btn-primary" style={{marginTop:10}} disabled={busy||!st} onClick={()=>onSave({ statut:st, arrivee:a, depart:d, note:n, initiales:i })}>💾 Enregistrer ce jour</button>
+  </div>);
+}
+
+function MenageScreen({ token, me, onBack, onAuthLost, fixedLieu }){
+  const lieux = fixedLieu ? (me.lieux||[]).filter(l=>l.code===fixedLieu) : (me.lieux||[]);
+  const [lieu,setLieu]=useState(lieux[0]?lieux[0].code:"");
+  const [date,setDate]=useState(me.today);
+  const [data,setData]=useState(null);
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [toast,setToast]=useState("");
+  const [note,setNote]=useState(""); const [taches,setTaches]=useState([]);
+  const [ini,setIni]=useState(()=>{ try{ return localStorage.getItem("pribon_menage_ini")||""; }catch(e){ return ""; } });
+  const [showFiche,setShowFiche]=useState(false);
+  const say=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
+  const run=async(fn)=>{ setBusy(true); setErr(""); try{ await fn(); }catch(e){ if(e.auth) onAuthLost(e.message); else setErr(e.message); } setBusy(false); };
+  const load=()=>run(async()=>{ const j=await mapi("lieu-get",{ idToken:token, lieu, date }); setData(j); setNote((j.passage&&j.passage.note)||""); setTaches([]); });
+  useEffect(()=>{ if(lieu) load(); },[lieu,date]);
+  useEffect(()=>{ try{ localStorage.setItem("pribon_menage_ini",ini); }catch(e){} },[ini]);
+  const p = data && data.passage; const L = data && data.lieu;
+  const arrived = p && p.arriveeAt; const left = p && p.departAt; const annule = p && p.statut==="annule"; const absent = p && p.statut==="absent";
+  const fullNote = ()=> [taches.length?taches.join(", "):"", note.trim()].filter(Boolean).join(" — ");
+  const act=(action, extra, msg)=>run(async()=>{ const j=await mapi(action,{ idToken:token, lieu, date: me.master?date:undefined, initiales:ini, ...extra }); setData(j); setNote((j.passage&&j.passage.note)||""); setTaches([]); say(msg); });
+  const isToday = date===me.today;
+
+  return (
+    <div className="page">
+      <div className="top blue"><button className="back" onClick={onBack}>←</button>
+        <div style={{flex:1}}><h1>🧹 Ménage</h1><div className="sub">{L?L.nom:"…"}{L&&L.societe?" · "+L.societe:""}</div></div>
+        {L && <button className="back" onClick={()=>setShowFiche(v=>!v)}>{showFiche?"Fermer":"ℹ️ Infos"}</button>}
+      </div>
+      <div className="wrap">
+        {(me.master || lieux.length>1) && (
+          <div className="box"><h3>{me.master?(fixedLieu?"Master — choisir le jour":"Master — choisir le lieu et le jour"):"Lieu"}</h3>
+            {lieux.length>1 && <div className="seg">{lieux.map(l=><button key={l.code} className={lieu===l.code?"on":""} onClick={()=>setLieu(l.code)}>{l.nom||l.code}</button>)}</div>}
+            {me.master && <div style={{marginTop:10,display:"flex",gap:8,alignItems:"center"}}><input type="date" value={date} max={me.today} onChange={e=>setDate(e.target.value||me.today)} style={{padding:10,borderRadius:10,border:"1.5px solid #e8e3da",fontSize:15}}/>
+              {!isToday && <button className="seg" style={{background:"none"}} onClick={()=>setDate(me.today)}><span className="chip">Aujourd'hui</span></button>}</div>}
+          </div>)}
+
+        {showFiche && L && (
+          <div className="box"><h3>Fiche prestataire</h3>
+            <div className="kv">
+              <span className="k">Société</span><span className="v">{L.societe||"—"}</span>
+              <span className="k">Contact</span><span className="v">{L.contactNom||"—"}{L.contactTel && <> · <a href={"tel:"+L.contactTel}>{L.contactTel}</a></>}</span>
+              {L.contactEmail && <><span className="k">Email</span><span className="v"><a href={"mailto:"+L.contactEmail}>{L.contactEmail}</a></span></>}
+              <span className="k">Responsable</span><span className="v">{L.responsable||"—"}{L.responsableTel && <> · <a href={"tel:"+L.responsableTel}>{L.responsableTel}</a></>}</span>
+              <span className="k">Jours</span><span className="v">{(L.jours||[]).length?(L.jours||[]).map(j=>JOURS[j]).join(", "):"—"}</span>
+              <span className="k">Horaire</span><span className="v">{L.horaire||"—"}</span>
+              <span className="k">Tarif</span><span className="v">{L.tarifType==="mensuel"?(L.tarifMensuel?L.tarifMensuel+" € HT / mois":"—"):(L.prixPassage?L.prixPassage+" € HT / passage":"—")}</span>
+              {L.conditions && <><span className="k">Conditions</span><span className="v" style={{fontWeight:500,whiteSpace:"pre-wrap"}}>{L.conditions}</span></>}
+              {L.contratDebut && <><span className="k">Contrat</span><span className="v">depuis le {new Date(L.contratDebut+"T12:00:00").toLocaleDateString("fr-FR")}{L.lienContrat && <> · <a href={L.lienContrat} target="_blank" rel="noreferrer">📄 voir</a></>}</span></>}
+            </div>
+          </div>)}
+
+        {!data && busy && <div className="box" style={{textAlign:"center",color:"#888"}}>Chargement…</div>}
+        {data && (<>
+          <div className="box today">
+            <div className="day">{isToday?"Aujourd'hui":"📅"} · {dayLong(date)}</div>
+            <span className={"pv "+(data.prevuDate?"yes":"no")}>{data.prevuDate?"Passage prévu"+(L.horaire?" · "+L.horaire:""):"Pas de passage prévu ce jour"}</span>
+          </div>
+
+          {me.master && !isToday ? (
+            <PastEditor p={p} busy={busy} onSave={(o)=>run(async()=>{ await mapi("passage-set",{ idToken:token, lieu, date, ...o }); say("Jour enregistré"); const j=await mapi("lieu-get",{ idToken:token, lieu, date }); setData(j); })}/>
+          ) : annule || absent ? (
+            <div className="box" style={{textAlign:"center"}}>
+              <div style={{fontSize:20,fontWeight:900,color:absent?"#c4170c":"#777"}}>{absent?"❌ Agent pas passé·e":"🚫 Passage annulé / prévenu"}</div>
+              {p.note && <div className="small-note">{p.note}</div>}
+              <button className="link" onClick={()=>{ if(confirm("Remettre ce jour à zéro ?")) act("passage-reset",{},"Remis à zéro"); }}>Remettre à zéro</button>
+              {absent && <button className="btn-secondary" onClick={()=>act("passage-arrivee",{force:true},"Arrivée pointée")} disabled={busy}>En fait l'agent est venu·e</button>}
+            </div>
+          ) : left ? (
+            <div className="done-card">
+              <div style={{fontSize:42}}>✨</div>
+              <div className="big">Passage validé</div>
+              <div style={{marginTop:6,fontWeight:700,color:"#6b4f00"}}>Arrivé·e {hhmm(p.arriveeAt)} · Parti·e {hhmm(p.departAt)}</div>
+              {p.note && <div style={{marginTop:8,fontSize:15}}>📝 {p.note}</div>}
+              <div style={{marginTop:12}}>
+                <textarea className="note" value={note} onChange={e=>setNote(e.target.value)} placeholder="Modifier la note…"/>
+                <button className="btn-secondary" disabled={busy || note===(p.note||"")} onClick={()=>act("passage-note",{note},"Note enregistrée")}>💾 Enregistrer la note</button>
+              </div>
+            </div>
+          ) : (
+            <div className="box">
+              <div className="steps">
+                <div className={"step "+(arrived?"done":"cur")}>1 · Arrivée {arrived?"✓ "+hhmm(p.arriveeAt):""}</div>
+                <div className={"step "+(arrived?"cur":"")}>2 · Départ + note</div>
+              </div>
+              {!arrived ? (<>
+                <button className="bigbtn arr" disabled={busy} onClick={()=>act("passage-arrivee",{},"🙋 Arrivée pointée")}>
+                  <span className="em">🙋</span>Agent arrivé·e<small>Appuie dès que l'agent arrive</small></button>
+                <div style={{textAlign:"center"}}><button className="link" onClick={()=>{ const r=prompt("Pourquoi ? (ex : fermé, prestataire a prévenu)"); if(r!==null) act("passage-annule",{note:r||"Passage annulé / prévenu"},"Passage annulé"); }}>Passage annulé / prestataire a prévenu</button></div>
+              </>) : (<>
+                <div style={{fontWeight:800,marginBottom:6}}>Qu'est-ce qui a été fait ?</div>
+                <div className="chips">{TACHES.map(t=><button key={t} className={"chip"+(taches.includes(t)?" on":"")} onClick={()=>setTaches(v=>v.includes(t)?v.filter(x=>x!==t):[...v,t])}>{taches.includes(t)?"✓ ":""}{t}</button>)}</div>
+                <textarea className="note" value={note} onChange={e=>setNote(e.target.value)} placeholder="Note libre (oubli, problème, produit manquant…)"/>
+                <button className="bigbtn dep" style={{marginTop:12}} disabled={busy} onClick={()=>act("passage-depart",{note:fullNote()},"👋 Départ pointé — merci !")}>
+                  <span className="em">👋</span>Agent parti·e<small>Valide le passage</small></button>
+              </>)}
+              <div className="ini">Tes initiales (facultatif) <input value={ini} maxLength={4} onChange={e=>setIni(e.target.value.replace(/[^A-Za-zÀ-ÿ]/g,"").toUpperCase())} placeholder="HG"/></div>
+            </div>
+          )}
+
+          <div className="box"><h3>Les dernières semaines</h3>
+            <MiniCal days={data.days} today={data.today} onPick={me.master?(x)=>setDate(x.date):null}/>
+            {me.master && <div className="small-note">Master : touche un jour pour le corriger.</div>}
+          </div>
+        </>)}
+        {err && <div className="box err" style={{textAlign:"center"}}>{err}</div>}
+      </div>
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/* ============================ INFOS MAGASIN =========================== */
+function InfosScreen({ lieu, onBack }){
+  const L=lieu||{}; const J=(L.jours||[]).map(j=>JOURS[j]).join(", ");
+  const Row=({k,v})=> v ? <><span className="k">{k}</span><span className="v">{v}</span></> : null;
+  return (<div className="page">
+    <div className="top"><button className="back" onClick={onBack}>←</button><div><h1>🏪 Infos magasin</h1><div className="sub">{L.nom}</div></div></div>
+    <div className="wrap">
+      <div className="box"><h3>Le magasin</h3><div className="kv">
+        <Row k="Nom" v={L.nom}/><Row k="Adresse" v={L.adresse}/>
+        <Row k="Téléphone" v={L.telMagasin && <a href={"tel:"+L.telMagasin}>{L.telMagasin}</a>}/>
+        <Row k="Email(s)" v={L.emailsMagasin}/><Row k="Code réception" v={L.codeReception}/>
+      </div></div>
+      <div className="box"><h3>Ménage</h3><div className="kv">
+        <Row k="Société" v={L.societe||"—"}/><Row k="Contact" v={[L.contactNom,L.contactTel].filter(Boolean).join(" · ")}/>
+        <Row k="Responsable" v={[L.responsable,L.responsableTel].filter(Boolean).join(" · ")}/>
+        <Row k="Jours" v={J}/><Row k="Horaire" v={L.horaire}/>
+        <Row k="Tarif" v={L.tarifType==="mensuel"?(L.tarifMensuel?L.tarifMensuel+" € HT / mois":""):(L.prixPassage?L.prixPassage+" € HT / passage":"")}/>
+        <Row k="Contrat" v={L.lienContrat && <a href={L.lienContrat} target="_blank" rel="noreferrer">📄 voir</a>}/>
+      </div></div>
+      <div className="small-note" style={{textAlign:"center"}}>Ces infos se modifient dans la console › Référentiels › 🏪 Fiches magasins.</div>
+    </div></div>);
+}
+function ArtInfo(){ return (
+  <svg viewBox="0 0 120 96" width="100%" height="96" aria-hidden="true">
+    <rect x="22" y="34" width="76" height="50" rx="6" fill="#fff4dc" stroke="#c98a1a" strokeWidth="2"/>
+    <path d="M16 36 L60 10 L104 36 Z" fill="#e9a23b"/><rect x="50" y="56" width="20" height="28" rx="3" fill="#c98a1a"/>
+    <rect x="30" y="44" width="14" height="12" rx="2" fill="#bfe0ff"/><rect x="76" y="44" width="14" height="12" rx="2" fill="#bfe0ff"/>
+  </svg>); }
+
+/* ============================== APP ================================= */
+function App(){
+  const QS=new URLSearchParams(location.search);
+  const lieuParam=(QS.get("lieu")||"").toUpperCase(); const embed=QS.get("embed")==="1";
+  const [token,setToken]=useState(null);
+  const [store,setStore]=useState(null);     // compte magasin (code réception) : { storeCode, storeLabel, email }
+  const [session,setSession]=useState(null); // { code, expiresAt }
+  const [me,setMe]=useState(null);           // module ménage : { email, master, lieux[], today }
+  const [sel,setSel]=useState(lieuParam||"");// master : magasin choisi
+  const [menageErr,setMenageErr]=useState("");
+  const [todayInfo,setTodayInfo]=useState(null);
+  const [view,setView]=useState("hub");
+  const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
+  const [latest,setLatest]=useState(null);
+  useEffect(()=>{ let stop=false; (async()=>{ const v=await fetchLatestVersion(); if(!stop&&v) setLatest(v); })(); return ()=>{ stop=true; }; },[]);
+  const updateAvailable = !embed && latest && isNewer(APP_VERSION, latest);
+
+  const onToken=async(idToken)=>{
+    setToken(idToken); setErr(""); setBusy(true); setMenageErr("");
+    const [a,b]=await Promise.allSettled([ api("magasin-login",{ idToken }), mapi("me",{ idToken }) ]);
+    const j=a.status==="fulfilled"?a.value:null;
+    const m=b.status==="fulfilled"?b.value:null;
+    if(j && j.allowed && !(m && m.master)){ setStore({ storeCode:j.storeCode, storeLabel:j.storeLabel, email:j.email }); setSession(j.current||null); }
+    if(m) setMe(m); else setMenageErr(b.reason && b.reason.message || "");
+    if(!(j && j.allowed) && !m) setErr("Accès refusé"+((j&&j.email)?" : "+j.email:"")+" n'est pas un compte magasin autorisé.");
+    setBusy(false);
+  };
+  // v2.1.0 — ouverte dans la console (même site) : reprend la connexion Google du responsable.
+  useEffect(()=>{ let tok=null; try{ if(window.parent!==window) tok=window.parent.__pribonIdToken||null; }catch(e){} if(tok) onToken(tok); },[]);
+
+  const master = !!(me && me.master);
+  const lieux = (me && me.lieux) || [];
+  const curLieu = master ? lieux.find(l=>l.code===sel) : (lieux[0]||null);
+  const codeStore = master ? (curLieu && curLieu.codeReception ? { storeCode:curLieu.codeReception, storeLabel:curLieu.nom } : null) : store;
+  useEffect(()=>{ if(master) setSession(null); },[sel]);
+
+  // Badge du jour sur l'encart Ménage
+  useEffect(()=>{ setTodayInfo(null); if(!curLieu || view!=="hub") return;
+    mapi("lieu-get",{ idToken:token, lieu:curLieu.code }).then(j=>setTodayInfo(j)).catch(()=>{}); },[me, view, curLieu && curLieu.code]);
+  const logout=()=>{ try{ google.accounts.id.disableAutoSelect(); }catch(e){} setToken(null); setStore(null); setSession(null); setMe(null); setSel(lieuParam||""); setView("hub"); setErr(""); setTodayInfo(null); };
+  const onAuthLost=(m)=>{ alert((m||"Session expirée")+"\n\nReconnecte-toi avec Google."); logout(); };
+
+  const logged = store || me;
+  let badge=null;
+  if(todayInfo){ const p=todayInfo.passage;
+    if(p && p.departAt) badge=<span className="mt-badge ok">✓ passé aujourd'hui</span>;
+    else if(p && p.arriveeAt) badge=<span className="mt-badge run">⏳ agent sur place</span>;
+    else if(p && p.statut==="annule") badge=<span className="mt-badge todo">annulé</span>;
+    else if(p && p.statut==="absent") badge=<span className="mt-badge ko">pas passé·e</span>;
+    else if(todayInfo.prevuDate) badge=<span className="mt-badge todo">prévu aujourd'hui</span>; }
+  const name = master ? "Master · "+(curLieu?curLieu.nom:"tous les magasins") : (store ? store.storeLabel : (curLieu ? curLieu.nom : ""));
+  const COLS=["#2f8f4e","#1e6fd9","#e8730c","#8e44ad","#c0392b","#16a085"];
+
+  let screen;
+  if(!logged) screen=(
+      <div className="land" style={{justifyContent:"center"}}>
+        <div className="land-logo">🏬 PRIBON</div>
+        <div className="land-tag">Bureau magasin{lieuParam?" · "+lieuParam:""}</div>
+        <div className="card">
+          <div style={{fontWeight:800,marginBottom:14,fontSize:17}}>Connexion du magasin</div>
+          <GoogleLogin onToken={onToken}/>
+          {busy && <div className="small-note">Vérification…</div>}
+          {err && <div className="err">{err}</div>}
+          <div className="small-note">Compte Google du magasin — ou compte master (hg@, rr@, achat@) pour voir tous les magasins.</div>
+        </div>
+      </div>);
+  else if(master && !curLieu) screen=(
+      <div className="land">
+        <div className="land-logo">🏬 PRIBON</div>
+        <div className="land-tag">Master — choisis un magasin</div>
+        <div className="who">{me.email}<button onClick={logout}>Se déconnecter</button></div>
+        <div className="mod-grid">{lieux.filter(l=>l.actif!==false).map((l,i)=>(
+          <div key={l.code} className="mod-tile" style={{borderTop:"5px solid "+COLS[i%COLS.length]}} onClick={()=>setSel(l.code)}>
+            <div style={{width:64,height:64,borderRadius:18,background:COLS[i%COLS.length],color:"#fff",display:"grid",placeItems:"center",fontSize:22,fontWeight:900}}>{l.code}</div>
+            <div className="mt-name">{l.nom}</div>
+            <div className="mt-sub">{[l.responsable && "👤 "+l.responsable, l.societe && "🧹 "+l.societe].filter(Boolean).join(" · ")||"—"}</div>
+          </div>))}</div>
+      </div>);
+  else if(view==="code" && codeStore) screen=<CodeScreen token={token} store={codeStore} session={session} setSession={setSession} master={master} onBack={()=>setView("hub")}/>;
+  else if(view==="menage" && me) screen=<MenageScreen token={token} me={me} fixedLieu={master?curLieu.code:null} onBack={()=>setView("hub")} onAuthLost={onAuthLost}/>;
+  else if(view==="infos" && curLieu) screen=<InfosScreen lieu={curLieu} onBack={()=>setView("hub")}/>;
+  else screen=(
+      <div className="land">
+        <div className="land-logo">🏬 PRIBON</div>
+        <div className="land-tag">{curLieu?curLieu.nom:"Bureau magasin"} — choisis un encart</div>
+        <div className="who">{name}
+          {master && !lieuParam && <button onClick={()=>{ setSel(""); setView("hub"); }}>↔ Changer</button>}
+          {!embed && <button onClick={logout}>Se déconnecter</button>}</div>
+        <div className="mod-grid">
+          <div className={"mod-tile code"+(codeStore?"":" soon")} onClick={()=>codeStore && setView("code")}>
+            {!master && session && session.expiresAt>Date.now() && <span className="mt-badge ok">code actif</span>}
+            <div className="mt-art"><ArtCle/></div>
+            <div className="mt-name">🔑 Code réception</div>
+            <div className="mt-sub">{codeStore?"Générer le code magasin (3h) pour les vendeurs":(master?"Code réception non réglé (Fiches magasins)":"Réservé au compte du magasin")}</div>
+          </div>
+          <div className={"mod-tile menage"+(me?"":" soon")} onClick={()=>me && setView("menage")}>
+            {badge}
+            <div className="mt-art"><ArtBalai/></div>
+            <div className="mt-name">🧹 Ménage</div>
+            <div className="mt-sub">{me?"Pointer l'arrivée et le départ de l'agent · infos prestataire":(menageErr||"Pas encore disponible")}</div>
+          </div>
+          {curLieu && <div className="mod-tile" style={{borderTop:"5px solid #e9a23b",background:"linear-gradient(160deg,#fff,#fff8ec)"}} onClick={()=>setView("infos")}>
+            <div className="mt-art"><ArtInfo/></div>
+            <div className="mt-name">🏪 Infos magasin</div>
+            <div className="mt-sub">Adresse, téléphone, responsable, prestataire</div>
+          </div>}
+        </div>
+        <div className="small-note" style={{marginTop:22}}>D'autres encarts arrivent pour la vie du magasin.</div>
+      </div>);
+
+  return (<>
+    {updateAvailable && (<div className="update-bar"><span>Nouvelle version {latest} disponible</span><button onClick={()=>reloadToLatest(latest)}>Mettre à jour</button></div>)}
+    {screen}
+    <div className="ver-badge">v{APP_VERSION}</div>
+  </>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>

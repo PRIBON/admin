@@ -109,6 +109,16 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-s
 .side button.tab svg{width:17px;height:17px;flex:0 0 17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
 .side .cnt{margin-left:auto;font-size:11px;font-weight:700;background:rgba(255,255,255,.09);border-radius:999px;padding:1px 7px;color:#dfe8da}
 .side .cnt.r{background:#f04438;color:#fff}.side .cnt.a{background:#f5a524;color:#1d1503}.side .cnt:empty{display:none}
+/* v2.12.0 — menu façon Kelbongoo : groupes en cartes colorées */
+.kgrp{margin:12px 0 0;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-left:4px solid var(--g,#8dc478);padding:6px 6px 8px}
+.kgrp-h{display:flex;align-items:center;gap:10px;padding:6px 8px 8px;font-size:14.5px;font-weight:800;color:#fff;letter-spacing:.01em}
+.kgrp-ic{width:30px;height:30px;flex:0 0 30px;border-radius:9px;display:grid;place-items:center;font-size:17px;background:var(--g,#8dc478);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.kgrp .tab{padding:8px 10px !important;font-size:14.5px !important;border-radius:9px !important;color:#e3ebde !important}
+.kgrp .tab.active{background:rgba(255,255,255,.12) !important;box-shadow:inset 3px 0 0 var(--g,#8dc478) !important;font-weight:700 !important;color:#fff !important}
+.kgrp .tab .em{font-size:18px !important;width:24px !important;flex:0 0 24px !important}
+.kgrp.solo{background:none;border:none;padding:0;margin-top:2px}
+.kgrp.solo .tab{padding:11px 12px !important;font-size:16px !important;font-weight:700 !important;border-radius:12px !important;background:rgba(255,255,255,.05);margin-bottom:6px}
+.kgrp.solo .tab.active{background:linear-gradient(135deg,rgba(141,196,120,.35),rgba(141,196,120,.15)) !important;box-shadow:none !important}
 .side-foot{margin-top:auto;padding:12px 10px 0;border-top:1px solid rgba(255,255,255,.07);display:flex;gap:10px;align-items:center}
 .side-av{width:30px;height:30px;border-radius:50%;background:#2c3b2a;color:#cfe3c6;display:grid;place-items:center;font-size:12px;font-weight:800;flex:0 0 30px}
 .side-foot div{font-size:12px;color:#e6eee2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.side-foot small{display:block;color:#7d8f77;font-size:11px}
@@ -220,7 +230,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 .blf-act{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .blf-log{font-size:12.5px}.blf-log div{padding:6px 0;border-bottom:1px dashed var(--line)}
 @media (max-width:1300px){ .fr-kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
-@media (max-width:1100px){ .side{width:64px;padding:14px 8px} .side .brand div,.side-sec,.side button.tab span.lbl,.side .cnt,.side-foot div{display:none} .main{margin-left:64px} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2,.grid-r{grid-template-columns:1fr} }
+@media (max-width:1100px){ .side{width:64px;padding:14px 8px} .side .brand div,.side-sec,.side button.tab span.lbl,.side .cnt,.side-foot div,.kgrp-t{display:none} .kgrp{padding:4px 2px;border-left-width:3px} .kgrp-h{padding:4px 2px 6px;justify-content:center} .kgrp-ic{width:26px;height:26px;flex-basis:26px;font-size:14px} .main{margin-left:64px} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .grid2,.grid-r{grid-template-columns:1fr} }
 
 /* ===== v2.10 — Menu téléphone (tiroir) ===== */
 #navBtn{display:none}
@@ -229,7 +239,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
   #navBtn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:20px;flex:0 0 44px;cursor:pointer}
   .side{width:min(300px,86vw);padding:18px 12px 14px;transform:translateX(-105%);transition:transform .22s ease;z-index:120;box-shadow:0 0 40px rgba(0,0,0,.35)}
   body.nav-open .side{transform:none}
-  .side .brand div,.side-foot div{display:block}.side-sec{display:block}.side button.tab span.lbl{display:inline}.side .cnt{display:inline-block}
+  .side .brand div,.side-foot div{display:block}.side-sec{display:block}.kgrp-t{display:inline} .kgrp{padding:6px 6px 8px;border-left-width:4px} .kgrp-h{padding:6px 8px 8px;justify-content:flex-start} .kgrp-ic{width:30px;height:30px;flex-basis:30px;font-size:17px}.side button.tab span.lbl{display:inline}.side .cnt{display:inline-block}
   .side button.tab{padding:12px 12px;font-size:15.5px}.side button.tab .em{font-size:19px;width:26px;flex-basis:26px}
   body.nav-open #navBack{display:block;position:fixed;inset:0;background:rgba(10,20,14,.5);z-index:110}
   .main{margin-left:0}
@@ -340,28 +350,39 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <div class="hidden" id="app">
   <nav class="side" aria-label="Navigation">
     <div class="brand"><div class="logo">P</div><div><b>Pribon Console</b><small id="sideVer">Responsable</small></div></div>
-    <div class="side-sec"><span class="se">🧭</span>Pilotage</div>
-    <button class="tab" data-tab="home" data-key="home"><span class="em">🏠</span><span class="lbl">Aujourd'hui</span><span class="cnt" id="cnt-home"></span></button>
-    <button class="tab" data-tab="suivi" data-key="suivi"><span class="em">📡</span><span class="lbl">Suivi live</span><span class="cnt" id="cnt-suivi"></span></button>
-    <div class="side-sec"><span class="se">🏪</span>Magasins</div>
-    <button class="tab" data-tab="multi" data-key="multi"><span class="em">📄</span><span class="lbl">Chargement BL</span><span class="cnt" id="cnt-multi"></span></button>
-    <button class="tab" data-tab="g5" data-key="g5"><span class="em">📥</span><span class="lbl">Réceptions G5</span><span class="cnt" id="cnt-g5"></span></button>
-    <button class="tab" data-tab="avoirs" data-key="avoirs"><span class="em">💶</span><span class="lbl">Avoirs</span><span class="cnt" id="cnt-avoirs"></span></button>
-    <button class="tab" data-tab="msg" data-key="msg"><span class="em">💬</span><span class="lbl">Messages</span><span class="cnt" id="cnt-msg"></span></button>
-    <div class="side-sec"><span class="se">🏭</span>Entrepôt PDP</div>
-    <button class="tab" data-tab="centrale" data-key="centrale" data-cview="histo"><span class="em">🚚</span><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
-    <button class="tab" data-tab="rungis" data-key="rungis"><span class="em">🚛</span><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
-    <button class="tab" data-tab="sapins" data-key="sapins"><span class="em">🎄</span><span class="lbl">Sapins</span><span class="cnt" id="cnt-sapins"></span></button>
-    <button class="tab" data-tab="inventaire" data-key="inventaire"><span class="em">📋</span><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
-    <div class="side-sec"><span class="se">🧀</span>Fromage</div>
-    <button class="tab" data-tab="fromage" data-key="fromage"><span class="em">📒</span><span class="lbl">Suivi fromage</span><span class="cnt" id="cnt-fromage"></span></button>
-    <button class="tab" data-tab="blf" data-key="blf"><span class="em">📦</span><span class="lbl">BL fromage</span><span class="cnt" id="cnt-blf"></span></button>
-    <button class="tab" data-tab="centrale" data-key="decoupe" data-cview="decoupe"><span class="em">🔪</span><span class="lbl">Découpes par BL</span><span class="cnt" id="cnt-decoupe"></span></button>
-    <button class="tab" data-tab="centrale" data-key="traca" data-cview="traca"><span class="em">🏷️</span><span class="lbl">Traçabilité lots</span><span class="cnt" id="cnt-traca"></span></button>
-    <button class="tab" data-tab="kbgpoids" data-key="kbgpoids"><span class="em">⚖️</span><span class="lbl">Poids Kelbongoo</span><span class="cnt" id="cnt-kbgpoids"></span></button>
-    <div class="side-sec"><span class="se">🛠️</span>Référentiels &amp; outils</div>
-    <button class="tab" data-tab="fourn" data-key="fourn"><span class="em">🏢</span><span class="lbl">Fournisseurs</span><span class="cnt" id="cnt-fourn"></span></button>
-    <button class="tab" data-tab="appview" data-key="appview"><span class="em">📱</span><span class="lbl">Vue appli &amp; ménage</span><span class="cnt" id="cnt-appview"></span></button>
+    <div class="kgrp solo">
+      <button class="tab" data-tab="home" data-key="home"><span class="em">🏠</span><span class="lbl">Aujourd'hui</span><span class="cnt" id="cnt-home"></span></button>
+      <button class="tab" data-tab="suivi" data-key="suivi"><span class="em">📡</span><span class="lbl">Suivi live</span><span class="cnt" id="cnt-suivi"></span></button>
+    </div>
+    <div class="kgrp" style="--g:#5fa8ff">
+      <div class="kgrp-h"><span class="kgrp-ic">🏪</span><span class="kgrp-t">Magasins</span></div>
+      <button class="tab" data-tab="multi" data-key="multi"><span class="em">📄</span><span class="lbl">Chargement BL</span><span class="cnt" id="cnt-multi"></span></button>
+      <button class="tab" data-tab="g5" data-key="g5"><span class="em">📥</span><span class="lbl">Réceptions G5</span><span class="cnt" id="cnt-g5"></span></button>
+      <button class="tab" data-tab="avoirs" data-key="avoirs"><span class="em">💶</span><span class="lbl">Avoirs</span><span class="cnt" id="cnt-avoirs"></span></button>
+      <button class="tab" data-tab="msg" data-key="msg"><span class="em">💬</span><span class="lbl">Messages</span><span class="cnt" id="cnt-msg"></span></button>
+      <button class="tab" data-tab="menage" data-key="menage"><span class="em">🧽</span><span class="lbl">Ménage</span><span class="cnt" id="cnt-menage"></span></button>
+    </div>
+    <div class="kgrp" style="--g:#f5a524">
+      <div class="kgrp-h"><span class="kgrp-ic">🏭</span><span class="kgrp-t">Entrepôt PDP</span></div>
+      <button class="tab" data-tab="centrale" data-key="centrale" data-cview="histo"><span class="em">🚚</span><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
+      <button class="tab" data-tab="rungis" data-key="rungis"><span class="em">🚛</span><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
+      <button class="tab" data-tab="sapins" data-key="sapins"><span class="em">🎄</span><span class="lbl">Sapins</span><span class="cnt" id="cnt-sapins"></span></button>
+      <button class="tab" data-tab="inventaire" data-key="inventaire"><span class="em">📋</span><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
+    </div>
+    <div class="kgrp" style="--g:#e9c46a">
+      <div class="kgrp-h"><span class="kgrp-ic">🧀</span><span class="kgrp-t">Fromage</span></div>
+      <button class="tab" data-tab="fromage" data-key="fromage"><span class="em">📒</span><span class="lbl">Suivi fromage</span><span class="cnt" id="cnt-fromage"></span></button>
+      <button class="tab" data-tab="blf" data-key="blf"><span class="em">📦</span><span class="lbl">BL fromage</span><span class="cnt" id="cnt-blf"></span></button>
+      <button class="tab" data-tab="centrale" data-key="decoupe" data-cview="decoupe"><span class="em">🔪</span><span class="lbl">Découpes par BL</span><span class="cnt" id="cnt-decoupe"></span></button>
+      <button class="tab" data-tab="centrale" data-key="traca" data-cview="traca"><span class="em">🏷️</span><span class="lbl">Traçabilité lots</span><span class="cnt" id="cnt-traca"></span></button>
+      <button class="tab" data-tab="kbgpoids" data-key="kbgpoids"><span class="em">⚖️</span><span class="lbl">Poids Kelbongoo</span><span class="cnt" id="cnt-kbgpoids"></span></button>
+    </div>
+    <div class="kgrp" style="--g:#b39ddb">
+      <div class="kgrp-h"><span class="kgrp-ic">🛠️</span><span class="kgrp-t">Référentiels &amp; outils</span></div>
+      <button class="tab" data-tab="fourn" data-key="fourn"><span class="em">🏢</span><span class="lbl">Fournisseurs</span><span class="cnt" id="cnt-fourn"></span></button>
+      <button class="tab" data-tab="fiches" data-key="fiches"><span class="em">🏪</span><span class="lbl">Fiches magasins</span><span class="cnt" id="cnt-fiches"></span></button>
+      <button class="tab" data-tab="appview" data-key="appview"><span class="em">📱</span><span class="lbl">Vue appli</span><span class="cnt" id="cnt-appview"></span></button>
+    </div>
     <div class="side-foot"><span class="side-av" id="sideAv">·</span><div><span id="whoami"></span><small id="sideDate"></small></div>
       <button class="tbtn s" style="margin-left:auto;background:transparent;border-color:rgba(255,255,255,.12);color:#9fb098" title="Se déconnecter" onclick="consoleLogout()"><svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l-5-5 5-5M5 12h11"/></svg></button></div>
   </nav>
@@ -391,6 +412,8 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
       <div id="tab-msg" class="hidden"></div>
       <div id="tab-fourn" class="hidden"></div>
       <div id="tab-appview" class="hidden"></div>
+      <div id="tab-menage" class="hidden"></div>
+      <div id="tab-fiches" class="hidden"></div>
     </div>
   </div>
 </div>
@@ -398,7 +421,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.11.3"; // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.13.0"; // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -580,6 +603,7 @@ const readyStores=()=>STORES.filter(s=>s.firebaseConfig&&s.firebaseConfig.databa
 
 function start(email){
   ME_EMAIL=email;
+  setTimeout(()=>{ try{ menagePreload(); }catch(e){} }, 1500);
   document.getElementById("gate").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   document.getElementById("whoami").textContent=email;
@@ -633,10 +657,10 @@ function start(email){
   setInterval(()=>dashTick(false), 4000);
 }
 let ACTIVE_TAB="home", ACTIVE_KEY="home";
-const TAB_IDS=["home","multi","g5","centrale","rungis","sapins","inventaire","kbgpoids","fromage","blf","avoirs","suivi","msg","fourn","appview"];
+const TAB_IDS=["home","multi","g5","centrale","rungis","sapins","inventaire","kbgpoids","fromage","blf","avoirs","suivi","msg","fourn","appview","menage","fiches"];
 const CRUMBS={ home:["Pilotage","Aujourd'hui"], suivi:["Pilotage","Suivi live"], multi:["Magasins","Chargement BL"], g5:["Magasins","Réceptions G5"], avoirs:["Magasins","Avoirs"], msg:["Magasins","Messages"],
   centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Fromage","Découpes par BL"], traca:["Fromage","Traçabilité lots"], fromage:["Fromage","Suivi fromage"], blf:["Fromage","BL fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], sapins:["Entrepôt PDP","🎄 Sapins"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Fromage","Poids Kelbongoo"],
-  fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli & ménage"] };
+  fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli"], menage:["Magasins","Ménage"], fiches:["Référentiels & outils","Fiches magasins"] };
 function switchTab(t, key){
   if(TAB_IDS.indexOf(t)<0) t="home";
   key = key || (t==="centrale" && centraleView==="decoupe" ? "decoupe" : (t==="centrale" && centraleView==="traca" ? "traca" : t));
@@ -656,6 +680,8 @@ function switchTab(t, key){
   if(t==="kbgpoids") renderKbgPoids();
   if(t==="fromage") renderFromage();
   if(t==="blf") renderBlf();
+  if(t==="menage") renderMenage();
+  if(t==="fiches") renderFiches();
   try{ window.scrollTo(0,0); }catch(e){}
 }
 /* Rafraîchit l'affichage de l'onglet courant SANS recharger la page (donc sans se reconnecter).
@@ -678,6 +704,8 @@ function refreshActive(btn){
     else if(t==="fromage") renderFromage();
     else if(t==="blf") renderBlf();
     else if(t==="kbgpoids") renderKbgPoids();
+    else if(t==="menage") renderMenage(true);
+    else if(t==="fiches") renderFiches(true);
     if(t==="suivi") renderLive();
     renderLoadStatus && renderLoadStatus();
     dashTick(true);
@@ -3930,7 +3958,7 @@ const ENLEVEMENT_URL = "https://script.google.com/macros/s/AKfycbypY1ue7nBesHFhO
 const KBG_FIREBASE_CONFIG = { apiKey:"AIzaSyDiOCgkDItazkaUfNC1kTjF9Z7K9rSqqow", authDomain:"distribkbg.firebaseapp.com", projectId:"distribkbg",
   storageBucket:"distribkbg.firebasestorage.app", messagingSenderId:"255791649801", appId:"1:255791649801:web:bcf2d080e524000f3194d8" };
 // Réception : même appli pour tous les magasins (le responsable bascule de magasin dans l'appli).
-const APP_URLS = { centrale:"https://pribon.github.io/centrale/", reception:"https://pribon.github.io/Bichat/" };
+const APP_URLS = { centrale:"https://pribon.github.io/centrale/", reception:"https://pribon.github.io/Bichat/", magasin:"https://pribon.github.io/admin/magasin.html" };
 const RESP_NAMES = { "hg@probon.fr":"Henry", "rr@pribon.org":"Raimbaud" };
 const SITE_COL = { ROB:"#E11D48", BIC:"#FF1F8E", TOL:"#0A84FF", PDP:"#7C3AED", BOR:"#FF6D00", STB:"#00B060", PDC:"#00A8B5", NCC:"#D946EF", LIL:"#9333EA", CES:"#16A34A", BAR:"#F43F5E", CHA:"#2563EB", NCA:"#0D9488", ROM:"#EA580C", FOR:"#B45309", PAD:"#DB2777", BEL:"#455a64" };
 const SITE_NAME = { ROB:"Robespierre", BIC:"Bichat", TOL:"Tolbiac", PDP:"Porte de Pantin", BOR:"Borrego", STB:"Saint-Blaise", BEL:"Belleville", ENTREPOT:"Entrepôt" };
@@ -4035,7 +4063,7 @@ function todoItems(){
   const av=avoirsTodo(); if(av.length) L.push({ pr:3, ic:"💶", bg:"var(--warn-s)", col:"var(--warn)", t:`${av.length} avoir(s) à réclamer`, s:[...new Set(av.map(r=>r.supplier||"?"))].slice(0,4).map(esc).join(" · "), btn:`<button class="tbtn s" onclick="switchTab('avoirs')">Ouvrir</button>` });
   const ec=[]; if(ec.length) L.push({ pr:4, ic:"⚠", bg:"var(--info-s)", col:"var(--info)", t:`${ec.length} dispatch avec écarts à traiter`, s:ec.slice(0,3).map(s=>esc(s.meta.supplier||"?")).join(" · "), btn:`<button class="tbtn s" onclick="centraleView='ecarts';switchTab('centrale')">Voir</button>` });
   const pk=pickingList().filter(p=>p.closed&&p.closed.partial&&isToday(p.closed.at)); pk.forEach(p=>L.push({ pr:5, ic:"🛒", bg:"var(--info-s)", col:"var(--pick)", t:`Picking ${STORE_SHORT[p.meta.storeCode]||p.meta.storeCode||""} clôturé partiellement`, s:`cde ${esc(p.meta.orderNum||"—")} · ${p.st.done}/${p.st.total} lignes`, btn:`<button class="tbtn s" onclick="centraleView='picking';switchTab('centrale')">Voir</button>` }));
-  const mn=menageCandidates(); if(mn.length) L.push({ pr:6, ic:"🧹", bg:"#eef0ee", col:"#4a5547", t:`${mn.length} ancien(s) dispatch / picking encore visible(s) sur la tablette`, s:"traités ou abandonnés — à nettoyer", btn:`<button class="tbtn s" onclick="switchTab('appview')">Faire le ménage</button>` });
+  const mn=menageCandidates(); if(mn.length) L.push({ pr:6, ic:"🧹", bg:"#eef0ee", col:"#4a5547", t:`${mn.length} ancien(s) dispatch / picking encore visible(s) sur la tablette`, s:"traités ou abandonnés — à nettoyer", btn:`<button class="tbtn s" onclick="switchTab('appview')">Faire le tri</button>` });
   return L.sort((a,b)=>a.pr-b.pr);
 }
 function pribonEvents(){
@@ -4851,6 +4879,35 @@ function toastC(msg){ let t=document.getElementById("toastC"); if(!t){ t=documen
   t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 3200); }
 
 /* ===================================================================== VUE APPLI & MÉNAGE */
+/* v2.13.0 — 3 vues : 1 Centrale & ménage (inchangée) · 2 Magasin admin (multi) · 3 Réception (multi) */
+const APP_SEGS=[["centrale","1 · Centrale & ménage"],["magasin","2 · Magasin admin"],["reception","3 · Réception"]];
+let appDesk=false, appDeskLieu="";
+function appLieux(kind){
+  if(kind==="reception") return [["ROBESPIERRE","Pribon Robespierre"],["BICHAT","Pribon Bichat"]];
+  const ls=(MN.data&&MN.data.lieux||[]).map(x=>x.lieu).filter(l=>l.actif!==false);
+  return ls.length ? ls.map(l=>[l.code,l.nom||l.code]) : [["ROB","Pribon Montreuil"],["BIC","Pribon Bichat"],["TOL","Pribon Tolbiac"]];
+}
+function appUrl(kind, code){ return kind==="reception" ? APP_URLS.reception+"?embed=1&store="+encodeURIComponent(code) : APP_URLS.magasin+"?embed=1&lieu="+encodeURIComponent(code); }
+function renderAppMulti(el){
+  if(appSel==="magasin" && !MN.data && mnReady() && !MN.loading){ mnLoad().then(()=>{ if(ACTIVE_TAB==="appview") renderAppView(); }); }
+  const L=appLieux(appSel); if(!appDeskLieu || !L.find(x=>x[0]===appDeskLieu)) appDeskLieu=L[0][0];
+  const seg=APP_SEGS.map(([k,l])=>`<button class="${appSel===k?"on":""}" onclick="appSel='${k}';renderAppView(true)">${l}</button>`).join("");
+  const mode=`<span class="seg"><button class="${appDesk?"":"on"}" onclick="appDesk=false;renderAppView()">📱 Tous les magasins</button><button class="${appDesk?"on":""}" onclick="appDesk=true;renderAppView()">🖥 Vue ordinateur</button></span>`;
+  const title=appSel==="magasin"?"Magasin admin (connexion magasin)":"Réception magasins";
+  let body;
+  if(appDesk){
+    const u=appUrl(appSel, appDeskLieu);
+    body=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="t2">Lieu :</span><span class="seg">${L.map(([c,n])=>`<button class="${appDeskLieu===c?"on":""}" onclick="appDeskLieu='${esc(c)}';renderAppView()">${esc(n)}</button>`).join("")}</span><span style="flex:1"></span><a class="tbtn s" href="${esc(u)}" target="_blank" rel="noopener">Ouvrir dans un onglet ↗</a></div>
+      <div class="cx" style="overflow:hidden"><iframe src="${esc(u)}" title="${esc(title)}" style="width:100%;height:78vh;border:0;display:block;background:#f7f5f0"></iframe></div>`;
+  } else {
+    body=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:22px;align-items:start">${L.map(([c,n])=>{ const u=appUrl(appSel,c); return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div style="display:flex;gap:8px;align-items:center"><b style="font-size:15px">${esc(n)}</b><span class="pill" style="background:#f1efe9">${esc(c)}</span>
+          <button class="tbtn s" onclick="appDesk=true;appDeskLieu='${esc(c)}';renderAppView()">🖥</button><a class="tbtn s" href="${esc(u)}" target="_blank" rel="noopener">↗</a></div>
+        <div class="phone"><iframe src="${esc(u)}" title="${esc(n)}"></iframe></div></div>`; }).join("")}</div>`;
+  }
+  el.innerHTML=`<div class="page-h"><div><h1>📱 Vue appli</h1><div class="sub">${esc(title)} — chaque écran est ouvert avec ton compte (master). ⚠️ Les actions sont réelles.</div></div><span class="sp"></span>${mode}<span class="seg">${seg}</span></div>${body}`;
+}
 let appSel="centrale", appApercu=true, appBuiltFor="", appVersions={}, menageSel={};
 async function loadVersions(){
   const get=async(u,re)=>{ try{ const t=await (await fetch(u+(u.includes("?")?"&":"?")+"nocache="+Date.now(),{cache:"no-store"})).text(); const m=t.match(re); return m?m[1]:"?"; }catch(e){ return "?"; } };
@@ -4860,15 +4917,16 @@ async function loadVersions(){
 }
 function renderAppView(force){
   const el=document.getElementById("tab-appview"); if(!el) return;
+  if(appSel!=="centrale"){ el.dataset.built=""; appBuiltFor=""; renderAppMulti(el); return; }
   if(!el.dataset.built){
-    el.innerHTML=`<div class="page-h"><div><h1>Vue appli &amp; ménage</h1><div class="sub">Voir les applis comme sur la tablette pour tester, et retirer les anciens dispatch / picking.</div></div><span class="sp"></span><span class="seg" id="appSeg"></span></div>
+    el.innerHTML=`<div class="page-h"><div><h1>📱 Vue appli</h1><div class="sub">Voir les applis comme sur l'appareil. Centrale : tester + retirer les anciens dispatch / picking (ménage tablette).</div></div><span class="sp"></span><span class="seg" id="appSeg"></span></div>
       <div style="display:grid;grid-template-columns:420px minmax(0,1fr);gap:20px;align-items:start">
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px"><div class="phone"><iframe id="appFrame" title="Aperçu de l'appli"></iframe></div><div id="appCtl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center"></div></div>
         <div id="appRight" style="display:flex;flex-direction:column;gap:16px;min-width:0"></div>
       </div>`;
     el.dataset.built="1"; loadVersions();
   }
-  const segs=[["centrale","La Centrale PDP"],["reception","Réception magasins"]];
+  const segs=APP_SEGS;
   document.getElementById("appSeg").innerHTML=segs.map(([k,l])=>`<button class="${appSel===k?"on":""}" onclick="appSel='${k}';renderAppView(true)">${l}</button>`).join("");
   const url=APP_URLS[appSel]+(appSel==="centrale"&&appApercu?"?apercu=1":"");
   if(force || appBuiltFor!==url){ document.getElementById("appFrame").src=url; appBuiltFor=url; }
@@ -4982,5 +5040,333 @@ function renderKbgLive(){
 function consoleLogout(){ if(!confirm("Se déconnecter de la console ?")) return; try{ google.accounts.id.disableAutoSelect(); }catch(e){} try{ firebase.apps.forEach(a=>{ if(a.name!=="KBG" && a.auth) a.auth().signOut(); }); }catch(e){} setTimeout(()=>location.reload(),300); }
 
 </script>
+<style>
+/* ===================== v2.12.0 — MÉNAGE ===================== */
+.mn-cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;padding:14px 16px 16px}
+.mn-cal .h{font-size:11px;font-weight:700;color:var(--mute);text-align:center;text-transform:uppercase;letter-spacing:.06em}
+.mn-d{position:relative;min-height:62px;border-radius:11px;background:#faf8f3;border:1px solid #efebe3;padding:6px 7px;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:transform .1s}
+.mn-d:hover{transform:translateY(-1px);border-color:var(--line2)}
+.mn-d .n{font-weight:800;font-size:13px;color:#b6b0a5}
+.mn-d .t{font-size:10.5px;font-weight:700;line-height:1.2}
+.mn-d.out{visibility:hidden}
+.mn-d.ok,.mn-d.extra,.mn-d.ok_sans_depart{background:linear-gradient(160deg,#ffe680,#f5c400);border-color:#e0b200;box-shadow:inset 0 -3px 0 rgba(0,0,0,.07)}
+.mn-d.ok .n,.mn-d.extra .n,.mn-d.ok_sans_depart .n,.mn-d.ok .t,.mn-d.extra .t,.mn-d.ok_sans_depart .t{color:#5a4300}
+.mn-d.absent{background:linear-gradient(160deg,#ff6b5e,#c4170c);border-color:#9e1208;transform:perspective(260px) rotateX(10deg);box-shadow:0 6px 0 #7d0d06,0 10px 16px rgba(196,23,12,.35)}
+.mn-d.absent .n,.mn-d.absent .t{color:#fff}
+.mn-d.en_cours{background:#ffe9cc;border:2px dashed #ff9800}.mn-d.en_cours .t{color:#a14d00}
+.mn-d.prevu{background:var(--info-s);border-color:#c5d3ee}.mn-d.prevu .t{color:var(--info)}
+.mn-d.a_renseigner{background:#fff;border:1.5px dashed #d6d0c4}.mn-d.a_renseigner .t{color:#a09a90}
+.mn-d.annule{background:repeating-linear-gradient(45deg,#eee,#eee 5px,#f8f8f8 5px,#f8f8f8 10px)}.mn-d.annule .t{color:#777}
+.mn-d.today{outline:3px solid var(--acc);outline-offset:1px}
+.mn-d .nt{position:absolute;right:6px;top:5px;font-size:11px}
+.mn-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);padding:0 16px 14px}
+.mn-leg i{display:inline-block;width:13px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px}
+.mn-stat{display:inline-flex;gap:6px;align-items:center;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#f1efe9;color:var(--ink2)}
+.mn-stat.y{background:#fff3c4;color:#7a5b00}.mn-stat.r{background:var(--dan-s);color:var(--dan)}.mn-stat.g{background:#f1efe9;color:#8a857c}.mn-stat.b{background:var(--info-s);color:var(--info)}
+.mn-alert{display:flex;gap:12px;align-items:center;border-radius:12px;padding:12px 14px;font-weight:700;margin:12px 16px}
+.mn-alert.r{background:linear-gradient(135deg,#fde6e6,#fff3f2);color:#8f1d14;border:1.5px solid #f3b4ae}
+.mn-alert.g{background:var(--acc-s);color:var(--acc-d);border:1.5px solid #c9dfbf}
+.mn-alert.y{background:#fff8e1;color:#7a5b00;border:1.5px solid #f0d67a}
+.mn-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;padding:14px 16px}
+.mn-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:650;color:var(--ink2)}
+.mn-form input,.mn-form select,.mn-form textarea{font:500 14px Inter,sans-serif;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff}
+.mn-form .full{grid-column:1/-1}
+.mn-form input,.mn-form select,.mn-form textarea{width:100%;box-sizing:border-box;min-width:0}.mn-form label{min-width:0;text-transform:none;letter-spacing:0}
+.mn-days{display:flex;gap:6px;flex-wrap:wrap}
+.mn-days button{all:unset;cursor:pointer;font:700 12.5px Inter,sans-serif;padding:7px 11px;border-radius:8px;background:#f1efe9;color:var(--ink2)}
+.mn-days button.on{background:var(--acc);color:#fff}
+@media (max-width:760px){ .mn-form{grid-template-columns:1fr} .mn-d{min-height:46px;padding:4px} .mn-d .t{display:none} }
+</style>
+<script>
+/* =====================================================================
+   v2.12.0 — MÉNAGE (passages agent, calendrier, factures prestataire)
+   Données : Apps Script « PRIBON Ménage » (Google Sheet). Auth = idToken Google.
+   ===================================================================== */
+try{ Object.defineProperty(window,"__pribonIdToken",{ get:()=>ID_TOKEN, configurable:true }); }catch(e){} // v2.13.0 : les vues magasin/réception intégrées reprennent la connexion
+const MENAGE_URL = "https://script.google.com/macros/s/AKfycbwmqzL-bcriCwUQ2Aqn6CL09HQkPPgZl8hiC0DG4yf-Wy00f5DN4LGbnYpPyqqXaOuc/exec";   // ← URL /exec du script Ménage (voir INSTALLATION)
+const MN = { view:"cal", mois:new Date().toISOString().slice(0,7), data:null, loading:false, err:"", journal:null };
+const MN_JOURS=["","Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+const MN_TXT={ ok:"Passé", extra:"Passé (hors planning)", ok_sans_depart:"Passé · départ non pointé", en_cours:"En cours", absent:"PAS PASSÉ·E", annule:"Annulé", a_renseigner:"À renseigner", prevu:"Prévu" };
+const MN_VERDICT={ ok:["OK pour payer","g"], ok_sans_tarif:["OK (pas de tarif)","g"], absences_non_deduites:["Paiement total malgré absences","r"], ecart:["Montant trop élevé","r"], absences_a_verifier:["Absences à vérifier","y"], a_verifier:["À vérifier","y"] };
+const mnReady=()=> MENAGE_URL && MENAGE_URL.indexOf("__A_REMPLIR__")<0;
+const mnEur=(n)=> (Math.round((+n||0)*100)/100).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2})+" €";
+const mnMoisFr=(m)=> new Date(m+"-15T12:00:00").toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+const mnHH=(ms)=> ms? new Date(+ms).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}):"";
+const mnDM=(iso)=> iso.slice(8,10)+"/"+iso.slice(5,7);
+
+async function mnApi(action, extra){
+  if(!mnReady()) throw new Error("Module Ménage pas encore branché : colle l'URL du script dans MENAGE_URL (console.html et magasin.html).");
+  const r=await fetch(MENAGE_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action,idToken:ID_TOKEN},extra||{}))});
+  const j=await r.json();
+  if(j && j.auth===false){ const ok=await mnReauth(); if(ok) return mnApi(action, extra); throw new Error(j.error||"Session expirée"); }
+  if(j && j.error) throw new Error(j.error);
+  return j;
+}
+/* Le jeton Google dure 1 h : on redemande une connexion SANS recharger la console. */
+function mnReauth(){
+  return new Promise(res=>{
+    const back=document.createElement("div"); back.className="modal-back";
+    back.innerHTML=`<div class="modal-box" style="max-width:380px;text-align:center"><h2 style="margin:0 0 6px;font-size:17px">🔐 Session Google expirée</h2>
+      <div class="t2" style="margin-bottom:14px">Reconnecte-toi pour continuer (la console reste ouverte).</div><div id="mnGbtn" style="display:flex;justify-content:center"></div>
+      <button class="tbtn" style="margin-top:14px" id="mnCancel">Annuler</button></div>`;
+    document.body.appendChild(back);
+    const restore=()=>{ try{ google.accounts.id.initialize({client_id:OAUTH_CLIENT_ID,callback:onCredential}); }catch(e){} };
+    back.querySelector("#mnCancel").onclick=()=>{ back.remove(); restore(); res(false); };
+    try{ google.accounts.id.initialize({client_id:OAUTH_CLIENT_ID,callback:(resp)=>{ ID_TOKEN=resp.credential; back.remove(); restore(); res(true); }});
+      google.accounts.id.renderButton(back.querySelector("#mnGbtn"),{theme:"filled_blue",size:"large",text:"signin_with"}); }catch(e){ back.remove(); res(false); }
+  });
+}
+async function menagePreload(){ if(!mnReady()) return; try{ MN.data=await mnApi("admin-mois",{mois:MN.mois}); mnCount(); }catch(e){} }
+function mnCount(){
+  if(!MN.data) return; const d=MN.data; let n=0;
+  const hier=new Date(Date.now()-864e5).toISOString().slice(0,10);
+  d.lieux.forEach(L=>L.cal.forEach(c=>{ if(c.statut==="absent" && c.date>=hier) n++; }));
+  (d.factures||[]).forEach(f=>{ if(!f.decision && f.verdict && !/^ok/.test(f.verdict)) n++; });
+  try{ setCnt("menage", n, "r"); }catch(e){}
+}
+async function mnLoad(){
+  MN.loading=true; MN.err=""; renderMenage();
+  try{ MN.data=await mnApi("admin-mois",{mois:MN.mois}); mnCount(); }catch(e){ MN.err=e.message; }
+  MN.loading=false; renderMenage(); if(typeof ACTIVE_TAB!=="undefined" && ACTIVE_TAB==="fiches") renderFiches();
+}
+function mnShift(n){ const d=new Date(MN.mois+"-15T12:00:00"); d.setMonth(d.getMonth()+n); MN.mois=d.toISOString().slice(0,7); mnLoad(); }
+function mnSet(v){ MN.view=v; if(v==="journal") mnJournal(); else renderMenage(); }
+
+function renderMenage(force){
+  const el=document.getElementById("tab-menage"); if(!el) return;
+  if(force===true){ mnLoad(); return; }
+  if(!MN.data && !MN.loading && !MN.err && mnReady()){ mnLoad(); return; }
+  const seg=[["cal","📅 Calendrier"],["fact","🧾 Factures"],["reg","⚙️ Réglages"],["journal","📜 Journal"]].map(([k,l])=>`<button class="${MN.view===k?"on":""}" onclick="${k==="reg"?"switchTab('fiches')":"mnSet('"+k+"')"}">${l}</button>`).join("");
+  let body="";
+  if(!mnReady()) body=`<div class="cx"><div class="empty">🧽 Module Ménage prêt mais pas encore branché.<br>1) Crée la Google Sheet « PRIBON — Ménage » + le script (fichier <b>Menage_Code_v1.0.gs</b>) · 2) Déploie en appli web · 3) Colle l'URL dans <code>MENAGE_URL</code> ici et dans magasin.html.</div></div>`;
+  else if(MN.err) body=`<div class="cx"><div class="empty" style="color:var(--dan)">⚠️ ${esc(MN.err)}<br><br><button class="tbtn" onclick="mnLoad()">Réessayer</button></div></div>`;
+  else if(!MN.data) body=`<div class="cx"><div class="empty">Chargement…</div></div>`;
+  else if(MN.view==="cal") body=mnCalHtml();
+  else if(MN.view==="fact") body=mnFactHtml();
+  else if(MN.view==="reg") body=mnRegHtml();
+  else if(MN.view==="journal") body=mnJournalHtml();
+  const showMois = MN.view==="cal"||MN.view==="fact";
+  el.innerHTML=`<div class="page-h"><div><h1>🧽 Ménage</h1><div class="sub">Passages de l'agent pointés par les magasins · calendrier · contrôle des factures du prestataire</div></div><span class="sp"></span>
+    ${showMois?`<span class="seg"><button onclick="mnShift(-1)">‹</button><button class="on" style="text-transform:capitalize;min-width:120px;text-align:center">${esc(mnMoisFr(MN.mois))}</button><button onclick="mnShift(1)">›</button></span>`:""}
+    <span class="seg">${seg}</span></div>${MN.loading&&MN.data?`<div class="t2" style="margin:-8px 0 10px">Actualisation…</div>`:""}${body}`;
+}
+
+/* ---------- CALENDRIER ---------- */
+function mnCalHtml(){
+  const d=MN.data, today=d.today; if(!d.lieux.length) return `<div class="cx"><div class="empty">Aucun lieu. Ajoute-en un dans ⚙️ Réglages.</div></div>`;
+  return d.lieux.filter(L=>L.lieu.actif!==false).map(L=>{
+    const s=L.stats, first=new Date(L.cal[0].date+"T12:00:00"), off=(first.getDay()+6)%7;
+    const cells=[]; for(let i=0;i<off;i++) cells.push(`<div class="mn-d out"></div>`);
+    L.cal.forEach(c=>{ const p=c.p||{}; const t=c.statut?MN_TXT[c.statut]:"";
+      const hrs = p.arriveeAt? mnHH(p.arriveeAt)+(p.departAt?"→"+mnHH(p.departAt):"") : "";
+      cells.push(`<div class="mn-d ${c.statut}${c.date===today?" today":""}" title="${esc(c.date+(t?" · "+t:"")+(p.note?" · "+p.note:""))}" onclick="mnEditDay('${esc(L.lieu.code)}','${c.date}')">
+        <span class="n">${+c.date.slice(8,10)}</span>${t?`<span class="t">${esc(t)}</span>`:""}${hrs?`<span class="t">${esc(hrs)}</span>`:""}${p.note?`<span class="nt">📝</span>`:""}</div>`); });
+    const nr = s.nonRenseignes ? `<button class="tbtn s" onclick="mnBulkOk('${esc(L.lieu.code)}')">✓ Marquer les ${s.nonRenseignes} jours « à renseigner » comme passés</button>`:"";
+    return `<div class="cx" style="margin-bottom:16px;overflow:hidden">
+      <div class="cx-h" style="flex-wrap:wrap"><h3 style="font-size:15px">${esc(L.lieu.nom||L.lieu.code)}</h3><span class="t2">${esc(L.lieu.societe||"prestataire ?")} · ${(L.lieu.jours||[]).map(j=>MN_JOURS[j]).join(", ")||"jours non réglés"}</span><span class="sp"></span>
+        <span class="mn-stat b">📅 ${s.prevus} prévus</span><span class="mn-stat y">✓ ${s.effectues} passé${s.effectues>1?"s":""}</span><span class="mn-stat r">✗ ${s.absents} absent${s.absents>1?"s":""}</span>${s.nonRenseignes?`<span class="mn-stat g">? ${s.nonRenseignes} à renseigner</span>`:""}</div>
+      ${nr?`<div style="padding:10px 16px 0">${nr}</div>`:""}
+      <div class="mn-cal">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(h=>`<div class="h">${h}</div>`).join("")}${cells.join("")}</div>
+      <div class="mn-leg"><span><i style="background:#f5c400"></i>Passé</span><span><i style="background:#c4170c;box-shadow:0 2px 0 #7d0d06"></i>Pas passé·e</span><span><i style="background:var(--info-s)"></i>Prévu</span><span><i style="background:#ffe9cc"></i>En cours</span><span><i style="border:1.5px dashed #ccc;background:#fff"></i>À renseigner (clique pour saisir)</span><span><i style="background:#eee"></i>Annulé</span></div>
+    </div>`; }).join("");
+}
+function mnFind(code,date){ const L=MN.data.lieux.find(x=>x.lieu.code===code); return { L, c:L && L.cal.find(x=>x.date===date) }; }
+function mnEditDay(code,date){
+  const {L,c}=mnFind(code,date); if(!L) return; const p=(c&&c.p)||{};
+  const st = c&&(c.statut==="ok"||c.statut==="extra"||c.statut==="ok_sans_depart"||c.statut==="en_cours") ? "ok" : (c&&c.statut==="absent"?"absent":(c&&c.statut==="annule"?"annule":""));
+  const back=document.createElement("div"); back.className="modal-back";
+  const opt=(v,l,col)=>`<label style="flex:1;cursor:pointer"><input type="radio" name="mnst" value="${v}" ${st===v?"checked":""} style="display:none" onchange="mnRadio(this)"><div class="mnr" data-v="${v}" style="border:2px solid ${st===v?col:"#e8e3da"};background:${st===v?col+"22":"#fff"};border-radius:12px;padding:12px 6px;text-align:center;font-weight:800">${l}</div></label>`;
+  back.innerHTML=`<div class="modal-box" style="max-width:480px">
+    <h2 style="margin:0;font-size:18px">${esc(L.lieu.nom||code)}</h2>
+    <div class="t2" style="margin:2px 0 14px;text-transform:capitalize">${new Date(date+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})} · ${c&&c.prevu?"passage prévu":"pas prévu au planning"}</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">${opt("ok","✅ Passé","#e0b200")}${opt("absent","❌ Pas passé·e","#c4170c")}${opt("annule","🚫 Annulé","#888888")}</div>
+    <div class="mn-form" style="padding:0;grid-template-columns:1fr 1fr 1fr">
+      <label>Arrivée<input type="time" id="mnA" value="${p.arriveeAt?mnHH(p.arriveeAt):""}"></label>
+      <label>Départ<input type="time" id="mnD" value="${p.departAt?mnHH(p.departAt):""}"></label>
+      <label>Initiales<input id="mnI" maxlength="4" value="${esc(p.initiales||"")}" style="text-transform:uppercase"></label>
+      <label class="full">Note (ce qui a été fait / remarque)<textarea id="mnN" rows="3">${esc(p.note||"")}</textarea></label>
+    </div>
+    ${p.majBy?`<div class="t2" style="font-size:11.5px;margin-top:8px">Dernière modif : ${esc(p.majBy)} · source ${esc(p.source||"")}</div>`:""}
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="tbtn" onclick="this.closest('.modal-back').remove()">Annuler</button>
+      ${st?`<button class="tbtn" style="color:var(--dan)" id="mnClr">Effacer le jour</button>`:""}<span style="flex:1"></span>
+      <button class="tbtn p" id="mnSave">Enregistrer</button></div></div>`;
+  document.body.appendChild(back);
+  const save=async(statut)=>{ const b=back.querySelector("#mnSave"); b.disabled=true; b.textContent="…";
+    try{ await mnApi("passage-set",{ lieu:code, date, statut, arrivee:back.querySelector("#mnA").value, depart:back.querySelector("#mnD").value,
+      initiales:back.querySelector("#mnI").value, note:back.querySelector("#mnN").value }); back.remove(); mnLoad(); }
+    catch(e){ alert(e.message); b.disabled=false; b.textContent="Enregistrer"; } };
+  back.querySelector("#mnSave").onclick=()=>{ const r=back.querySelector('input[name="mnst"]:checked'); if(!r){ alert("Choisis Passé, Pas passé·e ou Annulé."); return; } save(r.value); };
+  const clr=back.querySelector("#mnClr"); if(clr) clr.onclick=()=>{ if(confirm("Effacer ce jour (revient à « à renseigner ») ?")) save(""); };
+}
+function mnRadio(inp){ const box=inp.closest(".modal-box"); const col={ok:"#e0b200",absent:"#c4170c",annule:"#888888"};
+  box.querySelectorAll(".mnr").forEach(d=>{ const on=d.dataset.v===inp.value; d.style.borderColor=on?col[d.dataset.v]:"#e8e3da"; d.style.background=on?col[d.dataset.v]+"22":"#fff"; }); }
+async function mnBulkOk(code){
+  const {L}=mnFind(code, MN.mois+"-01"); const days=L.cal.filter(c=>c.statut==="a_renseigner").map(c=>c.date);
+  if(!days.length) return;
+  if(!confirm(`${L.lieu.nom} — marquer ${days.length} jour(s) comme PASSÉS ?\n\n${days.map(mnDM).join(", ")}\n\n(Les jours où l'agent n'est pas venu : clique dessus ensuite et mets « Pas passé·e ».)`)) return;
+  const ini=prompt("Tes initiales (traçabilité) :","")||"";
+  MN.loading=true; renderMenage();
+  try{ for(const d of days){ await mnApi("passage-set",{ lieu:code, date:d, statut:"ok", initiales:ini, note:"Saisie rattrapage console" }); } }catch(e){ alert(e.message); }
+  mnLoad();
+}
+
+/* ---------- FACTURES ---------- */
+function mnFactHtml(){
+  const d=MN.data; const fs=(d.factures||[]).filter(f=>String(f.mois)===MN.mois);
+  const rows=d.lieux.filter(L=>L.lieu.actif!==false).map(L=>{
+    const f=fs.find(x=>x.lieu===L.lieu.code); const s=L.stats;
+    const v=f&&f.verdict?MN_VERDICT[f.verdict]||[f.verdict,"y"]:null;
+    const dec = f&&f.decision==="payer" ? `<span class="pill" style="background:var(--acc-s);color:var(--acc-d)">✅ Validée pour paiement</span>`
+      : f&&f.decision==="contestee" ? `<span class="pill" style="background:var(--warn-s);color:var(--warn)">✉️ Contestée ${f.mailAt?"le "+new Date(f.mailAt).toLocaleDateString("fr-FR"):""}</span>` : "";
+    let alert="";
+    if(f && f.verdict==="absences_non_deduites") alert=`<div class="mn-alert r">⚠️ Attention : paiement total (${mnEur(f.montantHT)} HT) alors que ${s.absents} absence${s.absents>1?"s":""} (${s.absDates.map(mnDM).join(", ")}). Attendu : ${mnEur(f.attenduHT)} HT.</div>`;
+    else if(f && f.verdict==="ecart") alert=`<div class="mn-alert r">⚠️ Montant facturé ${mnEur(f.montantHT)} HT au lieu de ${mnEur(f.attenduHT)} HT attendu (+${mnEur(f.ecartHT)}).</div>`;
+    else if(f && /^ok/.test(f.verdict||"")) alert=`<div class="mn-alert g">✅ Facture cohérente avec les passages : OK pour payer.</div>`;
+    else if(!f && s.absents) alert=`<div class="mn-alert y">🧾 Facture pas encore chargée · ${s.absents} absence${s.absents>1?"s":""} à déduire ce mois.</div>`;
+    if(s.nonRenseignes) alert+=`<div class="mn-alert y" style="margin-top:0">❓ ${s.nonRenseignes} jour(s) non renseigné(s) : complète le calendrier avant de payer.</div>`;
+    const pc=v?(v[1]==="g"?["acc-s","acc-d"]:v[1]==="r"?["dan-s","dan"]:["warn-s","warn"]):null;
+    return `<div class="cx" style="margin-bottom:14px;overflow:hidden">
+      <div class="cx-h" style="flex-wrap:wrap"><h3 style="font-size:15px">${esc(L.lieu.nom||L.lieu.code)}</h3><span class="t2">${esc(L.lieu.societe||"")}${L.lieu.contactEmail?" · "+esc(L.lieu.contactEmail):" · ⚠️ email prestataire manquant"}</span><span class="sp"></span>
+        <span class="mn-stat b">${s.prevus} prévus</span><span class="mn-stat y">${s.effectues} passés</span><span class="mn-stat r">${s.absents} absent${s.absents>1?"s":""}</span>${v?`<span class="pill" style="background:var(--${pc[0]});color:var(--${pc[1]})">${esc(v[0])}</span>`:""}${dec}</div>
+      ${alert}
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 16px 14px">
+        ${f?`<span><b>${mnEur(f.montantHT)} HT</b>${f.montantTTC?` · ${mnEur(f.montantTTC)} TTC`:""}${f.numero?` · n° ${esc(f.numero)}`:""}</span>${f.fichierUrl?`<a class="tbtn s" href="${esc(f.fichierUrl)}" target="_blank" rel="noreferrer">📄 Voir la facture</a>`:""}`:`<span class="t2">Aucune facture pour ${esc(mnMoisFr(MN.mois))}</span>`}
+        <span style="flex:1"></span>
+        <button class="tbtn s ${f?"":"p"}" onclick="mnUpload('${esc(L.lieu.code)}')">${f?"✏️ Modifier / recharger":"⬆️ Charger la facture"}</button>
+        ${f?`<button class="tbtn s" onclick="mnMail('${esc(f.id)}')">✉️ Mail au prestataire</button><button class="tbtn s p" onclick="mnPay('${esc(f.id)}')">✅ OK pour payer</button><button class="tbtn s" style="color:var(--dan)" title="Supprimer" onclick="mnDelF('${esc(f.id)}')">🗑</button>`:""}
+      </div></div>`; }).join("");
+  const nOk=fs.filter(f=>f.decision==="payer").length, nPb=fs.filter(f=>!f.decision && !/^ok/.test(f.verdict||"")).length, nMiss=d.lieux.filter(L=>L.lieu.actif!==false && !fs.find(f=>f.lieu===L.lieu.code)).length;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="mn-stat y">✅ ${nOk} validée(s) pour paiement</span><span class="mn-stat r">⚠️ ${nPb} à traiter</span><span class="mn-stat g">🧾 ${nMiss} facture(s) manquante(s)</span></div>${rows}`;
+}
+async function mnPdfGuess(file){
+  try{ if(!window.pdfjsLib || !/pdf/i.test(file.type)) return {};
+    const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise; let txt="";
+    for(let i=1;i<=Math.min(pdf.numPages,3);i++){ const pg=await pdf.getPage(i); const tc=await pg.getTextContent(); txt+=" "+tc.items.map(x=>x.str).join(" "); }
+    const num=(s)=>parseFloat(String(s).replace(/\s/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",","."));
+    const grab=(re)=>{ const m=txt.match(re); return m?num(m[1]):null; };
+    const ht=grab(/total\s*(?:hors\s*taxes?|h\.?\s*t\.?)\s*:?\s*([\d\s.,]+\d)/i);
+    const ttc=grab(/(?:total\s*)?t\.?\s*t\.?\s*c\.?\s*:?\s*([\d\s.,]+\d)/i) || grab(/net\s*[àa]\s*payer\s*:?\s*([\d\s.,]+\d)/i);
+    const numero=(txt.match(/facture\s*(?:n[°ºo]\.?|num[ée]ro)\s*:?\s*([A-Z0-9\-\/]{3,})/i)||[])[1]||"";
+    return { ht, ttc, numero };
+  }catch(e){ return {}; }
+}
+async function mnB64(file){ const buf=new Uint8Array(await file.arrayBuffer()); let bin=""; for(let i=0;i<buf.length;i+=32768) bin+=String.fromCharCode.apply(null,buf.subarray(i,i+32768)); return btoa(bin); }
+function mnUpload(code){
+  const L=MN.data.lieux.find(x=>x.lieu.code===code); const f=(MN.data.factures||[]).find(x=>x.lieu===code && String(x.mois)===MN.mois)||{};
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box" style="max-width:520px"><h2 style="margin:0;font-size:18px">🧾 Facture ménage — ${esc(L.lieu.nom)}</h2>
+    <div class="t2" style="margin:2px 0 12px;text-transform:capitalize">${esc(mnMoisFr(MN.mois))} · ${esc(L.lieu.societe||"")}</div>
+    <div class="mn-form" style="padding:0">
+      <label class="full">Fichier (PDF ou photo)<input type="file" id="mfF" accept="application/pdf,image/*"></label>
+      <label>Montant HT (€) *<input id="mfHT" inputmode="decimal" value="${f.montantHT||""}"></label>
+      <label>Montant TTC (€)<input id="mfTTC" inputmode="decimal" value="${f.montantTTC||""}"></label>
+      <label>N° de facture<input id="mfNum" value="${esc(f.numero||"")}"></label>
+      <label>Nb de passages facturés<input id="mfNb" inputmode="numeric" value="${f.nbFactures||""}"></label>
+      <label class="full">Note<input id="mfNote" value="${esc(f.note||"")}"></label>
+    </div><div class="t2" id="mfHint" style="margin-top:8px;font-size:12px">Prévus ${L.stats.prevus} · passés ${L.stats.effectues} · absents ${L.stats.absents} · tarif ${L.lieu.tarifType==="mensuel"?mnEur(L.lieu.tarifMensuel)+" / mois":mnEur(L.lieu.prixPassage)+" / passage"}</div>
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="tbtn" onclick="this.closest('.modal-back').remove()">Annuler</button><span style="flex:1"></span><button class="tbtn p" id="mfGo">Analyser et enregistrer</button></div></div>`;
+  document.body.appendChild(back);
+  const q=(id)=>back.querySelector(id);
+  q("#mfF").onchange=async()=>{ const file=q("#mfF").files[0]; if(!file) return; q("#mfHint").textContent="Lecture du PDF…";
+    const g=await mnPdfGuess(file); if(g.ht && !q("#mfHT").value) q("#mfHT").value=String(g.ht).replace(".",",");
+    if(g.ttc && !q("#mfTTC").value) q("#mfTTC").value=String(g.ttc).replace(".",","); if(g.numero && !q("#mfNum").value) q("#mfNum").value=g.numero;
+    q("#mfHint").textContent=g.ht?"Montants lus sur le PDF — vérifie-les.":"Montant non trouvé automatiquement : saisis-le."; };
+  q("#mfGo").onclick=async()=>{ const n=(v)=>parseFloat(String(v||"").replace(/\s/g,"").replace(",","."))||0;
+    const ht=n(q("#mfHT").value); if(!ht){ alert("Indique le montant HT."); return; }
+    const b=q("#mfGo"); b.disabled=true; b.textContent="Envoi…";
+    try{ let base64="", nom="", mime=""; const file=q("#mfF").files[0];
+      if(file){ if(file.size>8e6) throw new Error("Fichier trop lourd (8 Mo max)."); base64=await mnB64(file); nom=file.name; mime=file.type; }
+      const r=await mnApi("facture-upload",{ lieu:code, mois:MN.mois, montantHT:ht, montantTTC:n(q("#mfTTC").value), numero:q("#mfNum").value, nbFactures:n(q("#mfNb").value), note:q("#mfNote").value, base64, nom, mime });
+      back.remove(); MN.view="fact"; await mnLoad();
+      if(r.facture && r.facture.verdict==="absences_non_deduites" && confirm(`⚠️ Attention : paiement total alors que ${r.analyse.stats.absents} absence(s).\n\nPréparer le mail au prestataire maintenant ?`)) mnMail(r.facture.id);
+    }catch(e){ alert(e.message); b.disabled=false; b.textContent="Analyser et enregistrer"; } };
+}
+async function mnMail(id){
+  let pv; try{ pv=await mnApi("facture-preview",{id}); }catch(e){ alert(e.message); return; }
+  const back=document.createElement("div"); back.className="modal-back";
+  back.innerHTML=`<div class="modal-box" style="max-width:640px"><h2 style="margin:0 0 10px;font-size:18px">✉️ Mail au prestataire</h2>
+    <div class="t2" style="font-size:12.5px">À : <b>${esc(pv.to)}</b><br>Copie : ${esc(pv.cc.join(", "))}</div>
+    <div class="mn-form" style="padding:10px 0 0;grid-template-columns:1fr"><label>Objet<input id="mmS" value="${esc(pv.subject)}" disabled></label>
+      <label>Message (modifiable)<textarea id="mmB" rows="14" style="font-size:13.5px;line-height:1.45">${esc(pv.body)}</textarea></label></div>
+    <div style="display:flex;gap:8px;margin-top:14px"><button class="tbtn" onclick="this.closest('.modal-back').remove()">Annuler</button><span style="flex:1"></span><button class="tbtn p" id="mmGo">Valider et envoyer</button></div></div>`;
+  document.body.appendChild(back);
+  back.querySelector("#mmGo").onclick=async()=>{ if(!confirm("Envoyer ce mail à "+pv.to+" (copie magasin) ?")) return; const b=back.querySelector("#mmGo"); b.disabled=true; b.textContent="Envoi…";
+    try{ await mnApi("facture-mail",{ id, texte:back.querySelector("#mmB").value }); back.remove(); mnLoad(); alert("✅ Mail envoyé."); }catch(e){ alert(e.message); b.disabled=false; b.textContent="Valider et envoyer"; } };
+}
+async function mnPay(id){ const f=(MN.data.factures||[]).find(x=>x.id===id); if(f && f.verdict && !/^ok/.test(f.verdict) && !confirm("⚠️ La facture n'est pas cohérente avec les passages ("+((MN_VERDICT[f.verdict]||[f.verdict])[0])+").\n\nValider quand même pour paiement ?")) return;
+  try{ await mnApi("facture-ok",{id}); mnLoad(); }catch(e){ alert(e.message); } }
+async function mnDelF(id){ if(!confirm("Supprimer cette facture de la liste ? (le fichier reste sur le Drive)")) return; try{ await mnApi("facture-delete",{id}); mnLoad(); }catch(e){ alert(e.message); } }
+
+/* ---------- RÉGLAGES ---------- */
+function renderFiches(force){
+  const el=document.getElementById("tab-fiches"); if(!el) return;
+  if(force===true || (!MN.data && !MN.loading && mnReady())){ mnLoad(); }
+  const body = !mnReady() ? `<div class="cx"><div class="empty">Module Ménage non branché (MENAGE_URL).</div></div>`
+    : MN.err ? `<div class="cx"><div class="empty" style="color:var(--dan)">⚠️ ${esc(MN.err)}</div></div>`
+    : !MN.data ? `<div class="cx"><div class="empty">Chargement…</div></div>` : mnRegHtml();
+  el.innerHTML=`<div class="page-h"><div><h1>🏪 Fiches magasins</h1><div class="sub">Pour chaque magasin : email du compte Google, responsable, adresse, code réception · prestataire ménage, jours, tarif, contrat. Visible par le magasin dans « Infos magasin ».</div></div></div>${body}`;
+}
+function mnRegHtml(){
+  const ls=MN.data.lieux.map(x=>x.lieu);
+  return ls.map(l=>mnLieuForm(l)).join("")+`<button class="tbtn" onclick="mnNewLieu()">➕ Ajouter un lieu</button>`;
+}
+function mnLieuForm(l){
+  const c=esc(l.code); const j=l.jours||[];
+  return `<div class="cx" style="margin-bottom:16px" id="mnL-${c}"><div class="cx-h"><h3 style="font-size:15px">${esc(l.nom||l.code)}</h3><span class="pill" style="background:#f1efe9">${c}</span><span class="sp"></span>
+    <label style="font-size:12.5px;font-weight:700;display:flex;gap:6px;align-items:center"><input type="checkbox" data-k="actif" ${l.actif!==false?"checked":""}> Actif</label></div>
+   <div style="padding:12px 16px 0;font-weight:800;font-size:13px">🏪 Le magasin</div>
+   <div class="mn-form">
+    <label>Nom du magasin<input data-k="nom" value="${esc(l.nom||"")}"></label>
+    <label>Emails du magasin (compte Google connexion + alertes, séparés par ,)<input data-k="emailsMagasin" value="${esc(l.emailsMagasin||"")}"></label>
+    <label>Adresse<input data-k="adresse" value="${esc(l.adresse||"")}"></label>
+    <label>Téléphone du magasin<input data-k="telMagasin" value="${esc(l.telMagasin||"")}"></label>
+    <label>Responsable du magasin<input data-k="responsable" value="${esc(l.responsable||"")}"></label>
+    <label>Téléphone responsable<input data-k="responsableTel" value="${esc(l.responsableTel||"")}"></label>
+    <label>Code réception (script central, ex : BICHAT)<input data-k="codeReception" value="${esc(l.codeReception||"")}" style="text-transform:uppercase"></label>
+   </div>
+   <div style="padding:4px 16px 0;font-weight:800;font-size:13px;border-top:1px solid var(--line);margin-top:4px;padding-top:12px">🧽 Ménage — prestataire</div>
+   <div class="mn-form">
+    <label>Société de ménage<input data-k="societe" value="${esc(l.societe||"")}"></label>
+    <label>Email prestataire (factures / réclamations)<input data-k="contactEmail" value="${esc(l.contactEmail||"")}"></label>
+    <label>Contact (nom)<input data-k="contactNom" value="${esc(l.contactNom||"")}"></label>
+    <label>Contact (téléphone)<input data-k="contactTel" value="${esc(l.contactTel||"")}"></label>
+    <label class="full">Jours de passage<div class="mn-days" data-k="jours">${[1,2,3,4,5,6,7].map(n=>`<button type="button" data-n="${n}" class="${j.includes(n)?"on":""}" onclick="this.classList.toggle('on')">${MN_JOURS[n]}</button>`).join("")}</div></label>
+    <label>Horaire habituel<input data-k="horaire" value="${esc(l.horaire||"")}" placeholder="ex : 7h00 – 8h30"></label>
+    <label>Type de tarif<select data-k="tarifType"><option value="passage" ${l.tarifType!=="mensuel"?"selected":""}>Prix par passage</option><option value="mensuel" ${l.tarifType==="mensuel"?"selected":""}>Forfait mensuel</option></select></label>
+    <label>Prix par passage (€ HT)<input data-k="prixPassage" inputmode="decimal" value="${l.prixPassage||""}"></label>
+    <label>Forfait mensuel (€ HT)<input data-k="tarifMensuel" inputmode="decimal" value="${l.tarifMensuel||""}"></label>
+    <label>Début du contrat<input type="date" data-k="contratDebut" value="${esc(l.contratDebut||"")}"></label>
+    <label>Fin du contrat<input type="date" data-k="contratFin" value="${esc(l.contratFin||"")}"></label>
+    <label class="full">Conditions (contrat de base, prestations, préavis…)<textarea data-k="conditions" rows="3">${esc(l.conditions||"")}</textarea></label>
+    <label class="full">Notes internes<textarea data-k="notes" rows="2">${esc(l.notes||"")}</textarea></label>
+    <label class="full">Contrat (PDF)<span style="display:flex;gap:8px;align-items:center">${l.lienContrat?`<a class="tbtn s" href="${esc(l.lienContrat)}" target="_blank" rel="noreferrer">📄 Voir le contrat</a>`:`<span class="t2">aucun</span>`}<input type="file" accept="application/pdf,image/*" onchange="mnContrat('${c}',this)"></span></label>
+   </div>
+   <div style="display:flex;padding:0 16px 14px"><span style="flex:1"></span><button class="tbtn p" onclick="mnSaveLieu('${c}',this)">💾 Enregistrer ${esc(l.nom||l.code)}</button></div></div>`;
+}
+async function mnSaveLieu(code, btn){
+  const box=document.getElementById("mnL-"+code); const o={ code };
+  box.querySelectorAll("[data-k]").forEach(el=>{ const k=el.dataset.k;
+    if(k==="jours") o.jours=[...el.querySelectorAll("button.on")].map(b=>+b.dataset.n);
+    else if(el.type==="checkbox") o[k]=el.checked;
+    else if(k==="prixPassage"||k==="tarifMensuel") o[k]=parseFloat(String(el.value).replace(",","."))||0;
+    else if(k==="codeReception") o[k]=el.value.trim().toUpperCase();
+    else o[k]=el.value.trim(); });
+  btn.disabled=true; btn.textContent="…";
+  try{ await mnApi("lieu-save",{ lieu:o }); btn.textContent="✓ Enregistré"; setTimeout(()=>mnLoad(),600); }catch(e){ alert(e.message); btn.disabled=false; btn.textContent="💾 Enregistrer"; }
+}
+async function mnContrat(code, inp){ const file=inp.files[0]; if(!file) return; if(file.size>8e6){ alert("8 Mo max."); return; }
+  try{ await mnApi("contrat-upload",{ lieu:code, base64:await mnB64(file), nom:file.name, mime:file.type }); mnLoad(); }catch(e){ alert(e.message); } }
+async function mnNewLieu(){ const code=(prompt("Code court du lieu (ex : PDC, STB, PDP) :")||"").toUpperCase().replace(/[^A-Z0-9]/g,""); if(!code) return;
+  const nom=prompt("Nom du lieu :", "Pribon "+code)||code; try{ await mnApi("lieu-save",{ lieu:{ code, nom, actif:true } }); mnLoad(); }catch(e){ alert(e.message); } }
+
+/* ---------- JOURNAL ---------- */
+async function mnJournal(){ MN.journal=null; renderMenage(); try{ MN.journal=(await mnApi("journal",{})).rows||[]; }catch(e){ MN.journal=[]; MN.err=e.message; } renderMenage(); }
+function mnJournalHtml(){
+  if(!MN.journal) return `<div class="cx"><div class="empty">Chargement…</div></div>`;
+  if(!MN.journal.length) return `<div class="cx"><div class="empty">Rien pour l'instant.</div></div>`;
+  return `<div class="cx" style="overflow:auto"><table class="tb"><tr><th>Quand</th><th>Qui</th><th>Action</th><th>Lieu</th><th>Détail</th></tr>${MN.journal.map(r=>`<tr><td style="white-space:nowrap">${r.at?new Date(r.at).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):""}</td><td>${esc(r.who)}</td><td>${esc(r.action)}</td><td>${esc(r.lieu)}</td><td class="t2">${esc(r.detail)}</td></tr>`).join("")}</table></div>`;
+}
+</script>
+
 </body>
 </html>
