@@ -398,7 +398,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.11.1"; // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.11.2"; // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4191,14 +4191,14 @@ var SAP_STORES = [
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] },
   { k:"BIC", label:"PRIBON BICHAT", short:"Bichat", col:"BICHAT", cols:["bichat","pribon bichat","bic"], mail:"bichat@pribon.org", color:"#FF1F8E",
     lines:["M80","M100","M125","M150","M175","M200"], noProp:true }, // Morvan uniquement, PAS de proposition (pas d'historique)
-  { k:"KBG", masterCmd:true, manualCmd:true, label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.org", color:"#7C3AED",
+  { k:"KBG", masterCmd:true, manualCmd:true, label:"KELBONGOO", short:"Kelbongoo", col:"KELBONGOO", cols:["kelbongoo","kbg"], mail:"achat@probon.fr,achat@probon.org", color:"#7C3AED",
     lines:["M80","M100","M125","M150"] },                          // Morvan uniquement, sans remplacement
   // 🧪 Magasin TEST : n'existe que sur les journées de test (Console › 🎄 Sapins › 🧪 Test). Tous les mails → hg@ + rr@.
-  { k:"TST", label:"🧪 MAGASIN TEST", short:"Test", col:"TEST", cols:["test"], mail:"hg@probon.org,rr@pribon.org", color:"#455A64", test:true,
+  { k:"TST", label:"🧪 MAGASIN TEST", short:"Test", col:"TEST", cols:["test"], mail:"hg@probon.fr,hg@probon.org,rr@pribon.org", color:"#455A64", test:true,
     lines:["M80","M100","M125","M150","M175","J80","J100","J125","J150","J175","M200","J200"] }
 ];
 var SAP_MINI_DEF = { ROB:3, TOL:1, BIC:1, KBG:2, TST:3 };
-var SAP_TEST_TO = "hg@probon.org,rr@pribon.org";
+var SAP_TEST_TO = "hg@probon.fr,hg@probon.org,rr@pribon.org";
 function sapLine(k){ for (var i=0;i<SAP_LINES.length;i++) if (SAP_LINES[i].k===k) return SAP_LINES[i]; return null; }
 function sapStore(k){ for (var i=0;i<SAP_STORES.length;i++) if (SAP_STORES[i].k===k) return SAP_STORES[i]; return null; }
 function sapOther(k){ return k.charAt(0)==="M" ? "J"+k.slice(1) : "M"+k.slice(1); }   // même taille, autre gamme
@@ -4548,7 +4548,7 @@ function sapReglagesHTML(){
       ${meta.suiviUrl?`📊 <a href="${esc(meta.suiviUrl)}" target="_blank">Classeur de suivi réel (créé par l'appli)</a><br>`:""}
       📗 Classeur de Raimbaud : lu seulement (jamais modifié) · dernière lecture ${S.n1&&S.n1.syncedAt?new Date(S.n1.syncedAt).toLocaleString("fr-FR"):"—"}<br>
       <button class="tbtn s" onclick="sapPost({action:'sapin-sync'}).then(j=>toastC(j.ok?'✅ Ventes 2025 relues':'Erreur '+j.error)).catch(e=>alert(e.message))">🔄 Relire le classeur de Raimbaud</button>
-      <span class="t2">Mail Rungis le jour J à 2h → gestion@probon.org, st@, fl@, achat@</span><br>
+      <span class="t2">Mail Rungis le jour J à 2h → gestion@probon.fr, st@, fl@, achat@</span><br>
       <button class="tbtn s" onclick="sapPost({action:'sapin-test',kind:'rappel'}).then(j=>toastC(j.ok?'🧪 Rappel test envoyé à hg@':'Erreur '+j.error)).catch(e=>alert(e.message))">🧪 Rappel 48 h test</button></div>
     <div class="cx" style="padding:14px 16px;line-height:2"><b>✉️ Adresses des magasins</b> (rappel 48 h, réception manquante, BL-facture)<br>
       ${SAP_STORES.filter(s=>!s.test).map(s=>`${sapStoreH(s.k)} ${inp("sapM"+s.k, mails[s.k]!=null?mails[s.k]:s.mail, "", `sapCfg('mails/${s.k}',this.value.trim())`,260)}`).join("<br>")}</div>
