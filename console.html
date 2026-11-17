@@ -398,7 +398,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.11.2"; // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.11.3"; // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4504,15 +4504,25 @@ function sapSuiviHTML(){
     <div class="sx-sec"><b>🏪 Magasins · ${esc(sapDayFr(d,true))}</b><span class="sp"></span>${rc||((S.livr||{})[d])?`<button class="sx-btn d" onclick="sapCancelRecup('${d}')">↩ Annuler la récupération chauffeur</button>`:""}</div>
     <div class="sx-stores">${cards}</div>
     <div class="sx-sec"><b>🌲 À enlever chez Cruard</b><span class="sp"></span><span class="t2">1er choix = Morvan · Extra = Jutland</span></div>
-    <div class="sx-card" style="padding:0;overflow:hidden"><div class="sx-scroll">${rowsL?`<table class="tb cr"><tr><th>Étiquette</th><th class="hide-m">Gamme Cruard</th><th style="text-align:center">Total</th>${REAL.map(s=>`<th style="text-align:center">${esc(s.short.slice(0,4))}</th>`).join("")}<th style="text-align:center">Pris</th></tr>${rowsL}</table>`:`<div class="empty">Aucun sapin commandé pour ce jour.</div>`}</div></div>`;
+    <div class="sx-card" style="padding:0;overflow:hidden"><div class="sx-scroll">${rowsL?`<table class="tb cr"><tr><th>Étiquette</th><th class="hide-m">Gamme Cruard</th><th style="text-align:center">Total</th>${REAL.map(s=>`<th style="text-align:center">${esc(s.short.slice(0,4))}</th>`).join("")}<th style="text-align:center">Pris</th></tr>${rowsL}</table>`:`<div class="empty">Aucun sapin commandé pour ce jour.</div>`}</div></div>${sapStockPdvH()}`;
+}
+/* 2.11.3 — Stock théorique PDV (sapins/stock/<mag>, envoyé par sapins_stock.ps1 toutes les 15 min). Négatif PDV = affiché 0 (borné par le serveur). */
+function sapStockPdvH(){
+  const ST=(sapS().stock)||{}, st=SAP_STORES.filter(s=>!s.test && !s.manualCmd);
+  if(!st.some(s=>ST[s.k])) return `<div class="sx-sec"><b>📦 Stock PDV (théorique)</b></div><div class="sx-card"><div class="empty">Pas encore reçu (script sapins_stock.ps1 sur le serveur 99).</div></div>`;
+  const tot=k=>st.reduce((a,s)=>a+Number((((ST[s.k]||{}).lines)||{})[k]||0),0);
+  const rows=SAP_LINES.filter(L=>st.some(s=>(((ST[s.k]||{}).lines)||{})[L.k]!=null)).map(L=>`<tr><td>${sapChipH(L.k)} ${esc(L.o==="MORVAN"?"Morvan":"Jutland")}</td>${st.map(s=>{const v=(((ST[s.k]||{}).lines)||{})[L.k]; return `<td style="text-align:center;font-weight:700">${v==null?"·":v}</td>`;}).join("")}<td style="text-align:center"><b>${tot(L.k)}</b></td></tr>`).join("");
+  const maj=st.map(s=>{const x=ST[s.k]; return `${esc(s.short)} ${x&&x.at?new Date(x.at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})+(Date.now()-x.at>3*3600e3?' <span class="sx-tag warn">ancien</span>':''):'<span class="sx-tag grey">jamais</span>'}`;}).join(" · ");
+  return `<div class="sx-sec"><b>📦 Stock PDV (théorique)</b><span class="sp"></span><span class="t2">mis à jour : ${maj}</span></div>
+    <div class="sx-card" style="padding:0;overflow:hidden"><div class="sx-scroll"><table class="tb cr"><tr><th>Étiquette</th>${st.map(s=>`<th style="text-align:center">${esc(s.short)}</th>`).join("")}<th style="text-align:center">Total</th></tr>${rows}</table></div></div>`;
 }
 function sapDetail(d, sk){
   const S=sapS(), cfg=S.config||{}, p=sapPlan(S.n1,cfg,d,sk,S.cmd||{},S.recep||{}), rc=(S.recup||{})[d]||{}, disp=sapAttendu(S.recup,S.livr,d,sk)||{}, r=((S.recep||{})[d]||{})[sk]||{};
-  const rows=p.lines.map(o=>`<tr><td>${sapChipH(o.k)} ${esc(sapLine(o.k).o)}</td><td style="text-align:center">${Math.round(o.ventes*10)/10}</td><td style="text-align:center">${Math.round(o.besoin*100)/100}</td><td style="text-align:center">${o.stockSaisi==null?(sk==="KBG"?"calc. "+o.stockCalc:"—"):o.stockSaisi}</td><td style="text-align:center">${o.theo}</td><td style="text-align:center"><b>${o.reel==null?"—":o.reel}</b></td><td style="text-align:center">${disp[o.k]||"·"}</td><td style="text-align:center;${r.lines&&Number(r.lines[o.k]||0)!==Number(disp[o.k]||0)?"color:var(--dan);font-weight:800":""}">${r.lines?(r.lines[o.k]||0):"·"}</td></tr>`).join("");
+  const rows=p.lines.map(o=>`<tr><td>${sapChipH(o.k)} ${esc(sapLine(o.k).o)}</td><td style="text-align:center">${Math.round(o.ventes*10)/10}</td><td style="text-align:center">${Math.round(o.besoin*100)/100}</td><td style="text-align:center">${(((((S.stock||{})[sk])||{}).lines)||{})[o.k]!=null?(S.stock[sk].lines[o.k]):"·"}</td><td style="text-align:center">${o.stockSaisi==null?(sk==="KBG"?"calc. "+o.stockCalc:"—"):o.stockSaisi}</td><td style="text-align:center">${o.theo}</td><td style="text-align:center"><b>${o.reel==null?"—":o.reel}</b></td><td style="text-align:center">${disp[o.k]||"·"}</td><td style="text-align:center;${r.lines&&Number(r.lines[o.k]||0)!==Number(disp[o.k]||0)?"color:var(--dan);font-weight:800":""}">${r.lines?(r.lines[o.k]||0):"·"}</td></tr>`).join("");
   const m=document.createElement("div"); m.className="modal-back sx-m"; m.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:300";
   m.onclick=e=>{ if(e.target===m) m.remove(); };
   m.innerHTML=`<div class="cx" style="max-width:860px;width:96%;max-height:90vh;overflow:auto;background:#fff"><div class="cx-h"><h3>${sapStoreH(sk)} · récup du ${esc(sapDayFr(d,true))}</h3><span class="sp"></span><button class="tbtn s" onclick="this.closest('.modal-back').remove()">Fermer</button></div>
-    <table class="tb"><tr><th>Ligne</th><th>Ventes 2025</th><th>Besoin</th><th>Inventaire</th><th>Proposition</th><th>Commande</th><th>Livré</th><th>Reçu</th></tr>${rows}</table>
+    <table class="tb"><tr><th>Ligne</th><th>Ventes 2025</th><th>Besoin</th><th>Stock PDV</th><th>Inventaire</th><th>Proposition</th><th>Commande</th><th>Livré</th><th>Reçu</th></tr>${rows}</table>
     <div style="padding:10px 16px" class="t2">Mini de présentation : ${p.mini} · coef ${p.coef}${sk==="BIC"?" · Bichat : pas de proposition, commande saisie dans la console (✏️ Commande)":""}</div>
     ${r.at&&r.coherent===false&&!r.vu?`<div style="padding:0 16px 14px"><button class="tbtn s p" onclick="dbCentrale.ref('sapins/recep/${d}/${sk}/vu').set({at:Date.now(),by:sapWho()}).then(()=>{this.closest('.modal-back').remove();toastC('Écart vu');})">✓ Écart vu / traité</button></div>`:""}</div>`;
   document.body.appendChild(m);
