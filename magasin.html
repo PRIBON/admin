@@ -125,7 +125,7 @@ function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
 const { useState, useEffect, useRef } = React;
 
 /* ============================ CONFIGURATION =========================== */
-const APP_VERSION = "2.2.0"; // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
+const APP_VERSION = "2.2.1"; // 2.2.1 = sécurité : plus aucune adresse affichée sur la page de connexion · jeton console par message ciblé // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
 
 // MÊME Client ID OAuth que les autres pages PRIBON.
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
@@ -178,6 +178,12 @@ function GoogleLogin({ onToken }){
   if(!OAUTH_READY()) return <div className="err">Config OAuth manquante.</div>;
   return <div ref={ref} style={{display:"flex",justifyContent:"center"}}></div>;
 }
+
+// v2.2.1 — sécurité : jeton reçu de la console par message ciblé (plus de lecture directe)
+function askParentToken(){ return new Promise(res=>{ if(window.parent===window) return res(null);
+    const t=setTimeout(()=>{ window.removeEventListener("message",h); res(null); },2500);
+    function h(e){ if(e.origin!==location.origin || e.source!==window.parent || !e.data || e.data.type!=="pribon-token") return; clearTimeout(t); window.removeEventListener("message",h); res(e.data.token||null); }
+    window.addEventListener("message",h); try{ window.parent.postMessage({type:"pribon-need-token"}, location.origin); }catch(e){ res(null); } }); }
 
 /* ============================ ILLUSTRATIONS =========================== */
 function ArtCle(){ return (
@@ -473,7 +479,7 @@ function App(){
     setBusy(false);
   };
   // v2.1.0 — ouverte dans la console (même site) : reprend la connexion Google du responsable.
-  useEffect(()=>{ let tok=null; try{ if(window.parent!==window) tok=window.parent.__pribonIdToken||null; }catch(e){} if(tok) onToken(tok); },[]);
+  useEffect(()=>{ askParentToken().then(tok=>{ if(tok) onToken(tok); }); },[]);
 
   const master = !!(me && me.master);
   const lieux = (me && me.lieux) || [];
@@ -508,7 +514,7 @@ function App(){
           <GoogleLogin onToken={onToken}/>
           {busy && <div className="small-note">Vérification…</div>}
           {err && <div className="err">{err}</div>}
-          <div className="small-note">Compte Google du magasin — ou compte master (hg@, rr@, achat@) pour voir tous les magasins.</div>
+          <div className="small-note">Connectez-vous avec le compte Google du magasin.</div>
         </div>
       </div>);
   else if(master && !curLieu) screen=(
