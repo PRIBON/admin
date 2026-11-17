@@ -125,7 +125,7 @@ function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
 const { useState, useEffect, useRef } = React;
 
 /* ============================ CONFIGURATION =========================== */
-const APP_VERSION = "2.1.0"; // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
+const APP_VERSION = "2.2.0"; // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
 
 // MÊME Client ID OAuth que les autres pages PRIBON.
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
@@ -242,7 +242,7 @@ function MiniCal({ days, today, onPick }){
   return (<div>
     <div className="cal">{["L","M","M","J","V","S","D"].map((h,i)=><div key={i} className="h">{h}</div>)}
       {cells.map(iso=>{ const x=map[iso]; const st=x?x.statut:""; return (
-        <div key={iso} className={"cell "+st+(iso===today?" today":"")} title={iso+(st?" — "+(STATUT_TXT[st]||st):"")} onClick={()=>onPick && x && onPick(x)} style={{cursor:onPick&&x?"pointer":"default"}}>
+        <div key={iso} className={"cell "+st+(iso===today?" today":"")} title={iso+(st?" — "+(STATUT_TXT[st]||st):"")} onClick={()=>onPick && (x||iso<=today) && onPick(x||{date:iso,statut:"",prevu:false,p:null})} style={{cursor:onPick&&(x||iso<=today)?"pointer":"default"}}>
           {+iso.slice(8,10)}{iso.slice(8,10)==="01" && <span className="d">{new Date(iso+"T12:00:00").toLocaleDateString("fr-FR",{month:"short"})}</span>}
         </div>); })}
     </div>
@@ -251,14 +251,14 @@ function MiniCal({ days, today, onPick }){
 }
 
 // Master : saisie d'un jour passé (comme le magasin, mais avec les heures).
-function PastEditor({ p, busy, onSave }){
+function PastEditor({ p, busy, onSave, title }){
   const st0 = p ? (p.statut==="absent"?"absent":p.statut==="annule"?"annule":(p.arriveeAt||p.statut==="ok")?"ok":"") : "";
   const [st,setSt]=useState(st0); const [a,setA]=useState(p&&p.arriveeAt?hhmm(p.arriveeAt):""); const [d,setD]=useState(p&&p.departAt?hhmm(p.departAt):"");
   const [n,setN]=useState((p&&p.note)||""); const [i,setI]=useState((p&&p.initiales)||"");
   useEffect(()=>{ setSt(st0); setA(p&&p.arriveeAt?hhmm(p.arriveeAt):""); setD(p&&p.departAt?hhmm(p.departAt):""); setN((p&&p.note)||""); setI((p&&p.initiales)||""); },[p&&p.id, p&&p.majAt]);
   const B=({v,l,c})=><button onClick={()=>setSt(v)} style={{flex:1,padding:"14px 6px",borderRadius:14,fontWeight:900,fontSize:15,border:"2px solid "+(st===v?c:"#e8e3da"),background:st===v?c+"22":"#fff"}}>{l}</button>;
   const inp={padding:10,borderRadius:10,border:"1.5px solid #e8e3da",fontSize:15,width:"100%"};
-  return (<div className="box"><h3>Saisie master de ce jour</h3>
+  return (<div className="box"><h3>{title||"Saisie master de ce jour"}</h3>
     <div style={{display:"flex",gap:8}}><B v="ok" l="✅ Passé" c="#e0b200"/><B v="absent" l="❌ Pas passé·e" c="#c4170c"/><B v="annule" l="🚫 Annulé" c="#888888"/></div>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:10}}>
       <label className="small-note" style={{margin:0}}>Arrivée<input type="time" value={a} onChange={e=>setA(e.target.value)} style={inp}/></label>
@@ -270,6 +270,40 @@ function PastEditor({ p, busy, onSave }){
   </div>);
 }
 
+/* v2.2.0 — Détail d'un jour (toucher une date du calendrier) */
+const MODIF_JOURS = 7;
+function DayModal({ day, me, today, busy, onClose, onSave }){
+  const p=day.p||{}; const st=day.statut;
+  const dt=new Date(day.date+"T12:00:00");
+  const age=Math.round((new Date(today+"T12:00:00")-dt)/864e5);
+  const canEdit = day.date<=today && (me.master || age<=MODIF_JOURS);
+  const [edit,setEdit]=useState(false);
+  const dur = p.arriveeAt && p.departAt ? Math.round((p.departAt-p.arriveeAt)/60000) : 0;
+  const COL={ ok:["#fff3c4","#6b4f00","✨ Passé"], extra:["#fff3c4","#6b4f00","✨ Passé (hors planning)"], ok_sans_depart:["#fff3c4","#6b4f00","✨ Passé (départ non pointé)"],
+    absent:["#fde0dd","#a3170c","❌ Pas passé·e"], annule:["#eeeeee","#666","🚫 Annulé / prévenu"], en_cours:["#ffe9cc","#a14d00","⏳ En cours"],
+    a_renseigner:["#f1efe9","#777","❓ Pas encore renseigné"], prevu:["#e1e8f5","#2c4a8c","📅 Prévu"], "":["#f1efe9","#777","Pas de passage prévu"] }[st||""];
+  return (<div style={{position:"fixed",inset:0,background:"rgba(20,30,25,.55)",zIndex:150,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+    <div onClick={e=>e.stopPropagation()} style={{background:"#f7f5f0",width:"100%",maxWidth:560,maxHeight:"92vh",overflowY:"auto",borderRadius:"24px 24px 0 0",padding:16,boxShadow:"0 -10px 40px rgba(0,0,0,.25)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+        <div style={{fontSize:20,fontWeight:900,flex:1,textTransform:"capitalize"}}>📅 {dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})}</div>
+        <button className="back" style={{background:"#e9e5dc",color:"#333"}} onClick={onClose}>✕</button></div>
+      <div style={{background:COL[0],color:COL[1],borderRadius:18,padding:16,textAlign:"center",fontWeight:900,fontSize:20}}>{COL[2]}
+        {day.prevu && <div style={{fontSize:12,fontWeight:700,opacity:.8,marginTop:4}}>passage prévu ce jour-là</div>}</div>
+      {(p.arriveeAt||p.note||p.initiales) && <div className="box" style={{marginTop:12}}><div className="kv">
+        {p.arriveeAt && <><span className="k">🙋 Arrivée</span><span className="v">{hhmm(p.arriveeAt)}</span></>}
+        {p.departAt && <><span className="k">👋 Départ</span><span className="v">{hhmm(p.departAt)}</span></>}
+        {dur>0 && <><span className="k">⏱ Durée</span><span className="v">{Math.floor(dur/60)}h{String(dur%60).padStart(2,"0")}</span></>}
+        {p.note && <><span className="k">📝 Fait</span><span className="v" style={{fontWeight:600}}>{p.note}</span></>}
+        {p.initiales && <><span className="k">✍️ Initiales</span><span className="v">{p.initiales}</span></>}
+        {p.source==="auto" && <><span className="k">🌙</span><span className="v" style={{fontWeight:600}}>Noté absent automatiquement à minuit</span></>}
+      </div></div>}
+      {canEdit ? (edit
+        ? <div style={{marginTop:12}}><PastEditor p={day.p} busy={busy} title="Corriger ce jour" onSave={(o)=>onSave(day.date,o)}/></div>
+        : <button className="btn-primary" style={{marginTop:12}} onClick={()=>setEdit(true)}>✏️ Corriger ce jour</button>)
+        : day.date<=today && <div className="small-note" style={{textAlign:"center"}}>Plus de {MODIF_JOURS} jours : pour corriger, préviens le bureau.</div>}
+    </div></div>);
+}
+
 function MenageScreen({ token, me, onBack, onAuthLost, fixedLieu }){
   const lieux = fixedLieu ? (me.lieux||[]).filter(l=>l.code===fixedLieu) : (me.lieux||[]);
   const [lieu,setLieu]=useState(lieux[0]?lieux[0].code:"");
@@ -279,6 +313,7 @@ function MenageScreen({ token, me, onBack, onAuthLost, fixedLieu }){
   const [note,setNote]=useState(""); const [taches,setTaches]=useState([]);
   const [ini,setIni]=useState(()=>{ try{ return localStorage.getItem("pribon_menage_ini")||""; }catch(e){ return ""; } });
   const [showFiche,setShowFiche]=useState(false);
+  const [pick,setPick]=useState(null);
   const say=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const run=async(fn)=>{ setBusy(true); setErr(""); try{ await fn(); }catch(e){ if(e.auth) onAuthLost(e.message); else setErr(e.message); } setBusy(false); };
   const load=()=>run(async()=>{ const j=await mapi("lieu-get",{ idToken:token, lieu, date }); setData(j); setNote((j.passage&&j.passage.note)||""); setTaches([]); });
@@ -368,12 +403,14 @@ function MenageScreen({ token, me, onBack, onAuthLost, fixedLieu }){
           )}
 
           <div className="box"><h3>Les dernières semaines</h3>
-            <MiniCal days={data.days} today={data.today} onPick={me.master?(x)=>setDate(x.date):null}/>
-            {me.master && <div className="small-note">Master : touche un jour pour le corriger.</div>}
+            <MiniCal days={data.days} today={data.today} onPick={(x)=>{ if(x.date===data.today && !me.master) return; setPick(x); }}/>
+            <div className="small-note">👆 Touche un jour pour voir le passage (et le corriger si besoin).</div>
           </div>
         </>)}
         {err && <div className="box err" style={{textAlign:"center"}}>{err}</div>}
       </div>
+      {pick && data && <DayModal day={pick} me={me} today={data.today} busy={busy} onClose={()=>setPick(null)}
+        onSave={(d,o)=>run(async()=>{ await mapi("passage-set",{ idToken:token, lieu, date:d, ...o }); setPick(null); say("✓ Jour corrigé"); const j=await mapi("lieu-get",{ idToken:token, lieu, date }); setData(j); })}/>}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
