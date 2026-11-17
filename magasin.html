@@ -125,7 +125,7 @@ function __cdnFB(u){ document.write('<scr'+'ipt src="'+u+'"></scr'+'ipt>'); }
 const { useState, useEffect, useRef } = React;
 
 /* ============================ CONFIGURATION =========================== */
-const APP_VERSION = "2.2.1"; // 2.2.1 = sécurité : plus aucune adresse affichée sur la page de connexion · jeton console par message ciblé // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
+const APP_VERSION = "2.2.2"; // 2.2.2 = Ménage : délai max 60 s + messages clairs // 2.2.1 = sécurité : plus aucune adresse affichée sur la page de connexion · jeton console par message ciblé // 2.2.0 = Ménage : toucher un jour du calendrier = détail du passage + correction (magasin : 7 derniers jours) // 2.1.0 = accès master multi-magasins (code 3h de chaque magasin, infos, ménage) + vue dans la console // 2.0.1 = URL Ménage branchée · 2.0.0 = connexion magasin en encarts (Code réception + Ménage)
 
 // MÊME Client ID OAuth que les autres pages PRIBON.
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
@@ -143,8 +143,11 @@ async function api(action, payload){
 }
 async function mapi(action, payload){
   if(!MENAGE_READY()) throw new Error("Module Ménage pas encore branché (MENAGE_URL).");
-  const res=await fetch(MENAGE_URL,{ method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, ...payload }) });
-  const j=await res.json();
+  const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),60000); let j;
+  try{ const res=await fetch(MENAGE_URL,{ method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify({ action, ...payload }), signal:ctl.signal });
+    const txt=await res.text(); try{ j=JSON.parse(txt); }catch(e){ throw new Error("Le serveur Ménage a répondu une erreur. Réessaie ou préviens le bureau."); } }
+  catch(e){ if(e.name==="AbortError") throw new Error("Le serveur Ménage ne répond pas. Réessaie dans un instant."); throw e; }
+  finally{ clearTimeout(to); }
   if(j && j.auth===false){ const e=new Error(j.error||"Session expirée"); e.auth=true; throw e; }
   if(j && j.error) throw new Error(j.error);
   return j;

@@ -421,7 +421,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.13.2"; // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.13.3"; // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -5109,8 +5109,12 @@ const mnDM=(iso)=> iso.slice(8,10)+"/"+iso.slice(5,7);
 
 async function mnApi(action, extra){
   if(!mnReady()) throw new Error("Module Ménage pas encore branché : colle l'URL du script dans MENAGE_URL (console.html et magasin.html).");
-  const r=await fetch(MENAGE_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action,idToken:ID_TOKEN},extra||{}))});
-  const j=await r.json();
+  const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),60000);
+  let j;
+  try{ const r=await fetch(MENAGE_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({action,idToken:ID_TOKEN},extra||{})),signal:ctl.signal});
+    const txt=await r.text(); try{ j=JSON.parse(txt); }catch(e){ throw new Error("Réponse du serveur Ménage illisible (script pas déployé en « Tout le monde » ou erreur du script)."); } }
+  catch(e){ if(e.name==="AbortError") throw new Error("Le serveur Ménage ne répond pas (plus de 60 s). Réessaie dans un instant."); if(/Failed to fetch|NetworkError|Load failed/i.test(e.message)) throw new Error("Pas de connexion au serveur Ménage."); throw e; }
+  finally{ clearTimeout(to); }
   if(j && j.auth===false){ const ok=await mnReauth(); if(ok) return mnApi(action, extra); throw new Error(j.error||"Session expirée"); }
   if(j && j.error) throw new Error(j.error);
   return j;
@@ -5204,7 +5208,7 @@ function mnEditDay(code,date){
       ${st?`<button class="tbtn" style="color:var(--dan)" id="mnClr">Effacer le jour</button>`:""}<span style="flex:1"></span>
       <button class="tbtn p" id="mnSave">Enregistrer</button></div></div>`;
   document.body.appendChild(back);
-  const save=async(statut)=>{ const b=back.querySelector("#mnSave"); b.disabled=true; b.textContent="…";
+  const save=async(statut)=>{ const b=back.querySelector("#mnSave"); b.disabled=true; b.textContent="⏳ Enregistrement…";
     try{ await mnApi("passage-set",{ lieu:code, date, statut, arrivee:back.querySelector("#mnA").value, depart:back.querySelector("#mnD").value,
       initiales:back.querySelector("#mnI").value, note:back.querySelector("#mnN").value }); back.remove(); mnLoad(); }
     catch(e){ alert(e.message); b.disabled=false; b.textContent="Enregistrer"; } };
@@ -5249,7 +5253,7 @@ function mnFactHtml(){
         ${f?`<button class="tbtn s" onclick="mnMail('${esc(f.id)}')">✉️ Mail au prestataire</button><button class="tbtn s p" onclick="mnPay('${esc(f.id)}')">✅ OK pour payer</button><button class="tbtn s" style="color:var(--dan)" title="Supprimer" onclick="mnDelF('${esc(f.id)}')">🗑</button>`:""}
       </div></div>`; }).join("");
   const nOk=fs.filter(f=>f.decision==="payer").length, nPb=fs.filter(f=>!f.decision && !/^ok/.test(f.verdict||"")).length, nMiss=d.lieux.filter(L=>L.lieu.actif!==false && !fs.find(f=>f.lieu===L.lieu.code)).length;
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${d.sheetUrl?`<a class="tbtn s" href="${esc(d.sheetUrl)}" target="_blank" rel="noopener">📊 Tout le suivi dans le Google Sheet (un onglet par lieu)</a>`:""}<span class="mn-stat y">✅ ${nOk} validée(s) pour paiement</span><span class="mn-stat r">⚠️ ${nPb} à traiter</span><span class="mn-stat g">🧾 ${nMiss} facture(s) manquante(s)</span></div>${rows}`;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">${d.sheetUrl?`<a class="tbtn s" href="${esc(d.sheetUrl)}" target="_blank" rel="noopener">📊 Tout le suivi dans le Google Sheet (un onglet par lieu)</a><button class="tbtn s" onclick="mnSheetNow(this)">🔄 Mettre à jour le Sheet</button>`:""}<span class="mn-stat y">✅ ${nOk} validée(s) pour paiement</span><span class="mn-stat r">⚠️ ${nPb} à traiter</span><span class="mn-stat g">🧾 ${nMiss} facture(s) manquante(s)</span></div>${rows}`;
 }
 async function mnPdfGuess(file){
   try{ if(!window.pdfjsLib || !/pdf/i.test(file.type)) return {};
@@ -5331,7 +5335,7 @@ function renderFiches(force){
     : MN.err ? `<div class="cx"><div class="empty" style="color:var(--dan)">⚠️ ${esc(MN.err)}</div></div>`
     : !MN.data ? `<div class="cx"><div class="empty">Chargement…</div></div>` : mnRegHtml();
   const vOld = MN.data && (!MN.data.version || parseFloat(MN.data.version)<1.2);
-  el.innerHTML=`<div class="page-h"><div><h1>🏪 Fiches magasins</h1><div class="sub">Pour chaque magasin : email du compte Google, responsable, adresse, code réception · prestataire ménage, jours, tarif, contrat. Visible par le magasin dans « Infos magasin ».</div></div><span class="sp"></span>${MN.data&&MN.data.sheetUrl?`<a class="tbtn" href="${esc(MN.data.sheetUrl)}" target="_blank" rel="noopener">📊 Google Sheet (un onglet par lieu)</a>`:""}</div>
+  el.innerHTML=`<div class="page-h"><div><h1>🏪 Fiches magasins</h1><div class="sub">Pour chaque magasin : email du compte Google, responsable, adresse, code réception · prestataire ménage, jours, tarif, contrat. Visible par le magasin dans « Infos magasin ».</div></div><span class="sp"></span>${MN.data&&MN.data.sheetUrl?`<a class="tbtn" href="${esc(MN.data.sheetUrl)}" target="_blank" rel="noopener">📊 Google Sheet (un onglet par lieu)</a> <button class="tbtn" onclick="mnSheetNow(this)">🔄 Mettre à jour le Sheet</button>`:""}</div>
     ${vOld?`<div class="mn-alert r" style="margin:0 0 14px">⚠️ Le script Ménage en ligne est trop ancien (v${esc(MN.data.version||"1.0")}) : adresse, téléphone, code réception, heures ne sont PAS enregistrés. Colle Menage_Code_v1.2.gs puis Déployer › Gérer les déploiements › Nouvelle version.</div>`:""}${body}`;
   if(MN.data) mnFichesWire();
 }
@@ -5421,6 +5425,8 @@ async function mnContrat(code, inp){ const file=inp.files[0]; if(!file) return; 
 async function mnNewLieu(){ const code=(prompt("Code court du lieu (ex : PDC, STB, PDP) :")||"").toUpperCase().replace(/[^A-Z0-9]/g,""); if(!code) return;
   const nom=prompt("Nom du lieu :", "Pribon "+code)||code; try{ await mnApi("lieu-save",{ lieu:{ code, nom, actif:true } }); mnLoad(); }catch(e){ alert(e.message); } }
 
+async function mnSheetNow(btn){ const t=btn.textContent; btn.disabled=true; btn.textContent="⏳ Mise à jour…";
+  try{ await mnApi("sheet-rebuild",{}); btn.textContent="✓ Sheet à jour"; }catch(e){ alert(e.message); btn.textContent=t; } setTimeout(()=>{ btn.disabled=false; btn.textContent=t; },3000); }
 /* ---------- JOURNAL ---------- */
 async function mnJournal(){ MN.journal=null; renderMenage(); try{ MN.journal=(await mnApi("journal",{})).rows||[]; }catch(e){ MN.journal=[]; MN.err=e.message; } renderMenage(); }
 function mnJournalHtml(){
