@@ -421,7 +421,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.14.0"; // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.15.0"; // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -923,11 +923,15 @@ async function parseOrderXlsx(file){
         lines.push({ article:codeCell||ref, code:codeCell||ref,
           ean:isEan?codeCell.replace(/^0+(?=\d)/,""):"", ref,
           designation:des, cdt, qteCmd, unit:cdt?"colis":"piece",
+          cdtKnown:(iColisage>=0||iCond>=0||nColis>0),
           attendu:qte, poidsVariable:false, categorie:"Autres" });
       }
       if(!lines.length) throw new Error("Commande lue mais aucune ligne article trouvée (format simple).");
       const mCmd=String(file.name||"").match(/(\d{6,})/);
-      return { format:"CMD", g5Key:"code", supplier:"", docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines };
+      // v2.15.0 — fichier « AAMMJJ - FOURNISSEUR - PRIBON XXX.xlsx » : le fournisseur est dans le nom.
+      const mSup=String(file.name||"").match(/^\s*\d{6}\s*-\s*(.+?)\s*-\s*PRIBON/i);
+      return { format:"CMD", g5Key:"code", supplier:mSup?mSup[1].trim().toUpperCase():"", docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines,
+        noColisage:(iColisage<0&&iCond<0&&iColis<0) };
     }
   }
   const N=(s)=>String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim();
@@ -1007,7 +1011,7 @@ function parseKarineJeffBL(wb, fileName){
 }
 // Fournisseurs dont la commande (export simple) est en UNITÉS alors que le BL donne le colisage :
 // la réception G5 se fait en COLIS (règle colisage du 28/09) → qteCmd = unités / colisage du BL.
-const SUP_COLIS_DU_BL = /VITAFRAIS|KARINE/i;
+const SUP_COLIS_DU_BL = /VITAFRAIS|KARINE|RELAIS\s*VERT/i; // v2.15.0 : + Relais Vert
 
 async function parseAnyFile(file){
   const name=(file.name||"").toLowerCase();
@@ -1029,8 +1033,30 @@ async function parseAnyFile(file){
 }
 function fmtFr(iso){ if(!iso) return ""; const [y,m,d]=iso.split("-"); return d+"/"+m+"/"+y; }
 // Écrit un document parsé dans le Firebase du magasin
+// v2.15.0 — Contrôle AVANT envoi au magasin : on dit précisément ce qui ne va pas pour que l'opérateur corrige seul.
+function receptionLoadCheck(parsed, supplier){
+  const sup=(supplier||parsed.supplier||"").trim(), lines=(parsed.lines||[]).filter(l=>!l.nonLivre&&!l.poidsVariable);
+  const msgs=[];
+  const uc=unitsColisName({supplier:sup});
+  if(uc){
+    const fix=vitafraisColisLines(lines).filter(l=>l.pcbInconnu);
+    if(fix.length) msgs.push("⛔ "+uc+" est commandé en UNITÉS mais reçu en COLIS sur G5 (G5 fait : Quantité × Condition.).\n"+
+      fix.length+" article(s) sur "+lines.length+" n'ont PAS de conditionnement dans ce fichier"+(parsed.noColisage?" (colonne « Condition. » absente)":"")+" :\n"+
+      fix.slice(0,8).map(l=>"• "+(l.designation||l.code)+" — "+(l.attendu||0)+" u.").join("\n")+(fix.length>8?"\n… et "+(fix.length-8)+" autre(s)":"")+
+      "\n→ Le .txt enverrait ces quantités en unités et G5 les multiplierait (12 u. → 12 colis).\nCORRIGER : réexporte le bon de commande G5 avec les colonnes « Code, Désignation, Quantité, Condition., Qté finale », ou charge aussi le BL (qui donne le colisage).");
+  } else if(parsed.noColisage && lines.length){
+    msgs.push("⚠️ Pas de colonne « Condition. » / « Colisage » dans ce fichier : le .txt G5 sera en UNITÉS.\nSi ce fournisseur est reçu en COLIS sur G5, réexporte la commande avec les colonnes « Quantité » et « Condition. ».");
+  }
+  const noCode=lines.filter(l=>!(l.code||l.ean||l.article));
+  if(noCode.length) msgs.push("⚠️ "+noCode.length+" ligne(s) sans code (absentes du .txt G5) : "+noCode.slice(0,5).map(l=>l.designation).join(", "));
+  if(!sup) msgs.push("⚠️ Fournisseur non renseigné.");
+  return msgs;
+}
 async function loadToStore(code, parsed, {supplier,type,deliveryDate}){
   const db=dbByStore[code]; if(!db) throw new Error("Magasin "+code+" non configuré");
+  const chk=receptionLoadCheck(parsed, supplier);
+  if(chk.length && !confirm("Vérification du fichier avant envoi au magasin "+code+" :\n\n"+chk.join("\n\n")+"\n\nOK = envoyer quand même · Annuler = je corrige le fichier"))
+    throw new Error("Envoi annulé : "+chk.map(x=>x.split("\n")[0]).join(" · ")+" — corrige le fichier puis recharge-le.");
   const ref=db.ref("documents").push();
   await ref.set({ docNumber:parsed.docNumber||"(sans n°)", supplier:(supplier||parsed.supplier||"").trim()||"(fournisseur ?)",
     type:type||"BL", format:parsed.format, deliveryDate:fmtFr(deliveryDate)||"",
@@ -1135,7 +1161,10 @@ function g5QtyColis(l, st){
  // VITAFRAIS (et uniquement Vitafrais) : on COMMANDE en unités, mais la réception G5 se fait en COLIS.
  // Le PCB (pièces/colis) vient du BL. On recalcule donc qteCmd = unités commandées / PCB.
  // Corrige aussi les réceptions déjà chargées avant la v2.0.1 (qteCmd stocké en unités).
- function isVitafraisDoc(doc, rec){ return /VITAFRAIS/i.test(String((doc&&doc.supplier)||"")+" "+String((rec&&rec.supplier)||"")); }
+ // v2.15.0 — même règle pour RELAIS VERT (bon de commande en unités, G5 en colis : « Quantité » × « Condition. »).
+ const UNITS_COLIS_SUPPLIERS=/VITAFRAIS|RELAIS\s*VERT/i;
+ function unitsColisName(doc, rec){ const m=(String((doc&&doc.supplier)||"")+" "+String((rec&&rec.supplier)||"")).match(UNITS_COLIS_SUPPLIERS); return m?m[0].toUpperCase().replace(/\s+/g," "):""; }
+ function isVitafraisDoc(doc, rec){ return !!unitsColisName(doc, rec); }
  function vitafraisColisLines(lines){
   const pcbByKey={};
   lines.forEach(l=>{ const c=Number(l.cdt)||0; if(c>1){ [l.ean,l.code,l.article].forEach(k=>{ if(k) pcbByKey[String(k)]=c; }); } });
@@ -1143,6 +1172,7 @@ function g5QtyColis(l, st){
     if(l.poidsVariable) return l;
     let cdt=Number(l.cdt)||0;
     if(cdt<=1){ cdt=pcbByKey[String(l.ean||"")]||pcbByKey[String(l.code||"")]||pcbByKey[String(l.article||"")]||0; }
+    if(cdt<=1 && l.cdtKnown) return l;                       // conditionnement 1 indiqué dans la commande : unités = colis
     if(cdt<=1) return { ...l, pcbInconnu:true };
     const att=Number(l.attendu)||0;
     const qc = (att%cdt===0) ? att/cdt : Math.max(1,Math.round(att/cdt));
@@ -1267,7 +1297,7 @@ function mergeOrderAndBL(order, bl){
       ref: ol.ref || blLine?.article || "",
       designation: ol.designation || blLine?.designation || "",
       marque: blLine?.marque || ol.marque || "",
-      cdt: cdtEff,
+      cdt: cdtEff, cdtKnown: !!ol.cdtKnown,
       qteCmd: vitaColis ? vitaQteCmd : ((ol.qteCmd!=null) ? ol.qteCmd : (blLine && blLine.qteCmd!=null ? blLine.qteCmd : null)),
       unit: vitaColis ? "colis" : (ol.unit || (blLine&&blLine.unit) || (cdtEff?"colis":"piece")),
       attendu: Number(ol.attendu)||0,
@@ -1618,8 +1648,9 @@ function renderCPDPCard(){
           </select>
           ${P.parsed&&P.parsed.store?`<div class="muted" style="font-size:11px;margin-top:3px">Détecté dans le fichier : ${esc(P.parsed.store)} (modifiable)</div>`:''}</div>
         ${P.parsed?`<div class="parse-note" style="background:${PICKING_BG};color:#0d2b5c">🛒 Commande <b>${esc(P.parsed.orderNum||'—')}</b>${P.parsed.orderDate?(' du '+esc(P.parsed.orderDate)):''} · ${P.parsed.products.length} produit(s) · ${pkSup} fournisseur(s) · ${pkTot} u.</div>`:''}
-        ${P.err?`<div class="err">${esc(P.err)}</div>`:''}
-        <button class="btn btn-lg" onclick="cpdpSendPicking()" ${(!P.parsed||P.sent||!P.store)?'disabled':''} style="margin-top:6px;background:${PICKING_COLOR};color:#fff">${P.sent?'🎉 Picking envoyé':'🚀 Envoyer le picking'}</button>
+        ${P.parsed?pickingReportHTML(P.parsed):''}
+        ${P.err?`<div class="err" style="white-space:pre-line">${esc(P.err)}</div>`:''}
+        <button class="btn btn-lg" onclick="cpdpSendPicking()" ${(!P.parsed||P.sent||!P.store||(P.parsed.report&&P.parsed.report.err.length))?'disabled':''} style="margin-top:6px;background:${PICKING_COLOR};color:#fff">${P.sent?'🎉 Picking envoyé':'🚀 Envoyer le picking'}</button>
         `:`
         <div class="field"><label>Fournisseur</label><input id="cpdpSup" style="width:100%" value="${esc(D.supplier)}" oninput="cpdp.dispatch.supplier=this.value" placeholder="Ex: SBV, GABORIT…"/></div>
         <div class="field"><label>Fichier dispatch (Excel)</label>
@@ -1751,11 +1782,18 @@ function pickingStoreFromText(t){
   return "";
 }
 function pickingNum(v){ if(v==null||v==="") return 0; const n=parseFloat(String(v).replace(/\s/g,"").replace(",",".")); return isNaN(n)?0:n; }
+/* v2.15.0 — Lecteur picking AVEC DIAGNOSTIC : chaque problème est signalé avec la ligne Excel,
+   la colonne et comment corriger, pour que l'opérateur corrige seul son fichier. */
+function pickingColLetter(j){ let s="",n=j+1; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+function pickingGtinOk(c){ if(!/^\d+$/.test(c)||[8,12,13,14].indexOf(c.length)<0) return false;
+  const d=c.split("").map(Number), chk=d.pop(); let s=0; d.reverse().forEach((x,i)=>{ s+=x*(i%2===0?3:1); }); return (10-(s%10))%10===chk; }
 function parsePickingExcel(workbook){
   const sheet=workbook.Sheets[workbook.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:true}); // raw : EAN sans notation 3.77E+12
+  const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:true,blankrows:true}); // raw : EAN sans notation 3.77E+12
+  const r0=(sheet["!ref"]?XLSX.utils.decode_range(sheet["!ref"]).s.r:0);
+  const xl=(i)=>r0+i+1;                               // n° de ligne Excel
+  const err=[], warn=[], info=[];
   let orderNum="", orderDate="", store="";
-  // En-tête : N° de commande, date, magasin.
   for(const r of rows){
     const cells=r.map(c=>String(c==null?"":c).trim());
     const c0=normColC(cells[0]);
@@ -1763,28 +1801,83 @@ function parsePickingExcel(workbook){
     else if(c0==="le" && !orderDate){ const v=r.slice(1).find(x=>x!==""&&x!=null); orderDate=(typeof v==="number")?XLSX.SSF.format("dd/mm/yyyy",v):String(v||""); }
     else if(!store && /^pribon\s*-/.test(c0)){ store=pickingStoreFromText(cells[0]); }
   }
-  // Colonnes (1re ligne d'en-tête « Code … Désignation … Qté … Fournisseur »).
-  let hIdx=-1, col={};
+  let hIdx=-1, col={}, qtyCands=[], head=[];
   for(let i=0;i<Math.min(rows.length,40);i++){
     const n=rows[i].map(c=>normColC(c));
-    if(n.some(c=>c==="designation"||c==="libelle") && n.some(c=>/^qte|^quantite/.test(c))){ hIdx=i;
+    if(n.some(c=>c==="designation"||c==="libelle") && n.some(c=>/^qte|^quantite|^qty/.test(c))){ hIdx=i; head=rows[i].map(c=>String(c==null?"":c).trim());
       n.forEach((c,j)=>{ if(c==="code"||c==="code article"||c==="ean") col.code=(col.code===undefined?j:col.code);
-        else if(c.startsWith("ref")) col.ref=j; else if(c==="designation"||c==="libelle") col.des=j;
-        else if(c.startsWith("pu")) col.pu=j; else if(/^qte|^quantite/.test(c)) col.qty=j; else if(c.startsWith("fournisseur")||c==="frs") col.sup=j; });
+        else if(c.startsWith("ref")) col.ref=(col.ref===undefined?j:col.ref); else if(c==="designation"||c==="libelle") col.des=j;
+        else if(c.startsWith("pu")) col.pu=j; else if(/^qte|^quantite|^qty/.test(c)) qtyCands.push({j,c});
+        else if(c.startsWith("fournisseur")||c==="frs") col.sup=j; });
       break; }
   }
-  if(hIdx===-1||col.des===undefined||col.qty===undefined) throw new Error("Format non reconnu : colonnes Désignation / Qté introuvables.");
-  const products=[], seen={};
-  for(let i=hIdx+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue;
-    const des=String(r[col.des]||"").trim(); if(!des || normColC(des)==="designation") continue; // en-tête répété (saut de page)
-    const qty=Math.round(pickingNum(r[col.qty])); if(qty<=0) continue;
-    const rawE=col.code!==undefined?r[col.code]:""; const ean=(typeof rawE==="number"?String(Math.round(rawE)):String(rawE)).replace(/\s/g,"").replace(/\.0+$/,"");
-    const supCode=String(col.sup!==undefined?r[col.sup]:"").trim().toUpperCase();
-    let k=ean?("e_"+ean.replace(/[^0-9A-Za-z]/g,"")):("i_"+i); if(seen[k]) k=k+"_"+i; seen[k]=1;
-    products.push({ k, ean, ref:String(col.ref!==undefined?r[col.ref]:"").trim(), designation:des, pu:pickingNum(col.pu!==undefined?r[col.pu]:0), qty, supCode, supName:pickingSupName(supCode) });
+  if(hIdx===-1||col.des===undefined||!qtyCands.length)
+    throw new Error("Ligne d'en-tête introuvable. Il faut, dans les 40 premières lignes, une ligne avec une colonne « Désignation » ET une colonne « Qté » ou « Quantité ». Vérifie que c'est bien l'export « Commande à la Centrale » (1re feuille du classeur).");
+  // Choix de la colonne quantité : « Qté » / « Quantité » en priorité ; jamais « Qté initiale » (stock avant) ;
+  // « Qté finale » seulement s'il n'y a rien d'autre.
+  const bad=/initial|stock|restant|avant/, fin=/final/;
+  let pick=qtyCands.find(q=>!bad.test(q.c)&&!fin.test(q.c)) || qtyCands.find(q=>fin.test(q.c)) || qtyCands[0];
+  col.qty=pick.j;
+  const qName=head[col.qty]||"Qté", qL=pickingColLetter(col.qty);
+  if(qtyCands.length>1) info.push({msg:"Plusieurs colonnes quantité ("+qtyCands.map(q=>"« "+head[q.j]+" »").join(", ")+") : j'utilise « "+qName+" » (colonne "+qL+")."});
+  if(col.code===undefined) warn.push({msg:"Pas de colonne « Code » / « EAN » : aucun produit ne pourra être scanné, seulement validé à la main."});
+  if(col.sup===undefined) warn.push({msg:"Pas de colonne « Fournisseur » : tous les produits seront dans un seul bloc."});
+  if(!orderNum) warn.push({msg:"N° de commande non trouvé (pas de ligne « Commande à la Centrale N° … ») : le picking sera numéroté automatiquement."});
+  if(!store) warn.push({msg:"Magasin non détecté dans le fichier : choisis-le dans la liste ci-dessous."});
+  // Formules fournisseur décalées (ex. ligne 3 = RECHERCHEV(C2…)).
+  const supShift=[];
+  const products=[], byKey={};
+  for(let i=hIdx+1;i<rows.length;i++){ const r=rows[i]; if(!r) continue; const L=xl(i);
+    const des=String(r[col.des]==null?"":r[col.des]).trim();
+    const rawE=col.code!==undefined?r[col.code]:""; const ean=(typeof rawE==="number"?String(Math.round(rawE)):String(rawE==null?"":rawE)).replace(/\s/g,"").replace(/\.0+$/,"");
+    if(!des){ if(/^\d{4,14}$/.test(ean)) warn.push({line:L,msg:"Code "+ean+" sans désignation → ligne ignorée. Ajoute la désignation."});
+      continue; }
+    if(normColC(des)==="designation") continue; // en-tête répété (saut de page)
+    const short=des.length>45?des.slice(0,45)+"…":des;
+    const rawQ=r[col.qty];
+    if(rawQ===""||rawQ==null){ if(!/\d/.test(ean)) continue; /* pied de page */ warn.push({line:L,msg:"« "+short+" » : quantité vide en colonne "+qL+" (« "+qName+" ») → ignorée."}); continue; }
+    const sq=String(rawQ).replace(/\s/g,"").replace(",",".");
+    if(typeof rawQ!=="number" && !/^-?\d+(\.\d+)?$/.test(sq)){ err.push({line:L,msg:"« "+short+" » : quantité « "+String(rawQ)+" » illisible en colonne "+qL+". Mets un nombre seul (ex. 12, sans « u », « colis »…)."}); continue; }
+    let qv=Number(sq);
+    if(qv<=0){ const other=qtyCands.filter(q=>q.j!==col.qty).map(q=>({h:head[q.j],v:pickingNum(r[q.j])})).filter(o=>o.v>0);
+      warn.push({line:L,msg:"« "+short+" » : quantité "+qv+" en colonne "+qL+" (« "+qName+" ») → ignorée."+(other.length?(" ("+other.map(o=>"« "+o.h+" » = "+o.v).join(", ")+" : mauvaise colonne remplie ?)"):"")}); continue; }
+    if(Math.round(qv)!==qv){ warn.push({line:L,msg:"« "+short+" » : quantité "+qv+" non entière → arrondie à "+Math.round(qv)+"."}); qv=Math.round(qv); }
+    if(!ean) warn.push({line:L,msg:"« "+short+" » : pas de code → ne pourra pas être scanné (validation à la main)."});
+    else if(/^\d+$/.test(ean) && ean.length>7 && !pickingGtinOk(ean))
+      warn.push({line:L,msg:"« "+short+" » : code "+ean+" ("+ean.length+" chiffres) n'est pas un EAN valide → il ne sera pas reconnu au scan. Vérifie le code (chiffre en trop ou en moins ?)."});
+    let supCode=String(col.sup!==undefined?(r[col.sup]==null?"":r[col.sup]):"").trim().toUpperCase();
+    if(col.sup!==undefined){
+      const cell=sheet[XLSX.utils.encode_cell({r:r0+i,c:col.sup})];
+      if(cell&&cell.t==="e"){ warn.push({line:L,msg:"« "+short+" » : fournisseur en erreur ("+(cell.w||"#N/A")+") → produit classé « sans fournisseur »."}); supCode=""; }
+      if(cell&&cell.f&&col.code!==undefined){ const m=String(cell.f).match(new RegExp("\\b"+pickingColLetter(col.code)+"\\$?(\\d+)\\b"));
+        if(m && Number(m[1])!==L) supShift.push({L,ref:Number(m[1])}); }
+      if(!supCode && !(cell&&cell.t==="e")) warn.push({line:L,msg:"« "+short+" » : fournisseur vide."});
+    }
+    const ref=String(col.ref!==undefined?(r[col.ref]==null?"":r[col.ref]):"").trim();
+    const dk=ean?("e_"+ean.replace(/[^0-9A-Za-z]/g,"")):("d_"+normColC(des).replace(/[^a-z0-9]/g,"_"));
+    if(byKey[dk]){ const p=byKey[dk]; warn.push({line:L,msg:"« "+short+" » en double (déjà ligne "+p._line+") : quantités additionnées ("+p.qty+" + "+qv+" = "+(p.qty+qv)+")."}); p.qty+=qv; continue; }
+    const k=ean?dk:("i_"+i);
+    const p={ k, ean, ref, designation:des, pu:pickingNum(col.pu!==undefined?r[col.pu]:0), qty:qv, supCode, supName:pickingSupName(supCode), _line:L };
+    byKey[dk]=p; products.push(p);
   }
-  if(!products.length) throw new Error("Aucune ligne produit (Qté > 0) trouvée.");
-  return { orderNum, orderDate, store, products };
+  if(supShift.length){ const s=supShift[0];
+    err.push({line:s.L,msg:"Colonne Fournisseur ("+pickingColLetter(col.sup)+") décalée : la formule de la ligne "+s.L+" cherche le code de la ligne "+s.ref+" ("+supShift.length+" ligne(s) concernée(s)). Les fournisseurs seraient FAUX. Corrige la formule de la ligne "+s.L+" ("+pickingColLetter(col.code)+s.L+" au lieu de "+pickingColLetter(col.code)+s.ref+"), recopie-la vers le bas, puis recharge le fichier."}); }
+  products.forEach(p=>{ delete p._line; });
+  if(!products.length){
+    const lst=err.concat(warn).filter(x=>x.line).slice(0,4).map(x=>"ligne "+x.line+" : "+x.msg).join("\n");
+    throw new Error("Aucune ligne produit avec une quantité > 0 en colonne "+qL+" (« "+qName+" »)."+(lst?("\n"+lst):""));
+  }
+  return { orderNum, orderDate, store, products, report:{err,warn,info,qtyCol:qName+" ("+qL+")"} };
+}
+function pickingReportHTML(parsed){
+  const R=parsed&&parsed.report; if(!R) return "";
+  const item=(x,c)=>`<li style="margin:2px 0;color:${c}">${x.line?`<b>Ligne ${x.line}</b> — `:''}${esc(x.msg)}</li>`;
+  const block=(arr,title,bg,bd,c,max)=>arr.length?`<div style="background:${bg};border:1px solid ${bd};border-radius:8px;padding:8px 10px;margin-top:6px;font-size:12px">
+      <div style="font-weight:800;color:${c};margin-bottom:3px">${title} (${arr.length})</div><ul style="margin:0;padding-left:18px">${arr.slice(0,max).map(x=>item(x,c)).join("")}${arr.length>max?`<li style="color:${c}">… et ${arr.length-max} autre(s)</li>`:''}</ul></div>`:"";
+  return block(R.err,"⛔ À corriger avant d'envoyer","#fdecea","#f5c2c0","#b71c1c",15)
+       + block(R.warn,"⚠️ À vérifier","#fff8e1","#ffe08a","#8a5a00",20)
+       + block(R.info,"ℹ️ Infos","#eef2f7","#d6dde6","#455a64",8)
+       + (!R.err.length&&!R.warn.length?`<div style="font-size:12px;color:#2e7d32;margin-top:4px">✓ Fichier propre (quantités lues en colonne ${esc(R.qtyCol)}).</div>`:"");
 }
 async function cpdpPickingFile(file){ if(!file) return; const P=cpdp.picking; P.err=""; P.fileName=file.name||"picking";
   try{ const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"}); P.parsed=parsePickingExcel(wb); P.sent=false;
@@ -1792,6 +1885,7 @@ async function cpdpPickingFile(file){ if(!file) return; const P=cpdp.picking; P.
   catch(e){ P.parsed=null; P.err="Erreur : "+e.message; } renderCPDPCard(); }
 async function cpdpSendPicking(){
   const P=cpdp.picking; if(!P.parsed) return;
+  if(P.parsed.report&&P.parsed.report.err.length){ P.err="Corrige d'abord les erreurs en rouge dans le fichier, puis recharge-le."; renderCPDPCard(); return; }
   if(!P.store){ P.err="Choisis le magasin destinataire."; renderCPDPCard(); return; }
   if(!dbCentrale){ P.err="Connexion centrale indisponible."; renderCPDPCard(); return; }
   const st=PICKING_STORES.find(x=>x.code===P.store)||{code:P.store,label:P.store};
@@ -2203,7 +2297,7 @@ function dlG5(code,id){
   if(isVitafraisDoc(doc,r) && doc && doc.lines){
     const seen=new Set();
     const inc=vitafraisColisLines(doc.lines.filter(l=>!l.nonLivre)).filter((l,i)=>{ const lk=lineKeyOf(l,i); if(seen.has(lk)) return false; seen.add(lk); const s2=(r.lines||{})[lk]||{}; return l.pcbInconnu && s2.status && s2.status!=='nonrecu'; });
-    if(inc.length) alert("⚠️ Vitafrais : PCB (pièces/colis) inconnu pour "+inc.length+" article(s) absent(s) du BL.\nIls sont dans le .txt en UNITÉS — à corriger en colis sur G5 :\n\n"+inc.map(l=>"• "+(l.designation||l.code)+" ("+l.attendu+" u.)").join("\n"));
+    if(inc.length && !confirm("⚠️ "+unitsColisName(doc,r)+" est reçu en COLIS sur G5, mais le colisage (pièces/colis) est INCONNU pour "+inc.length+" article(s).\nIls partiront dans le .txt en UNITÉS → G5 les multipliera par le conditionnement (ex. 12 unités lues comme 12 colis) :\n\n"+inc.slice(0,25).map(l=>"• "+(l.designation||l.code)+" ("+l.attendu+" u.)").join("\n")+(inc.length>25?"\n… et "+(inc.length-25)+" autre(s)":"")+"\n\nPour corriger : recharge la commande exportée de G5 AVEC les colonnes « Quantité » et « Condition. », ou charge le BL.\n\nOK = télécharger quand même (corriger à la main sur G5) · Annuler = ne pas télécharger")) return;
   }
   downloadTxt(g5Filename(r), txt);
 }
