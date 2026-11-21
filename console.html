@@ -378,6 +378,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
       <div class="kgrp-h"><span class="kgrp-ic">🏭</span><span class="kgrp-t">Entrepôt PDP</span></div>
       <button class="tab" data-tab="centrale" data-key="centrale" data-cview="histo"><span class="em">🚚</span><span class="lbl">Dispatch &amp; Picking</span><span class="cnt" id="cnt-centrale"></span></button>
       <button class="tab" data-tab="rungis" data-key="rungis"><span class="em">🚛</span><span class="lbl">Enlèvements Rungis</span><span class="cnt" id="cnt-rungis"></span></button>
+      <button class="tab" data-tab="rungis" data-key="rungisqr" data-rview="qr"><span class="em">🔳</span><span class="lbl">QR codes du jour</span><span class="cnt" id="cnt-rungisqr"></span></button>
       <button class="tab" data-tab="sapins" data-key="sapins"><span class="em">🎄</span><span class="lbl">Sapins</span><span class="cnt" id="cnt-sapins"></span></button>
       <button class="tab" data-tab="inventaire" data-key="inventaire"><span class="em">📋</span><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
     </div>
@@ -433,7 +434,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.17.0"; // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.18.0"; // 2.18.0 = Enlèvements Rungis › 🔳 QR codes du jour : calendrier, détail par type et lieu, tout imprimer ou sélection (même étiquette que Kelbongoo V11.74, scan chauffeur) // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -653,7 +654,7 @@ function start(email){
     dbCentrale.ref("rungis_notes").orderByKey().startAt(isoDay(Date.now()-7*86400000)).on("value",snap=>{ centraleState.rungisNotes=snap.val()||{}; dashTick(true); });
   }catch(e){ console.error("Firebase CENTRALE", e); }
   // Onglets (menu latéral)
-  document.querySelectorAll(".side .tab").forEach(b=>b.onclick=()=>{ document.body.classList.remove("nav-open"); if(b.dataset.cview) centraleView=b.dataset.cview; switchTab(b.dataset.tab, b.dataset.key); });
+  document.querySelectorAll(".side .tab").forEach(b=>b.onclick=()=>{ document.body.classList.remove("nav-open"); if(b.dataset.cview) centraleView=b.dataset.cview; if(b.dataset.tab==="rungis") rungisView=b.dataset.rview||(rungisView==="qr"?"suivi":rungisView); switchTab(b.dataset.tab, b.dataset.key); });
   renderMulti(); renderMsg();
   apiRP("get-fournisseurs").then(j=>{ if(j&&j.fournisseurs) FOURNS=j.fournisseurs; }).catch(()=>{});
   // Écouteurs live : réceptions + documents + messages de chaque magasin
@@ -671,7 +672,7 @@ function start(email){
 let ACTIVE_TAB="home", ACTIVE_KEY="home";
 const TAB_IDS=["home","multi","g5","centrale","rungis","sapins","inventaire","kbgpoids","fromage","blf","avoirs","suivi","msg","fourn","appview","menage","fiches"];
 const CRUMBS={ home:["Pilotage","Aujourd'hui"], suivi:["Pilotage","Suivi live"], multi:["Magasins","Chargement BL"], g5:["Magasins","Réceptions G5"], avoirs:["Magasins","Avoirs"], msg:["Magasins","Messages"],
-  centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Fromage","Découpes par BL"], traca:["Fromage","Traçabilité lots"], fromage:["Fromage","Suivi fromage"], blf:["Fromage","BL fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], sapins:["Entrepôt PDP","🎄 Sapins"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Fromage","Poids Kelbongoo"],
+  centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Fromage","Découpes par BL"], traca:["Fromage","Traçabilité lots"], fromage:["Fromage","Suivi fromage"], blf:["Fromage","BL fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], rungisqr:["Entrepôt PDP","QR codes du jour"], sapins:["Entrepôt PDP","🎄 Sapins"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Fromage","Poids Kelbongoo"],
   fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli"], menage:["Magasins","Ménage"], fiches:["Référentiels & outils","Fiches magasins"] };
 function switchTab(t, key){
   if(TAB_IDS.indexOf(t)<0) t="home";
@@ -5096,6 +5097,123 @@ function sapToggleDate(d, on){ dbCentrale.ref("sapins/config/recups/"+d).set({ o
 function sapAddDate(){ const v=(document.getElementById("sapAddD")||{}).value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v||"")) { alert("Choisis une date."); return; } sapToggleDate(v,true); sapDate=v; }
 function sapPaid(d, sk, on){ dbCentrale.ref("sapins/bl/"+d+"/"+sk+"/paid").set(on?{ at:Date.now(), by:sapWho() }:null).then(()=>toastC(on?"💶 Paiement noté":"Paiement annulé")); }
 
+/* ═══════════ QR CODES RUNGIS — même format que l'appli Kelbongoo V11.74 (le chauffeur scanne dans Kelbongoo) ═══════════
+   1 étiquette ½ A4 par support (palette / dolly). QR = https://gvs93.github.io/kelbongoo/?rq=<ligne>~<n°>~<total>
+   <ligne> = identifiant de la ligne chauffeur Kelbongoo : enl_<id demande>_<index item> · enl_<id>_dolly_<lieu> (fromage).
+   Pas de QR : palettes « via Kelbongoo », PDP, emballages renvoyés à RUNGIS (destruction). */
+const KQR_APP = "https://gvs93.github.io/kelbongoo/";
+const KQR_LIBS = ["https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js","https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"];
+const KQR_COL = { ROB:"#E11D48", BIC:"#FF1F8E", TOL:"#0A84FF", PDP:"#7C3AED", BOR:"#FF6D00", STB:"#00B060", PDC:"#00A8B5" };
+const KQR_LONG = { ROB:"Robespierre", TOL:"Tolbiac", BIC:"Bichat", BOR:"Borrego", STB:"Saint-Blaise", PDC:"Place de Clichy" };
+const kqrSafe = (s) => String(s||"").replace(/[\/#\[\]\.$]/g,"_").slice(0,140);
+const kqrEsc = (s) => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+// même ordre que Kelbongoo (kbEnlItems) : tableau sans trous, ou objet dans l'ordre des clés
+function kqrItems(r){ const it=r&&r.items; if(!it) return []; return Array.isArray(it)?it.filter(Boolean):Object.keys(it).map(k=>it[k]).filter(Boolean); }
+const kqrIso = (d) => { const m=String(d||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?m[3]+"-"+m[2]+"-"+m[1]:String(d||""); };
+const kqrUnits = (n,w) => Array.from({length:Math.max(0,Math.min(40,Math.round(Number(n)||0)))},()=>w);
+// Lignes étiquetables d'une demande d'enlèvement (id = clé Firebase enlevements/<id>)
+function kqrLines(id, r){
+  const out=[]; if(!r) return out;
+  const day = r.status==="valide" && r.pickup ? r.pickup : (r.date || "");
+  kqrItems(r).forEach((it,i)=>{
+    const code=String(it.code||"?").toUpperCase();
+    if(it.kbg || code==="PDP" || code==="RUNGIS") return;
+    const dol=Number(it.dollies)>0, n=dol?Number(it.dollies):Number(it.n)>0?Number(it.n):(it.mergedWith?0:1);
+    const units=kqrUnits(n, dol?(it.roll?"Roll":"Dolly"):"Palette"); if(!units.length) return;
+    const pick=String(it.type||"").toUpperCase()==="PICKING";
+    out.push({ id:kqrSafe("enl_"+id+"_"+i), rid:id, site:code, cat:pick?"picking":"dispatch", units,
+      label:(pick?"📦 Picking":"🏭 Dispatch")+" · "+units.length+" "+(units.length>1?({Palette:"palettes",Roll:"rolls",Dolly:"dollies"}[units[0]]||units[0].toLowerCase()+"s"):units[0].toLowerCase()),
+      sub:[pick&&it.ref?"cde "+it.ref:"", it.express?"express":"", it.frais?"❄️ frais":"", it.zone==="froid"?"❄️ ch. froide":it.zone==="sec"?"▣ sec":""].filter(Boolean).join(" · "),
+      day, valid:r.status==="valide", liv:kqrIso(r.livraison&&r.livraison[code])||"" });
+  });
+  (Array.isArray(r.lieux)?r.lieux:[]).forEach(L=>{
+    if(!L||!L.code||!(Number(L.dolly)>0)) return; const code=String(L.code).toUpperCase(); if(code==="PDP"||code==="RUNGIS") return;
+    out.push({ id:kqrSafe("enl_"+id+"_dolly_"+code), rid:id, site:code, cat:"fromage", units:kqrUnits(L.dolly,"Dolly fromage"),
+      label:"🧀 Fromage · "+L.dolly+(Number(L.dolly)>1?" dollies":" dolly"), sub:L.dollyZone==="froid"?"❄️ ch. froide":"", day, valid:r.status==="valide", liv:kqrIso(r.livraison&&r.livraison[code])||"" });
+  });
+  return out;
+}
+function kqrLoadLib(){
+  if(window.qrcode) return Promise.resolve(window.qrcode);
+  const load=(src)=>new Promise((ok,ko)=>{ const s=document.createElement("script"); s.src=src; s.async=true; s.onload=ok; s.onerror=()=>ko(new Error("chargement QR impossible")); document.head.appendChild(s); });
+  return load(KQR_LIBS[0]).catch(()=>load(KQR_LIBS[1])).then(()=>{ if(!window.qrcode) throw new Error("générateur QR indisponible"); return window.qrcode; });
+}
+function kqrSvg(qrcode, text){
+  const q=qrcode(0,"M"); q.addData(text); q.make();
+  const n=q.getModuleCount(), m=2, z=n+m*2; let d="";
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(q.isDark(r,c)) d+="M"+(c+m)+" "+(r+m)+"h1v1h-1z";
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+z+' '+z+'" shape-rendering="crispEdges"><rect width="'+z+'" height="'+z+'" fill="#fff"/><path d="'+d+'" fill="#000"/></svg>';
+}
+const kqrFr = (iso) => { const p=String(iso||"").split("-"); return p.length===3?p[2]+"/"+p[1]:String(iso||""); };
+// Ouvre la fenêtre d'impression (à appeler directement sur le clic : sinon le navigateur bloque la fenêtre)
+async function kqrPrint(lines, title){
+  const L=(lines||[]).filter(l=>l&&l.units&&l.units.length); const nb=L.reduce((a,l)=>a+l.units.length,0);
+  if(!nb) return 0;
+  const w=window.open("","_blank"); if(!w) throw new Error("Autorise les fenêtres pop-up pour imprimer");
+  w.document.write('<p style="font:20px sans-serif;padding:20px">Préparation des QR codes…</p>');
+  try{
+    const qrcode=await kqrLoadLib(); const out=[];
+    L.forEach(l=>{ const N=l.units.length, col=KQR_COL[l.site]||"#455a64";
+      l.units.forEach((u,i)=>{ const url=KQR_APP+"?rq="+encodeURIComponent(l.id+"~"+(i+1)+"~"+N);
+        out.push('<section class="lb"><div class="top" style="background:'+col+'"><span class="to">LIVRER À</span><span class="code">'+kqrEsc(l.site)+'</span><span class="nm">'+kqrEsc(KQR_LONG[l.site]||"")+'</span></div>'
+          +'<div class="mid"><div class="qr">'+kqrSvg(qrcode,url)+'</div><div class="info">'
+          +'<div class="cat">'+(l.cat==="picking"?"📦 Picking":l.cat==="fromage"?"🧀 Fromage":"🏭 Dispatch")+'</div>'
+          +'<div class="unit">'+kqrEsc(u)+' <b>'+(i+1)+'/'+N+'</b></div>'
+          +'<div class="det">'+kqrEsc(l.label)+'</div>'+(l.sub?'<div class="det">'+kqrEsc(l.sub)+'</div>':'')
+          +'<div class="day">🚚 '+(l.valid?'à prendre le '+kqrEsc(kqrFr(l.day))+(l.liv&&l.liv!==l.day?' · livraison '+kqrEsc(kqrFr(l.liv)):''):'demandé le '+kqrEsc(kqrFr(l.day))+' · en attente de Rungis')+'</div>'
+          +'</div></div><div class="foot">Chauffeur : scanne ce QR (appli Kelbongoo ou appareil photo) au chargement à PDP</div></section>'); }); });
+    const css='@page{size:A4 portrait;margin:8mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#111}'
+      +'.lb{height:136mm;border:1.2mm solid #111;border-radius:5mm;overflow:hidden;display:flex;flex-direction:column;margin-bottom:6mm;page-break-inside:avoid;break-inside:avoid}'
+      +'.lb:nth-child(2n){page-break-after:always;break-after:page;margin-bottom:0}'
+      +'.top{color:#fff;display:flex;align-items:baseline;gap:5mm;padding:3mm 6mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+      +'.to{font-size:5mm;font-weight:700}.code{font-size:16mm;font-weight:900;line-height:1}.nm{font-size:7mm;font-weight:700}'
+      +'.mid{flex:1;display:flex;align-items:center;gap:6mm;padding:4mm 6mm}.qr{flex:0 0 92mm;height:92mm}.qr svg{width:92mm;height:92mm;display:block}'
+      +'.info{flex:1;min-width:0}.cat{font-size:9mm;font-weight:900}.unit{font-size:11mm;font-weight:700;margin-top:2mm}.unit b{font-size:14mm}'
+      +'.det{font-size:4.6mm;margin-top:2mm;color:#333}.day{font-size:5.2mm;font-weight:700;margin-top:3mm}.foot{font-size:3.8mm;color:#555;text-align:center;padding:0 4mm 2.5mm}';
+    w.document.open(); w.document.write('<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>'+kqrEsc(title||"QR Rungis")+'</title><style>'+css+'</style></head><body>'+out.join("")+'</body></html>'); w.document.close();
+    setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){ } },600);
+    return nb;
+  }catch(e){ try{ w.close(); }catch(_){ } throw e; }
+}
+/* ---------- v2.18.0 — 🔳 QR codes du jour (calendrier · par type et lieu · tout / sélection) */
+let qrCalM="", qrCalSel="", qrOff={};
+const QR_TYPES=[["picking","📦 Picking"],["dispatch","🏭 Dispatch"],["fromage","🧀 Dolly fromage"]];
+function qrAll(){ const out=[]; enlList().forEach(e=>{ kqrLines(e.id,e).forEach(l=>out.push(l)); }); return out; }
+function qrByDay(){ const m={}; qrAll().forEach(l=>{ if(!l.day) return; (m[l.day]=m[l.day]||[]).push(l); }); return m; }
+function qrN(L){ return L.reduce((a,l)=>a+l.units.length,0); }
+function qrCalHTML(by){
+  const today=isoDay(); if(!qrCalM) qrCalM=(qrCalSel||today).slice(0,7); if(!qrCalSel) qrCalSel=today;
+  const [Y,M]=qrCalM.split("-").map(Number), first=new Date(Y,M-1,1,12), nd=new Date(Y,M,0).getDate(), off=(first.getDay()+6)%7;
+  let cells=""; for(let i=0;i<off;i++) cells+=`<div></div>`;
+  for(let d=1;d<=nd;d++){ const k=Y+"-"+String(M).padStart(2,"0")+"-"+String(d).padStart(2,"0"), n=qrN(by[k]||[]);
+    cells+=`<button class="enl-d${k===qrCalSel?" sel":""}${k===today?" tdy":""}" style="${n?"background:#e8f0fe;color:#1a4fb4;border-color:#1a4fb455":""}" onclick="qrCalSel='${k}';qrOff={};renderRungis()"><b>${d}</b>${n?`<small>🔳 ${n}</small>`:""}</button>`; }
+  const mo=first.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  const nav=(n)=>{ const t=new Date(Y,M-1+n,1,12); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0"); };
+  return `<div class="cx" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><button class="tbtn s" onclick="qrCalM='${nav(-1)}';renderRungis()">◀</button><b style="flex:1;text-align:center;text-transform:capitalize;font-size:15px">${esc(mo)}</b><button class="tbtn s" onclick="qrCalM='${nav(1)}';renderRungis()">▶</button><button class="tbtn s" onclick="qrCalM='';qrCalSel='';qrOff={};renderRungis()">Aujourd'hui</button></div>
+    <div class="enl-cal">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(w=>`<div class="w">${w}</div>`).join("")}${cells}</div>
+    <div class="enl-leg"><span>🔳 = nombre d'étiquettes (1 par palette / dolly)</span><span>jour = récupération Rungis (ou jour de la demande si pas encore validée)</span></div></div>`;
+}
+function qrDayHTML(by){
+  const L=(by[qrCalSel]||[]).slice(), sel=L.filter(l=>!qrOff[l.id]), nAll=qrN(L), nSel=qrN(sel);
+  const lbl=new Date(qrCalSel+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  const groups=QR_TYPES.map(([t,tl])=>{ const G=L.filter(l=>l.cat===t); if(!G.length) return "";
+    const sites=[...new Set(G.map(l=>l.site))].sort();
+    return `<div class="cx" style="overflow:hidden;margin-bottom:12px"><div class="cx-h"><h3>${tl}</h3><span class="sp"></span><span class="sub">🔳 ${qrN(G)}</span></div>
+      ${sites.map(s=>{ const S=G.filter(l=>l.site===s); return `<div style="padding:8px 14px;border-top:1px solid var(--line)"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${storeChip(s)}<b style="font-size:13px">${esc(KQR_LONG[s]||"")}</b><span class="t2">🔳 ${qrN(S)}</span></div>
+        ${S.map(l=>`<label style="text-transform:none;letter-spacing:0;font-weight:500;display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer;${qrOff[l.id]?"opacity:.5":""}"><input type="checkbox" ${qrOff[l.id]?"":"checked"} onchange="qrToggle('${esc(l.id)}',this.checked)" style="width:20px;height:20px">
+          <span style="flex:1;min-width:0"><b style="font-size:13.5px">${esc(l.label)}</b>${l.sub?` <span class="t2">${esc(l.sub)}</span>`:""}${l.valid?"":` <span class="pill po">⏳ pas encore validée par Rungis</span>`}</span><b style="color:#1a4fb4">🔳 ${l.units.length}</b></label>`).join("")}</div>`; }).join("")}</div>`; }).join("");
+  return `<div class="page-h" style="margin:0 0 10px"><div><h2 style="margin:0;font-size:18px;text-transform:capitalize">${esc(lbl)}</h2><div class="sub">${nAll?`${nAll} étiquette(s) · rangées par type et par lieu`:"Rien à étiqueter ce jour-là."}</div></div></div>
+    ${nAll?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="tbtn p" onclick="qrPrintDay(false)">🖨️ Tout imprimer (${nAll})</button><button class="tbtn" ${nSel&&nSel<nAll?"":"disabled"} onclick="qrPrintDay(true)">🖨️ Imprimer la sélection (${nSel})</button><button class="tbtn s" onclick="qrSetAll(${nSel===nAll?"false":"true"})">${nSel===nAll?"Tout décocher":"Tout cocher"}</button></div>`:""}
+    ${groups}
+    <div class="t2" style="margin-top:6px">2 étiquettes par A4, QR de 9 cm. Le chauffeur scanne dans l'appli Kelbongoo (ou avec l'appareil photo) : la palette passe « prise » toute seule. Les rolls Kelbongoo s'impriment dans l'appli Kelbongoo (Prépa › DLC & suivi). Pas de QR pour les emballages renvoyés à Rungis ni les palettes EPAL vides.</div>`;
+}
+function qrHTML(){ const by=qrByDay(); return `<div class="enl-grid"><div>${qrCalHTML(by)}</div><div>${qrDayHTML(by)}</div></div>`; }
+function qrToggle(id,on){ if(on) delete qrOff[id]; else qrOff[id]=1; renderRungis(); }
+function qrSetAll(on){ if(on){ qrOff={}; } else { (qrByDay()[qrCalSel]||[]).forEach(l=>{ qrOff[l.id]=1; }); } renderRungis(); }
+async function qrPrintDay(onlySel){
+  const L=(qrByDay()[qrCalSel]||[]).filter(l=>!onlySel||!qrOff[l.id]);
+  try{ const n=await kqrPrint(L, "QR Rungis "+frIso(qrCalSel)); if(n) toastC("🔳 "+n+" étiquette(s) envoyée(s) à l'impression"); }catch(e){ alert(e.message); }
+}
 function renderRungis(){
   const el=document.getElementById("tab-rungis"); if(!el) return;
   const pend=enlPending(), sent=enlSent(), val=enlValidated(10), refs=refusedOpen();
@@ -5107,11 +5225,12 @@ function renderRungis(){
   const K=enlCounts();
   const kp=(lbl,v,sub,c,view)=>`<div class="cx kpi" style="cursor:pointer;border-color:${ENL_COL[c][1]}55;background:${ENL_COL[c][0]}" onclick="rungisView='${view}';renderRungis()"><div class="eyebrow" style="color:${ENL_COL[c][1]}">${lbl}</div><div class="v" style="color:${ENL_COL[c][1]}">${v}</div><div class="s">${sub}</div></div>`;
   const kpis=`<div class="enl-kpis">${kp("⏳ En attente",K.att,"palettes pas encore validées par Rungis","orange","encours")}${kp("📅 À récupérer",K.av,"validées par Rungis, pas encore prises","orange","suivi")}${kp("✅ Récupérées",K.ok7,"ces 7 derniers jours","green","histo")}${kp("❌ Problèmes",K.pb+(K.q?` <small style="font-size:13px">· 💬 ${K.q}</small>`:""),"non récupérées, pas validées, questions","red","todo")}</div>`;
-  const seg=`<span class="seg"><button class="${rungisView==="suivi"?"on":""}" onclick="rungisView='suivi';renderRungis()">📅 Suivi</button><button class="${rungisView==="todo"?"on":""}" onclick="rungisView='todo';renderRungis()">⚠️ À traiter${K.pb+K.q?` (${K.pb+K.q})`:""}</button><button class="${rungisView==="encours"||rungisView==="soir"?"on":""}" onclick="rungisView='encours';renderRungis()">⏳ Ce soir / en cours</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">📚 Historique</button><button class="${rungisView==="epal"?"on":""}" onclick="rungisView='epal';renderRungis()">🟫 Palettes${epalToValidate().length?` (${epalToValidate().length})`:""}</button></span>`;
+  const seg=`<span class="seg"><button class="${rungisView==="suivi"?"on":""}" onclick="rungisView='suivi';renderRungis()">📅 Suivi</button><button class="${rungisView==="todo"?"on":""}" onclick="rungisView='todo';renderRungis()">⚠️ À traiter${K.pb+K.q?` (${K.pb+K.q})`:""}</button><button class="${rungisView==="encours"||rungisView==="soir"?"on":""}" onclick="rungisView='encours';renderRungis()">⏳ Ce soir / en cours</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">📚 Historique</button><button class="${rungisView==="qr"?"on":""}" onclick="rungisView='qr';renderRungis()">🔳 QR codes</button><button class="${rungisView==="epal"?"on":""}" onclick="rungisView='epal';renderRungis()">🟫 Palettes${epalToValidate().length?` (${epalToValidate().length})`:""}</button></span>`;
   const head=`<div class="page-h"><div><h1>Enlèvements Rungis</h1><div class="sub">Ce qui est en attente, validé par Rungis, récupéré — et ce qui pose problème.</div></div><span class="sp"></span>${seg}</div>`;
   if(rungisView==="suivi"){ el.innerHTML=head+kpis+`<div class="enl-grid"><div>${enlCalHTML()}</div><div>${enlDayHTML()}</div></div>`; enlModalRefresh(); return; }
   if(rungisView==="todo"){ el.innerHTML=head+kpis+enlTodoHTML(); enlModalRefresh(); return; }
   if(rungisView==="histo"){ el.innerHTML=head+enlHistHTML(); enlModalRefresh(); return; }
+  if(rungisView==="qr"){ el.innerHTML=head+qrHTML(); return; } // v2.18.0
   if(rungisView==="encours"||rungisView==="soir") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Tournée de ce soir</h3><span class="sub">${palCount(items)} pal. · ${pend.reduce((a,e)=>a+dolCount(e),0)} dolly</span><span class="sp"></span>${froid?`<span class="pill pcold">❄ ${froid} chambre froide</span>`:""}${sec?`<span class="pill pdry">▣ ${sec} entrepôt sec</span>`:""}</div>
       ${tableFor(pend,{edit:true, empty:"Aucune demande d'enlèvement en attente. La tablette enregistre les demandes au fil de la journée."})}</div>
       ${sent.length?`<div class="cx" style="overflow:hidden;margin-top:16px"><div class="cx-h"><h3>Envoyé à Rungis — en attente de validation</h3><span class="sp"></span><span class="sub">${sent.length} demande(s)</span></div>${tableFor(sent,{})}</div>`:""}`;
