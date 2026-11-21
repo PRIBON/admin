@@ -421,7 +421,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.15.0"; // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.16.0"; // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -833,10 +833,50 @@ function parseBiodisPDF(rowLines){
   }
   return { docNumber, supplier, lines: out };
 }
+/* v2.16.0 — FACTURE PDF AGIDRA (la facture sert de BL : elle arrive après la livraison).
+   Ligne : Colis | Conditionnement | Référence | Désignation | Origine | Réf douane | Bio | Quantité (unités) | P.U HT | [Remise %] | P.U Net | Total HT | Tva
+   Ex. « 2,00 CT 12 PQT 074128 BISCUITS BIO AVOINE CITRON CHIA 130 FR 19053199 Oui 24,00 1,1200 1,1200 26,88 5,50 » + suite de désignation à la ligne suivante. */
+function parseAgidraFacturePDF(rowLines){
+  const out=[]; let docNumber="", commande="";
+  const reItem=/^(\d+,\d{2})\s+(.+?)\s+(\d{5,7})\s+(.+?)\s+(?:([A-Z]{2})\s+)?(?:(\d{8})\s+)?(?:(Oui|Non)\s+)?(\d{1,5},\d{2})\s+(\d+,\d{4})\s+(?:(-?\d+(?:,\d+)?)\s+)?(\d+,\d{4})\s+(\d[\d ]*,\d{2})\s+(\d+,\d{2})\s*$/;
+  const isMeta=(L)=>/^(Colis\b|FACTURE|Page \d|T[ée]l\.|La distribution|Pas d'escompte|Toute facture|En outre|Si[èe]ge social|Au Capital|IBAN|TOTAL|Remise|Taxe|Voir les|Re[çc]u|Nb |Poids|Montant)/i.test(L) || /\d+,\d{2}\s*$/.test(L);
+  let cur=null, cat="Autres";
+  for(const L of rowLines){
+    let m=L.match(/FACTURE\s+(FW[A-Z]*\d[\w-]*)/i) || L.match(/Num[ée]ro pi[èe]ce\s*:\s*(\S+)/i); if(m && !docNumber) docNumber=m[1];
+    m=L.match(/Votre r[ée]f[ée]rence\s*:\s*(\S+)/i); if(m && !commande) commande=m[1];
+    m=L.match(reItem);
+    if(m){
+      const colis=toNum(m[1]), qte=toNum(m[8]);
+      let cdt=colis>0?qte/colis:null; if(cdt && Math.abs(cdt-Math.round(cdt))>1e-6) cdt=null; else if(cdt) cdt=Math.round(cdt);
+      cur={ article:m[3], ref:m[3], code:m[3], ean:"", designation:m[4].trim(), marque:"", cdt, qteCmd:colis, unit:cdt?"colis":"piece",
+            attendu:qte, puHT:toNum(m[11])||null, categorie:"Autres" };
+      out.push(cur); continue;
+    }
+    if(isMeta(L)){ cur=null; continue; }               // sous-total de rayon, pied de page… : fin de la désignation en cours
+    if(cur && L.length<=60 && !/^\d/.test(L)) { cur.designation=(cur.designation+" "+L).trim(); cur=null; } // suite de désignation (1 ligne)
+  }
+  return { docNumber, commandNumber:commande, supplier:"AGIDRA", lines:out };
+}
 function pickPdfParser(rowLines){
   const j=rowLines.join("\n");
-  if(/BIODIS/i.test(j)) return parseBiodisPDF(rowLines);
-  return parsePDFLines(rowLines); // Vitafrais (par défaut)
+  let r;
+  if(/AGIDRA/i.test(j) && /FACTURE|Colis\s+Conditionnement/i.test(j)) r=parseAgidraFacturePDF(rowLines);
+  else if(/BIODIS/i.test(j)) r=parseBiodisPDF(rowLines);
+  else r=parsePDFLines(rowLines); // Vitafrais (par défaut)
+  // v2.16.0 — on garde le texte brut : si aucun parseur ne reconnaît la mise en page, la commande guidera la lecture.
+  r._rows=rowLines;
+  if(!r.supplier){ const f=guessSupplierFromText(j); if(f) r.supplier=f; }
+  return r;
+}
+// v2.16.0 — Fournisseur deviné dans le texte du document (liste des fournisseurs G5 du picking).
+function guessSupplierFromText(txt){
+  const T=" "+stripAccentsC(String(txt||"")).toUpperCase().replace(/[^A-Z0-9&]+/g," ")+" ";
+  let best="";
+  Object.values(typeof PICKING_FOURN!=="undefined"?PICKING_FOURN:{}).forEach(n=>{
+    const k=stripAccentsC(n).toUpperCase().replace(/[^A-Z0-9&]+/g," ").trim();
+    if(k.length>=5 && !/^(PROBON|PRIBON|FRUITS|PDP)/.test(k) && T.includes(" "+k+" ") && k.length>best.length) best=n;
+  });
+  return best;
 }
 async function readPDF(buf){
   const pdf=await pdfjsLib.getDocument({data:buf}).promise;
@@ -930,7 +970,12 @@ async function parseOrderXlsx(file){
       const mCmd=String(file.name||"").match(/(\d{6,})/);
       // v2.15.0 — fichier « AAMMJJ - FOURNISSEUR - PRIBON XXX.xlsx » : le fournisseur est dans le nom.
       const mSup=String(file.name||"").match(/^\s*\d{6}\s*-\s*(.+?)\s*-\s*PRIBON/i);
-      return { format:"CMD", g5Key:"code", supplier:mSup?mSup[1].trim().toUpperCase():"", docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines,
+      // v2.16.0 — sinon : colonne « Fournisseur » (code G5, ex. F072 → AGIDRA) ou nom de fichier « agidra_261120.xlsx ».
+      let supS=mSup?mSup[1].trim().toUpperCase():"";
+      if(!supS){ const iF=find(x=>x==="FOURNISSEUR"||x==="FOUR STANDARD");
+        if(iF>=0){ for(let i=sh+1;i<rows.length && !supS;i++){ const c=String((rows[i]||[])[iF]||"").trim().toUpperCase(); if(c) supS=(typeof PICKING_FOURN!=="undefined"&&PICKING_FOURN[c])||""; } } }
+      if(!supS){ const mN=String(file.name||"").match(/^\s*([A-Za-z][A-Za-z &'-]{2,}?)[\s_-]+\d{6}/); if(mN) supS=mN[1].trim().toUpperCase(); }
+      return { format:"CMD", g5Key:"code", supplier:supS, docNumber: mCmd?mCmd[1]:"", deliveryDate:"", lines,
         noColisage:(iColisage<0&&iCond<0&&iColis<0) };
     }
   }
@@ -1119,6 +1164,8 @@ function renderLoadStatus(){
 }
 // Détermine la clé utilisée pour le .txt G5 : EAN si présent, sinon on propose le code article.
 function detectG5Key(parsed){
+  if(!(parsed.lines||[]).length) return 'code';                 // v2.16.0 — BL lu par la commande : la commande fait foi
+  if(/AGIDRA/i.test(parsed.supplier||"")) return 'code';         // v2.16.0 — facture Agidra sans EAN : rapprochée par réf. fournisseur
   const hasEan=(parsed.lines||[]).some(l=>l.ean&&String(l.ean).trim().length>=6);
   if(hasEan) return 'ean';
   const hasArticle=(parsed.lines||[]).some(l=>l.article);
@@ -1246,13 +1293,41 @@ function dateShort(ts){ if(!ts) return ""; return new Date(ts).toLocaleDateStrin
 const multiFiles={}; // code -> { orderFile, orderParsed, blFile, blParsed, deliveryDate, supplier }
 
 function normKey(s){ return String(s==null?"":s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z0-9]+/g,"").trim(); }
+// v2.16.0 — référence numérique : les zéros en tête ne comptent pas (facture Agidra 074128 = commande G5 74128).
+function normRef(s){ const k=normKey(s); return /^\d+$/.test(k) ? k.replace(/^0+(?=\d)/,"") : k; }
 function lineCandidates(l){
-  return [l.code,l.article,l.ref,l.ean,l.designation].map(normKey).filter(Boolean);
+  return [l.code,l.article,l.ref,l.ean,l.designation].map(normRef).filter(Boolean);
+}
+/* v2.16.0 — LECTURE GUIDÉE PAR LA COMMANDE (fournisseur dont la mise en page n'est pas connue).
+   Pour chaque ligne de la commande, on cherche dans le texte du PDF une ligne qui contient sa référence fournisseur
+   (zéros en tête ignorés) ou son EAN. Trouvée = livrée ; la quantité est lue si un nombre de la ligne = unités ou colis commandés.
+   Pas trouvée = proposée en 🚫 rupture, comme d'habitude. */
+function guidedBLLines(order, rows){
+  const toks=(rows||[]).map(L=>{ const t=String(L).split(/\s+/); return { L, set:new Set(t.map(normRef).filter(x=>x.length>=4)),
+    nums:t.map(x=>x.replace(/\.(?=\d{3}\b)/g,"")).filter(x=>/^\d+(?:[.,]\d+)?$/.test(x)).map(toNum) }; });
+  const used=new Set(), out=[];
+  (order.lines||[]).forEach(ol=>{
+    const keys=[ol.ref, ol.ean, ol.code, ol.article].map(normRef).filter(k=>k && k.length>=4);
+    if(!keys.length) return;
+    const i=toks.findIndex((t,ix)=>!used.has(ix) && keys.some(k=>t.set.has(k)));
+    if(i<0) return;
+    used.add(i);
+    const t=toks[i], att=Number(ol.attendu)||0, col=Number(ol.qteCmd)||0, cdt=Number(ol.cdt)||0;
+    let livre=null;
+    if(att && t.nums.includes(att)) livre=att;
+    else if(cdt>1 && col && t.nums.includes(col)) livre=col*cdt;
+    out.push({ article:ol.ref||ol.code||"", ref:ol.ref||"", code:ol.code||"", ean:ol.ean||"", designation:ol.designation||"",
+      attendu:livre!=null?livre:att, categorie:ol.categorie||"Autres", guided:true, qteLue:livre!=null, rowText:t.L.slice(0,160) });
+  });
+  return out;
 }
 function mergeOrderAndBL(order, bl){
   if(!order || order.format!=="CMD") throw new Error("Le bon de commande doit être un fichier XLSX/XLS de commande.");
   if(!bl || bl.format==='CMD') throw new Error("Le BL doit être un CSV, TXT ou PDF (pas la commande).");
-  const blLines=bl.lines||[];
+  let blLines=bl.lines||[];
+  // v2.16.0 — mise en page inconnue (0 ligne lue) : lecture guidée par la commande.
+  let guided=false;
+  if(!blLines.length && bl._rows && bl._rows.length){ blLines=guidedBLLines(order, bl._rows); guided=true; }
   const used=new Set();
   const merged=[];
   let unmatched=0;
@@ -1261,8 +1336,8 @@ function mergeOrderAndBL(order, bl){
     const keys=lineCandidates(ol);
     let bi=-1;
     // 0. v2.9.0 — référence fournisseur d'abord (Karine & Jeff : un même EAN peut exister en 2 formats)
-    const oref=normKey(ol.ref);
-    if(oref){ for(let i=0;i<blLines.length;i++){ if(used.has(i)) continue; const b=blLines[i]; if(normKey(b.ref)===oref || normKey(b.article)===oref){ bi=i; break; } } }
+    const oref=normRef(ol.ref);
+    if(oref){ for(let i=0;i<blLines.length;i++){ if(used.has(i)) continue; const b=blLines[i]; if(normRef(b.ref)===oref || normRef(b.article)===oref){ bi=i; break; } } }
     // 1. correspondance exacte sur code / référence fournisseur / EAN / article
     for(let i=0;bi<0 && i<blLines.length;i++){
       if(used.has(i)) continue;
@@ -1335,7 +1410,8 @@ function mergeOrderAndBL(order, bl){
     g5Key:"code",
     supplier:order.supplier || bl.supplier || "",
     docNumber:bl.docNumber || order.docNumber || "",
-    commandNumber:order.docNumber || "",
+    commandNumber:order.docNumber || bl.commandNumber || "",
+    guided,
     deliveryDate:order.deliveryDate || "",
     lines:merged,
     reconciliation:{ commandLines:(order.lines||[]).length, blLines:blLines.length, unmatchedCommand:unmatched, unmatchedBL:merged.filter(x=>x.horsCommande).length }
@@ -1374,14 +1450,16 @@ function parseNote(p){
   if(p.format==='BL+CMD'){
     const cl=p.lines.filter(l=>l.cdt).length;
     const hors=p.lines.filter(l=>l.horsCommande).length;
-    return '<div data-rnote="'+rupRid(p)+'">'+`<div class="parse-note">🔗 <b>BL + commande rapprochés</b> · BL ${esc(p.docNumber||'—')} · commande ${esc(p.commandNumber||'—')} · ${p.lines.length} lignes${cl?' · '+cl+' conditionnements':''}${hors?' · ⚠️ '+hors+' BL hors commande':''}</div>`+ruptureBlock(p)+'</div>';
+    const gd=p.guided?`<div class="parse-note" style="background:#fff8e1;color:#7a5200">🧭 <b>Mise en page du BL inconnue</b> → lu à l'aide de la commande (réf. fournisseur / EAN cherchés dans le PDF) : ${p.lines.filter(l=>l.commandMatched).length}/${p.reconciliation.commandLines} produit(s) retrouvé(s). Vérifie les absents ci-dessous avant de charger.</div>`:'';
+    return '<div data-rnote="'+rupRid(p)+'">'+`<div class="parse-note">🔗 <b>BL + commande rapprochés</b> · BL ${esc(p.docNumber||'—')} · commande ${esc(p.commandNumber||'—')} · ${p.lines.length} lignes${cl?' · '+cl+' conditionnements':''}${hors?' · ⚠️ '+hors+' BL hors commande':''}</div>`+gd+ruptureBlock(p)+'</div>';
   }
   if(p.format==='CMD'){
     const pv=p.lines.filter(l=>l.poidsVariable).length, cl=p.lines.filter(l=>l.cdt).length;
     return `<div class="parse-note">📋 <b>Commande ${esc(p.supplier||'?')}</b> ${esc(p.docNumber||'')} · ${p.lines.length} lignes${cl?(' · '+cl+' en colis'):''}${pv?(' · '+pv+' poids variable'):''}</div>`;
   }
   const g5 = p.g5Key==='article' ? ' · clé G5 : <b>code article</b>' : (p.g5Key==='ean' ? ' · clé G5 : EAN' : '');
-  return `<div class="parse-note">N° <b>${esc(p.docNumber||'—')}</b> · ${esc(p.format)} · ${p.lines.length} lignes${p.skipped?(' · '+p.skipped+' ignorée(s)'):''}${g5}</div>`;
+  if(!p.lines.length && p._rows && p._rows.length) return `<div class="parse-note" style="background:#fff8e1;color:#7a5200">🧭 ${esc(p.supplier||'Fournisseur')} · mise en page non connue : le BL sera <b>lu à l'aide de la commande</b> (charge aussi le bon de commande).</div>`;
+  return `<div class="parse-note">${p.supplier?('<b>'+esc(p.supplier)+'</b> · '):''}N° <b>${esc(p.docNumber||'—')}</b> · ${esc(p.format)} · ${p.lines.length} lignes${p.skipped?(' · '+p.skipped+' ignorée(s)'):''}${g5}</div>`;
 }
 /* ==================== CHARGEMENT « LA CENTRALE PDP » (dispatch + découpe) ====================
    La console est la plateforme de gestion : on charge ICI le dispatch et le fichier de
@@ -2087,16 +2165,16 @@ function renderMulti(){
       <h3>${esc(s.label)} ${ready?'':'<span class="badge warn">non configuré</span>'}</h3>
       ${ready?`
         <div class="field"><label>1️⃣ Bon de commande</label>
-          <div class="drop ${st.orderFile?'has':''}" onclick="document.getElementById('morder_${s.code}').click()">${st.orderFile?'✓ '+esc(st.orderFile.name):'📋 Charger le bon de commande (.xlsx)'}</div>
+          <div style="display:flex;gap:6px;align-items:stretch"><div class="drop ${st.orderFile&&!st.orderErr?'has':''}" style="flex:1" onclick="document.getElementById('morder_${s.code}').click()">${st.orderFile?(st.orderErr?'⚠️ ':'✓ ')+esc(st.orderFile.name):'📋 Charger le bon de commande (.xlsx)'}</div>${slotX('morderX_'+s.code,"clearMulti('"+s.code+"','order')",!!st.orderFile)}</div>
           <input id="morder_${s.code}" type="file" accept=".xlsx,.xls" style="display:none" onchange="onMultiOrder('${s.code}',this.files[0])"/>
         </div>
         <div class="field"><label>2️⃣ Bon de livraison (BL)</label>
-          <div class="drop ${st.blFile?'has':''}" onclick="document.getElementById('mbl_${s.code}').click()">${st.blFile?'✓ '+esc(st.blFile.name):'📄 Charger le BL (.pdf / .xlsx / .csv / .txt)'}</div>
+          <div style="display:flex;gap:6px;align-items:stretch"><div class="drop ${st.blFile&&!st.blErr?'has':''}" style="flex:1" onclick="document.getElementById('mbl_${s.code}').click()">${st.blFile?(st.blErr?'⚠️ ':'✓ ')+esc(st.blFile.name):'📄 Charger le BL (.pdf / .xlsx / .csv / .txt)'}</div>${slotX('mblX_'+s.code,"clearMulti('"+s.code+"','bl')",!!st.blFile)}</div>
           <input id="mbl_${s.code}" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onMultiBL('${s.code}',this.files[0])"/>
         </div>
         <div class="field"><label>Fournisseur</label><input style="width:100%" value="${esc(st.supplier||'')}" oninput="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{supplier:this.value})" placeholder="Déduit de la commande / BL…"/></div>
         <div class="field"><label>Livraison prévue</label><input type="date" style="width:100%" value="${esc(st.deliveryDate||'')}" onchange="multiFiles['${s.code}']=Object.assign(multiFiles['${s.code}']||{},{deliveryDate:this.value})"/></div>
-        <div id="mnote_${s.code}">${st.merged?parseNote(st.merged):(st.orderParsed?parseNote(st.orderParsed):st.blParsed?parseNote(st.blParsed):'')}</div>
+        <div id="mnote_${s.code}">${st.merged?parseNote(st.merged):((st.orderParsed?parseNote(st.orderParsed):'')+(st.blParsed?parseNote(st.blParsed):''))}${st.orderErr?'<div class="parse-note" style="color:#d32f2f">Commande : '+esc(st.orderErr)+'</div>':''}${st.blErr?'<div class="parse-note" style="color:#d32f2f">BL : '+esc(st.blErr)+'</div>':''}</div>
         <button class="btn btn-green btn-lg" id="loadBtn_${s.code}" style="width:100%;margin-top:10px" ${st.merged?'':'disabled'} onclick="loadOneStore('${s.code}')">📤 Charger ${esc(s.label)}</button>
         ${st.merged?'':'<div class="muted" style="font-size:12px;margin-top:4px;text-align:center">Charge le bon de commande + le BL pour activer</div>'}
       `:'<div class="muted">Renseigne sa config Firebase dans STORES pour l\'activer.</div>'}
@@ -2108,22 +2186,31 @@ function renderMulti(){
   renderLoadStatus();
   renderCPDPCard();
 }
+function clearMulti(code, which){
+  const st=multiFiles[code]; if(!st) return;
+  if(which==='order'){ delete st.orderFile; delete st.orderParsed; delete st.orderErr; }
+  else { delete st.blFile; delete st.blParsed; delete st.blErr; }
+  delete st.merged; tryMergeMulti(code); renderMulti();
+}
 async function onMultiOrder(code,file){
   if(!file)return;
   const st=multiFiles[code]=Object.assign(multiFiles[code]||{},{orderFile:file});
+  delete st.orderParsed; delete st.orderErr; delete st.merged;
   const note=document.getElementById('mnote_'+code); if(note) note.innerHTML='<div class="parse-note">Lecture de la commande…</div>';
-  try{ st.orderParsed=await parseAnyFile(file); if(st.orderParsed.format!=='CMD') throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.'); if(st.orderParsed.supplier&&!st.supplier) st.supplier=st.orderParsed.supplier; if(st.orderParsed.deliveryDate&&!st.deliveryDate){ const d=String(st.orderParsed.deliveryDate).split('/'); if(d.length===3) st.deliveryDate=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0'); } tryMergeMulti(code); renderMulti(); }
-  catch(e){ if(note)note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
+  try{ const _o=await parseAnyFile(file); if(_o.format!=='CMD') throw new Error('« '+file.name+' » n\'est pas une commande XLSX (c\'est peut-être le BL ?). ✖ Retirer puis mets-le dans la bonne case.'); st.orderParsed=_o; if(st.orderParsed.supplier&&!st.supplier) st.supplier=st.orderParsed.supplier; if(st.orderParsed.deliveryDate&&!st.deliveryDate){ const d=String(st.orderParsed.deliveryDate).split('/'); if(d.length===3) st.deliveryDate=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0'); } tryMergeMulti(code); renderMulti(); }
+  catch(e){ st.orderErr=e.message; renderMulti(); }
 }
 async function onMultiBL(code,file){
   if(!file)return;
   const st=multiFiles[code]=Object.assign(multiFiles[code]||{},{blFile:file});
+  delete st.blParsed; delete st.blErr; delete st.merged;
   const note=document.getElementById('mnote_'+code); if(note)note.innerHTML='<div class="parse-note">Lecture du BL…</div>';
-  try{ st.blParsed=await parseAnyFile(file); if(st.blParsed.format==='CMD') throw new Error('Sélectionne le BL, pas le bon de commande.'); if(st.blParsed.format!=='CMD') st.blParsed.g5Key=detectG5Key(st.blParsed); if(st.blParsed.supplier&&!st.supplier) st.supplier=st.blParsed.supplier; tryMergeMulti(code); renderMulti(); }
-  catch(e){ if(note)note.innerHTML='<div class="parse-note" style="color:#d32f2f">Erreur : '+esc(e.message)+'</div>'; }
+  try{ const _b=await parseAnyFile(file); if(_b.format==='CMD') throw new Error('« '+file.name+' » est une commande, pas un BL. ✖ Retirer puis mets-le dans la case 1️⃣.'); _b.g5Key=detectG5Key(_b); st.blParsed=_b; if(st.blParsed.supplier&&!st.supplier) st.supplier=st.blParsed.supplier; tryMergeMulti(code); renderMulti(); }
+  catch(e){ st.blErr=e.message; renderMulti(); }
 }
 function tryMergeMulti(code){
   const st=multiFiles[code];
+  delete st.merged;
   if(st.orderParsed&&st.blParsed){ st.merged=mergeOrderAndBL(st.orderParsed,st.blParsed); }
 }
 function updateMultiSummary(){
@@ -2155,8 +2242,8 @@ function renderSimple(){
   el.innerHTML=`<div class="load-status-box"></div><div class="card">
     <h2 style="margin-top:0">Charger BL + bon de commande</h2>
     <p class="muted"><b>1.</b> Bon de commande XLSX = référence (code G5 <b>ou Agidra</b>, quantité commandée, conditionnement).<br><b>2.</b> BL = livraison / n° BL — <b>optionnel</b> (ex. Agidra : la facture arrive après → charge la commande seule).<br><b>3.</b> Avec BL : rapprochement automatique. Sans BL : la commande sert de document à pointer.</p>
-    <div class="field"><label>1️⃣ Bon de commande</label><div class="drop" id="sorderDrop" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
-    <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div class="drop" id="sblDrop" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.pdf / .xlsx / .csv / .txt)</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
+    <div class="field"><label>1️⃣ Bon de commande</label><div style="display:flex;gap:6px;align-items:stretch"><div class="drop" id="sorderDrop" style="flex:1" onclick="document.getElementById('sorderFile').click()">📋 Charger le bon de commande (.xlsx)</div>${slotX('sorderX',"clearSimple('order')")}</div><input id="sorderFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="onSimpleOrder(this.files[0])"/></div>
+    <div class="field"><label>2️⃣ Bon de livraison (BL)</label><div style="display:flex;gap:6px;align-items:stretch"><div class="drop" id="sblDrop" style="flex:1" onclick="document.getElementById('sblFile').click()">📄 Charger le BL (.pdf / .xlsx / .csv / .txt)</div>${slotX('sblX',"clearSimple('bl')")}</div><input id="sblFile" type="file" accept=".csv,.txt,.pdf,.xlsx,.xls" style="display:none" onchange="onSimpleBL(this.files[0])"/></div>
     <div id="snote" style="margin-top:10px"></div>
     <div class="field" style="margin-top:12px"><label>Magasin</label><select id="sstore" style="width:100%">${opts}</select></div>
     <div class="field"><label>Fournisseur</label><input id="ssup" style="width:100%" placeholder="Déduit de la commande / BL…"/></div>
@@ -2168,14 +2255,36 @@ function renderSimple(){
 function showSimpleState(){
   const note=document.getElementById('snote'); if(!note)return;
   if(simpleMerged){ note.innerHTML=parseNote(simpleMerged); return; }
-  let h=''; if(simpleOrder)h+='<div class="parse-note">✓ Commande lue · '+simpleOrder.lines.length+' lignes</div>'; if(simpleBL)h+='<div class="parse-note">✓ BL lu · '+simpleBL.lines.length+' lignes</div>'; note.innerHTML=h;
+  let h=''; if(simpleOrder)h+=parseNote(simpleOrder); if(simpleBL)h+=parseNote(simpleBL); note.innerHTML=h;
+}
+/* v2.16.0 — ✖ Retirer un fichier mis par erreur (commande ou BL), avant l'envoi au magasin. */
+function slotX(id, onclick, show){ return `<button type="button" id="${id}" class="btn" title="Retirer ce fichier (erreur de fichier)" onclick="event.stopPropagation();${onclick}" style="display:${show?'inline-block':'none'};background:#fdecea;color:#c62828;padding:0 12px;font-size:13px;font-weight:800;border-radius:10px;white-space:nowrap">✖ Retirer</button>`; }
+function setSimpleSlot(which, fileName, ok){
+  const drop=document.getElementById(which==='order'?'sorderDrop':'sblDrop'), x=document.getElementById(which==='order'?'sorderX':'sblX');
+  if(drop){ drop.classList.toggle('has', !!fileName && ok!==false);
+    drop.textContent = fileName ? ((ok===false?'⚠️ ':'✓ ')+fileName) : (which==='order'?'📋 Charger le bon de commande (.xlsx)':'📄 Charger le BL (.pdf / .xlsx / .csv / .txt)'); }
+  if(x) x.style.display = fileName ? 'inline-block' : 'none';
+}
+function simpleRecompute(){
+  simpleMerged=null;
+  if(simpleOrder&&simpleBL){ try{ simpleMerged=mergeOrderAndBL(simpleOrder,simpleBL); }catch(e){ document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>'; } }
+  showSimpleState(); const b=document.getElementById('sbtn'); if(b) b.disabled=!(simpleMerged||simpleOrder);
+}
+function clearSimple(which){
+  if(which==='order'){ simpleOrder=null; const f=document.getElementById('sorderFile'); if(f) f.value=''; }
+  else { simpleBL=null; const f=document.getElementById('sblFile'); if(f) f.value=''; }
+  setSimpleSlot(which, '', true); simpleRecompute();
 }
 async function onSimpleOrder(file){
-  if(!file)return; document.getElementById('sorderDrop').classList.add('has');document.getElementById('sorderDrop').textContent='✓ '+file.name;
-  try{simpleOrder=await parseAnyFile(file);if(simpleOrder.format!=='CMD')throw new Error('Le fichier sélectionné n\'est pas une commande XLSX.');if(simpleOrder.supplier)document.getElementById('ssup').value=simpleOrder.supplier;if(simpleOrder.deliveryDate){const d=String(simpleOrder.deliveryDate).split('/');if(d.length===3)document.getElementById('sdate').value=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0');}simpleMerged=(simpleBL?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
+  if(!file)return; setSimpleSlot('order', file.name, true);
+  const inp=document.getElementById('sorderFile'); if(inp) inp.value='';            // re-choisir le même fichier redéclenche la lecture
+  simpleOrder=null;
+  try{const _o=await parseAnyFile(file);if(_o.format!=='CMD')throw new Error('« '+file.name+' » n\'est pas une commande XLSX (c\'est peut-être le BL ?). ✖ Retirer puis mets-le dans la bonne case.');simpleOrder=_o;if(simpleOrder.supplier)document.getElementById('ssup').value=simpleOrder.supplier;if(simpleOrder.deliveryDate){const d=String(simpleOrder.deliveryDate).split('/');if(d.length===3)document.getElementById('sdate').value=d[2]+'-'+d[1].padStart(2,'0')+'-'+d[0].padStart(2,'0');}simpleRecompute();}catch(e){setSimpleSlot('order', file.name, false);simpleRecompute();document.getElementById('snote').innerHTML+='<div class="err">'+esc(e.message)+'</div>';}}
 async function onSimpleBL(file){
-  if(!file)return;document.getElementById('sblDrop').classList.add('has');document.getElementById('sblDrop').textContent='✓ '+file.name;
-  try{simpleBL=await parseAnyFile(file);if(simpleBL.format==='CMD')throw new Error('Sélectionne le BL, pas la commande.');simpleBL.g5Key=detectG5Key(simpleBL);if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleMerged=(simpleOrder?mergeOrderAndBL(simpleOrder,simpleBL):null);showSimpleState();document.getElementById('sbtn').disabled=!(simpleMerged||simpleOrder);}catch(e){document.getElementById('snote').innerHTML='<div class="err">'+esc(e.message)+'</div>';}}
+  if(!file)return; setSimpleSlot('bl', file.name, true);
+  const inp=document.getElementById('sblFile'); if(inp) inp.value='';
+  simpleBL=null;
+  try{const _b=await parseAnyFile(file);if(_b.format==='CMD')throw new Error('« '+file.name+' » est une commande, pas un BL. ✖ Retirer puis mets-le dans la case 1️⃣.');_b.g5Key=detectG5Key(_b);simpleBL=_b;if(simpleBL.supplier&&!document.getElementById('ssup').value)document.getElementById('ssup').value=simpleBL.supplier;simpleRecompute();}catch(e){setSimpleSlot('bl', file.name, false);simpleRecompute();document.getElementById('snote').innerHTML+='<div class="err">'+esc(e.message)+'</div>';}}
 async function loadSimple(){
   const _doc=simpleMerged||simpleOrder; if(!_doc)return;const code=document.getElementById('sstore').value;const supplier=document.getElementById('ssup').value;const deliveryDate=document.getElementById('sdate').value;const btn=document.getElementById('sbtn');btn.disabled=true;btn.textContent='Chargement…';
   try{await loadToStore(code,_doc,{supplier,type:(simpleMerged?'BL + commande':'Commande'),deliveryDate});justLoaded[code]={at:Date.now()};document.getElementById('smsg').innerHTML='<div class="ok">✓ '+(simpleMerged?'BL + commande rapprochés':'Commande seule')+' chargé(e) dans '+esc(code)+'. Confirmation ci-dessous (📤 en attente de réception) et dans « Suivi live ».</div>';simpleOrder=null;simpleBL=null;simpleMerged=null;renderSimple();}
