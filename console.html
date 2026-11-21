@@ -171,6 +171,18 @@ table.tb{width:100%;border-collapse:collapse;font-size:13px;margin:0}
 table.tb th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:700;padding:8px 14px;border:none;border-bottom:1px solid var(--line);background:var(--muted)}
 table.tb td{padding:10px 14px;border:none;border-bottom:1px solid var(--line);vertical-align:middle}
 table.tb tr:last-child td{border-bottom:none}
+.enl-grid{display:grid;grid-template-columns:400px minmax(0,1fr);gap:16px;align-items:start}
+.enl-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}.enl-cal .w{font:700 11px Inter,sans-serif;color:var(--ink2);text-align:center;padding-bottom:2px}
+.enl-d{all:unset;box-sizing:border-box;cursor:pointer;min-height:50px;border-radius:9px;border:1px solid var(--line);background:#fff;padding:5px 6px;display:flex;flex-direction:column;justify-content:space-between;font:600 13px Inter,sans-serif}
+.enl-d small{font-size:11px;font-weight:800}.enl-d.tdy{box-shadow:inset 0 0 0 2px #1f1d1a}.enl-d.sel{outline:3px solid var(--acc);outline-offset:1px}
+.enl-leg{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11.5px;color:var(--ink2)}.enl-leg i{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid;vertical-align:-2px;margin-right:4px}
+.enl-it{display:flex;gap:12px;padding:10px;border:1px solid var(--line);border-radius:10px;margin:8px 0;background:#fff}
+.enl-ph{width:96px;height:96px;object-fit:cover;border-radius:9px;border:1px solid var(--line);flex:0 0 96px;display:block;background:#f1f3f4}
+.enl-ph.none{display:flex;align-items:center;justify-content:center;text-align:center;font-size:11px;color:var(--ink2)}
+.enl-fil{background:#f7f9fb;border:1px solid var(--line);border-radius:10px;padding:10px}
+.enl-msg{padding:7px 10px;border-radius:9px;margin:5px 0;font-size:13px;max-width:85%;white-space:pre-wrap}.enl-msg.c{background:#e8f0fe;margin-right:auto}.enl-msg.r{background:#e6f4ea;margin-left:auto}
+.enl-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+@media (max-width:1100px){ .enl-grid{grid-template-columns:1fr} .enl-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .thumb{width:44px;height:32px;border-radius:5px;object-fit:cover;background:#eee;display:block;border:1px solid var(--line)}
 .steps{display:flex;align-items:center;padding:16px}
 .step{display:flex;align-items:center;gap:10px;flex:1}
@@ -421,7 +433,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.16.0"; // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.17.0"; // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -4232,7 +4244,7 @@ function dashTick(force){
   if(!document.getElementById("app") || document.getElementById("app").classList.contains("hidden")) return;
   try{
     setCnt("g5", g5Todo().length); setCnt("avoirs", avoirsTodo().length, "a");
-    setCnt("rungis", refusedOpen().length || enlPending().length, refusedOpen().length?"r":"");
+    { const nPb=enlProblems().length+enlQuestionsOpen().length; setCnt("rungis", nPb || enlPending().length, nPb?"r":""); }
     setCnt("centrale", (function(){ try{ const t=isoDayKey(Date.now()); return centraleSessions().filter(s=>isoDayKey(s.meta.startedAt)===t && sessionEcarts(s).length>0).length; }catch(e){ return 0; } })(), "a"); setCnt("appview", menageCandidates().length);
     const lb=document.getElementById("liveBadge"); if(lb){ const on=!!dbCentrale; lb.innerHTML=`<span class="ldot${on?"":" off"}"></span>${on?"Live · synchro "+hm(Date.now()):"Hors ligne"}`; }
   }catch(e){ console.error(e); }
@@ -4256,6 +4268,10 @@ function todoItems(){
   refusedOpen().forEach(x=>L.push({ pr:0, ic:"🚛", bg:"var(--dan-s)", col:"var(--dan)", t:`Rungis : palette non récupérée (${new Date(x.r.at||x.e.validatedAt||x.e.at).toLocaleDateString("fr-FR")})`,
     s:`${x.it.type==="PICKING"?"Picking cde "+esc(x.it.ref||"—"):"Dispatch"} → ${storeChip(x.it.code)} · motif « ${esc(MOTIF_UI[x.r.motif]||x.r.motif||"?")} »${x.r.note?" — "+esc(x.r.note):""}`,
     btn:`<button class="tbtn s w" onclick="relancerRungis(['${esc(x.e.id)}|${esc(x.k)}'])">Relancer Rungis</button>` }));
+  enlQuestionsOpen().forEach(e=>{ const st=enlFilState(e), f=enlFil(e), last=f[f.length-1];
+    L.push({ pr:st==="lire"?0:1, ic:"💬", bg:st==="lire"?"var(--info-s)":"var(--dan-s)", col:st==="lire"?"var(--info)":"var(--dan)", t:st==="lire"?`Rungis a répondu (tournée ${frIso(enlDay(e))})`:`Question à Rungis sans réponse (tournée ${frIso(enlDay(e))})`,
+      s:"« "+esc(String(last.text).slice(0,90))+" » · "+esc(ago(last.at)), btn:`<button class="tbtn s" onclick="enlOpen('${esc(e.id)}')">Ouvrir</button>` }); });
+  enlProblems().filter(x=>x.st.k==="np"||x.st.k==="missed").slice(0,6).forEach(x=>L.push({ pr:1, ic:"❓", bg:"var(--dan-s)", col:"var(--dan)", t:`Rungis : ${x.st.t.replace(/^\S+\s/,"")}`, s:`${storeChip(x.it.code)} · tournée ${frIso(enlDay(x.e))}`, btn:`<button class="tbtn s" onclick="enlAsk('${esc(x.e.id)}','${esc(enlK(x.it))}')">Demander à Rungis</button>` }));
   const pend=enlPending(); if(pend.length){ const items=[].concat(...pend.map(enlItems)); const noZone=items.filter(i=>!i.kbg&&!i.mergedWith&&!i.zone).length;
     L.push({ pr:2, ic:"⏳", bg:"var(--warn-s)", col:"var(--warn)", t:`Enlèvement Rungis : ${palCount(items)} palette(s) en attente du mail de 23h59`, s:`${pend.length} demande(s)${noZone?` · ${noZone} sans emplacement`:""}${noteToday().text?" · note ajoutée":""}`,
       btn:`<button class="tbtn s" onclick="switchTab('rungis')">Voir</button>` }); }
@@ -4313,8 +4329,177 @@ function renderHome(){
   </div>`;
 }
 
+/* ===================================================================== v2.17.0 — SUIVI ENLÈVEMENTS RUNGIS
+   Une seule logique de statut (identique dans l'appli Kelbongoo › Espace Rungis › 📅 Suivi) :
+   palette → ✅ récupérée · ⏳ en attente (23h59 / envoyée / validée à récupérer) · ❌ problème (non récupérée, pas validée > 12 h,
+   pas prise par le chauffeur, validée mais jamais pointée). Jour du calendrier = date de récupération (validée) sinon date de la demande.
+   Questions ↔ Rungis : enlevements/<id>/fil/<push> = { from:"console"|"rungis", by, text, at, key?, label? }
+   enlevements/<id>/filDone = { at, by, upTo } (console : réponse lue / résolu). */
+const ENL_NP_FROM="2026-11-01";                 // avant : pas de pointage chauffeur (V10.79) → validée = récupérée
+const ENL_COL={ green:["#e6f4ea","#1e7b34","✅"], orange:["#fff3e0","#c25e00","⏳"], red:["#fdecea","#c62828","❌"], grey:["#f1f3f4","#5f6368","·"] };
+const ENL_RANK={ grey:0, green:1, orange:2, red:3 };
+let enlCalM="", enlCalSel="", enlHistQ="", enlHistDays=60;
+function enlK(it){ return String(it&&it.key||"").replace(/[.#$\[\]\/]/g,"_"); }
+function enlIsoD(v){ if(!v) return ""; const s=String(v); let m=s.match(/^(\d{4}-\d{2}-\d{2})/); if(m) return m[1]; m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); return m?m[3]+"-"+m[2]+"-"+m[1]:""; }
+function enlDay(e){ return (e.status==="valide" && enlIsoD(e.pickup)) || enlIsoD(e.date) || isoDay(e.at); }
+function enlWho(){ return RESP_NAMES[String(ME_EMAIL||"").toLowerCase()]||ME_EMAIL||"Console"; }
+/* Palettes d'une tournée (+ dollies fromage des lieux) */
+function enlAllItems(e){ const L=enlItems(e).map((it,i)=>Object.assign({_i:i},it));
+  arr(e.lieux).forEach(x=>{ if(Number(x.dolly)>0) L.push({ _i:-1, type:"DOLLY", code:x.code, dollies:x.dolly, key:"dolly_"+x.code, zone:"froid", _dolly:true }); });
+  return L; }
+function enlItemSt(e,it){
+  if(it.kbg) return { k:"kbg", c:"grey", t:"🥬 via Kelbongoo", sub:"pas enlevé par Rungis" };
+  if(it.mergedWith) return { k:"merged", c:"grey", t:"🔗 même palette que "+it.mergedWith };
+  const k=enlK(it), ref=(e.refused||{})[k], pk=(e.picked||{})[k], today=isoDay(), d=enlDay(e);
+  const mot=x=>MOTIF_UI[x&&x.motif]||(x&&x.motif)||"";
+  if(ref && ref.closedAt) return { k:"classe", c:"green", t:"✔️ Classée", sub:"réglée autrement · "+esc(ref.closedBy||"") };
+  if(ref && ref.relancedAt) return { k:"relance", c:"orange", t:"🔁 Relancée", sub:"non récupérée ("+mot(ref)+") → remise dans une nouvelle demande le "+dateShort(ref.relancedAt) };
+  if(ref) return { k:"nonrecup", c:"red", t:"❌ Non récupérée par Rungis", sub:"motif : "+mot(ref)+(ref.note?" — « "+ref.note+" »":"") };
+  if(pk && pk.status==="missed") return { k:"missed", c:"red", t:"❌ Pas prise par le chauffeur", sub:mot(pk)+(pk.note?" — « "+pk.note+" »":"")+(pk.by?" · "+pk.by:"") };
+  if(pk && pk.status==="ok") return { k:"ok", c:"green", t:"✅ Récupérée", sub:"par "+(pk.by||"le chauffeur")+" le "+dateShort(pk.at)+" à "+hm(pk.at) };
+  if(e.status==="valide"){
+    if(it._dolly) return d<=today ? { k:"ok", c:"green", t:"✅ Validée par Rungis" } : { k:"avenir", c:"orange", t:"📅 À récupérer le "+frIso(d) };
+    if(d<today) return d<ENL_NP_FROM ? { k:"ok", c:"green", t:"✅ Validée par Rungis", sub:"(avant le pointage chauffeur)" } : { k:"np", c:"red", t:"❓ Validée mais jamais pointée par le chauffeur", sub:"prévue le "+frIso(d)+" — à vérifier avec Rungis" };
+    return { k:"avenir", c:"orange", t:d===today?"🚚 À récupérer aujourd'hui":"📅 À récupérer le "+frIso(d), sub:"validée par Rungis le "+dateShort(e.validatedAt) };
+  }
+  if(e.status==="envoye"){ const t0=e.sentAt||e.at; return (Date.now()-t0)>12*3600000 ? { k:"nonval", c:"red", t:"⛔ Pas validée par Rungis", sub:"mail envoyé "+ago(t0) } : { k:"envoye", c:"orange", t:"📨 Envoyée — attente validation Rungis", sub:"mail envoyé "+ago(t0) }; }
+  return { k:"attente", c:"orange", t:"⏳ Part avec le mail de 23h59" };
+}
+function enlFil(e){ return Object.entries(e.fil||{}).map(([id,m])=>Object.assign({id},m)).filter(m=>m&&m.text).sort((a,b)=>(a.at||0)-(b.at||0)); }
+/* "rungis" = question posée, Rungis n'a pas répondu · "lire" = Rungis a répondu, pas encore lu ici · "" = rien */
+function enlFilState(e){ const f=enlFil(e); if(!f.length) return ""; const last=f[f.length-1];
+  if(last.from!=="rungis") return "rungis"; return (e.filDone && (e.filDone.upTo||0)>=(last.at||0)) ? "" : "lire"; }
+function enlTourSt(e){ let c="grey"; const its=enlAllItems(e).map(it=>({ it, st:enlItemSt(e,it) }));
+  its.forEach(x=>{ if(ENL_RANK[x.st.c]>ENL_RANK[c]) c=x.st.c; });
+  const fs=enlFilState(e); if(fs==="rungis" && ENL_RANK.red>ENL_RANK[c]) c="red"; if(fs==="lire" && c!=="red") c="orange";
+  return { c, its, fs, pb:its.filter(x=>x.st.c==="red").length }; }
+function enlByDay(){ const m={}; enlList().forEach(e=>{ const d=enlDay(e); (m[d]=m[d]||[]).push(e); }); return m; }
+function enlDayCol(list){ let c="grey"; (list||[]).forEach(e=>{ const s=enlTourSt(e).c; if(ENL_RANK[s]>ENL_RANK[c]) c=s; }); return c; }
+function enlPill(st){ const C=ENL_COL[st.c]||ENL_COL.grey; return `<span class="pill" style="background:${C[0]};color:${C[1]};font-weight:700">${esc(st.t)}</span>${st.sub?`<div class="t2" style="margin-top:3px">${esc(st.sub)}</div>`:""}`; }
+function enlCounts(){ const r={ att:0, av:0, ok7:0, pb:0, q:0 }, lim=isoDay(Date.now()-7*DAY);
+  enlList().forEach(e=>{ const S=enlTourSt(e); if(S.fs) r.q++;
+    S.its.forEach(x=>{ const k=x.st.k; if(k==="attente"||k==="envoye") r.att++; else if(k==="avenir") r.av++; else if(k==="ok" && enlDay(e)>=lim) r.ok7++; if(x.st.c==="red") r.pb++; }); });
+  return r; }
+function enlProblems(){ const out=[]; enlList().forEach(e=>{ const S=enlTourSt(e); S.its.forEach(x=>{ if(x.st.c==="red") out.push({ e, it:x.it, st:x.st }); }); }); return out; }
+function enlQuestionsOpen(){ return enlList().filter(e=>enlFilState(e)); }
+
+/* ---------- calendrier */
+function enlCalHTML(){
+  const today=isoDay(); if(!enlCalM) enlCalM=today.slice(0,7); if(!enlCalSel) enlCalSel=today;
+  const [Y,M]=enlCalM.split("-").map(Number), first=new Date(Y,M-1,1,12), nd=new Date(Y,M,0).getDate(), off=(first.getDay()+6)%7;
+  const by=enlByDay(); let cells="";
+  for(let i=0;i<off;i++) cells+=`<div></div>`;
+  for(let d=1;d<=nd;d++){ const k=Y+"-"+String(M).padStart(2,"0")+"-"+String(d).padStart(2,"0"), L=by[k]||[], c=L.length?enlDayCol(L):"", C=ENL_COL[c]||null;
+    const pal=L.reduce((a,e)=>a+palCount(enlItems(e))+dolCount(e),0);
+    cells+=`<button class="enl-d${k===enlCalSel?" sel":""}${k===today?" tdy":""}" style="${C?`background:${C[0]};color:${C[1]};border-color:${C[1]}55`:""}" onclick="enlCalSel='${k}';renderRungis()"><b>${d}</b>${L.length?`<small>${C[2]} ${pal||""}</small>`:""}</button>`; }
+  const mo=first.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  const nav=(n)=>{ const t=new Date(Y,M-1+n,1,12); return t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0"); };
+  return `<div class="cx" style="padding:12px 14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><button class="tbtn s" onclick="enlCalM='${nav(-1)}';renderRungis()">◀</button><b style="flex:1;text-align:center;text-transform:capitalize;font-size:15px">${esc(mo)}</b><button class="tbtn s" onclick="enlCalM='${nav(1)}';renderRungis()">▶</button><button class="tbtn s" onclick="enlCalM='';enlCalSel='';renderRungis()">Aujourd'hui</button></div>
+    <div class="enl-cal">${["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(w=>`<div class="w">${w}</div>`).join("")}${cells}</div>
+    <div class="enl-leg"><span><i style="background:${ENL_COL.green[0]};border-color:${ENL_COL.green[1]}"></i>tout OK</span><span><i style="background:${ENL_COL.orange[0]};border-color:${ENL_COL.orange[1]}"></i>en attente / en cours</span><span><i style="background:${ENL_COL.red[0]};border-color:${ENL_COL.red[1]}"></i>problème → relancer / demander</span><span>chiffre = palettes + dolly</span></div></div>`;
+}
+/* ---------- détail d'une tournée (calendrier, historique, popup) */
+function enlPhotoBig(e,it){ const ph=it._dolly?null:enlPhoto(e,it); if(!ph) return `<div class="enl-ph none">${it.hasPhoto?"📷 en cours…":"pas de photo"}</div>`;
+  return `<a href="${esc(ph.url||("https://drive.google.com/file/d/"+ph.id+"/view"))}" target="_blank" rel="noopener"><img class="enl-ph" src="https://drive.google.com/thumbnail?id=${encodeURIComponent(ph.id)}&sz=w400" alt="Photo de la palette" loading="lazy"></a>`; }
+function enlItemCard(e, x){
+  const it=x.it, st=x.st, code=String(it.code||"").toUpperCase(), k=enlK(it), liv=(e.livraison||{})[code], bl=(e.bl||{})[code];
+  const what=it._dolly?`Dolly fromage × ${it.dollies}`:it.type==="PICKING"?"Picking · commande "+esc(it.ref||"—"):esc((it.sups||[]).map(s=>s.name).slice(0,3).join(" · ")||"Dispatch");
+  const qty=it._dolly?"":(it.kbg?"via Kelbongoo":Number(it.dollies)>0?`${it.dollies} dolly`:Number(it.n)>0?`${it.n} palette${it.n>1?"s":""}`:"même palette")+epalTag(it);
+  const act=[];
+  if(st.k==="nonrecup") act.push(`<button class="tbtn s w" onclick="relancerRungis(['${esc(e.id)}|${esc(k)}'])">🔁 Relancer</button>`,`<button class="tbtn s" onclick="closeRefused('${esc(e.id)}','${esc(k)}')">Classer</button>`);
+  if(st.k==="np") act.push(`<button class="tbtn s p" onclick="enlConfirmOk('${esc(e.id)}','${esc(k)}')">✔️ Oui, récupérée</button>`);
+  if(st.c==="red"||st.k==="avenir"||st.k==="envoye") act.push(`<button class="tbtn s" onclick="enlAsk('${esc(e.id)}','${esc(k)}')">❓ Demander à Rungis</button>`);
+  return `<div class="enl-it" style="border-left:5px solid ${(ENL_COL[st.c]||ENL_COL.grey)[1]}">
+    ${it._dolly?`<div class="enl-ph none" style="font-size:26px">🧀</div>`:enlPhotoBig(e,it)}
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${typeTag(it.type)} ${storeChip(code)} <b style="font-size:13.5px">${what}</b> <span class="t2">${qty}${it.frais?" · ❄️ frais":""}</span></div>
+      <div style="margin-top:6px">${enlPill(st)}</div>
+      <div class="t2" style="margin-top:6px;line-height:1.55">📍 ${it.kbg?"—":it.mergedWith?"même palette":(ZONE_UI[it.zone]?ZONE_UI[it.zone].t:"emplacement non indiqué")}${liv?` · 🏪 livraison magasin ${esc(enlIsoD(liv)?frIso(enlIsoD(liv)):liv)}`:""}${bl&&bl.n?` · 📄 BL ${esc(bl.n)}`:""}${it.note?`<br>ℹ️ <b>${esc(it.note)}</b>`:""}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${it._i>=0?blBtn(e,it,it._i):""}${act.join("")}</div>
+    </div></div>`;
+}
+function enlFilHTML(e){
+  const f=enlFil(e), fs=enlFilState(e);
+  const msgs=f.map(m=>{ const r=m.from==="rungis"; return `<div class="enl-msg ${r?"r":"c"}"><div class="t2">${r?"🚚 Rungis":"🖥️ Console"} · ${esc(m.by||"")} · ${dateShort(m.at)} ${hm(m.at)}${m.label?` · ${esc(m.label)}`:""}</div>${esc(m.text)}</div>`; }).join("");
+  return `<div class="enl-fil"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="font-size:13px">💬 Questions ↔ Rungis</b>${fs==="rungis"?`<span class="pill pr">en attente de réponse Rungis</span>`:fs==="lire"?`<span class="pill pb">Rungis a répondu</span>`:""}<span class="sp" style="flex:1"></span>${fs==="lire"?`<button class="tbtn s p" onclick="enlFilDone('${esc(e.id)}')">✓ Lu / réglé</button>`:""}</div>
+    ${msgs||`<div class="t2">Aucun échange. Rungis voit et répond aux questions dans l'appli Kelbongoo › Espace Rungis › 📅 Suivi.</div>`}
+    <div style="display:flex;gap:6px;margin-top:8px"><textarea id="enlq_${esc(e.id)}" rows="2" placeholder="Ex. : la palette TOL n'a pas été prise, pourquoi ? / Quand passez-vous ?" style="flex:1;padding:7px;border:1px solid var(--line);border-radius:8px;font:13px Inter,sans-serif"></textarea>
+      <div style="display:flex;flex-direction:column;gap:4px"><button class="tbtn s p" onclick="enlSendQ('${esc(e.id)}')">Envoyer</button><button class="tbtn s" title="Prévenir aussi Rungis par mail (gestion@probon.fr)" onclick="enlMailQ('${esc(e.id)}')">📧 + mail</button></div></div></div>`;
+}
+function enlTourHTML(e){
+  const S=enlTourSt(e), C=ENL_COL[S.c]||ENL_COL.grey, d=enlDay(e);
+  const line=[`Demandée par <b>${esc(shortName(e.by))}</b> le ${dateShort(e.at)} ${hm(e.at)}`,
+    e.sentAt?`mail à Rungis ${dateShort(e.sentAt)} ${hm(e.sentAt)}${e.sentBy&&e.sentBy!=="23h59"?" ("+esc(e.sentBy)+")":""}`:"",
+    e.validatedAt?`✅ validée par Rungis ${dateShort(e.validatedAt)} ${hm(e.validatedAt)}`:"",
+    e.status==="valide"?`récupération ${frIso(d)}`:""].filter(Boolean).join(" · ");
+  return `<div class="cx" style="overflow:hidden;margin-bottom:14px;border-color:${C[1]}55">
+    <div class="cx-h" style="background:${C[0]}"><h3 style="color:${C[1]}">${C[2]} Tournée ${e.status==="valide"?"du "+frIso(d):"demandée le "+dateShort(e.at)}</h3>${e.fast?`<span class="pill pr">⚡ FAST ${esc(e.fast.ini||"")}</span>`:""}${e.relance?`<span class="pill po">🔁 relance</span>`:""}<span class="sp"></span><span class="sub">${palCount(enlItems(e))} pal.${dolCount(e)?" · "+dolCount(e)+" dolly":""}${S.pb?` · <b style="color:var(--dan)">${S.pb} problème(s)</b>`:""}</span></div>
+    <div style="padding:8px 14px" class="t2">${line}</div>
+    <div style="padding:0 14px 6px">${S.its.map(x=>enlItemCard(e,x)).join("")}</div>
+    <div style="padding:0 14px 14px">${enlFilHTML(e)}</div></div>`;
+}
+function enlDayHTML(){
+  const by=enlByDay(), L=(by[enlCalSel]||[]).slice().sort((a,b)=>(a.at||0)-(b.at||0)), c=enlDayCol(L);
+  const lbl=new Date(enlCalSel+"T12:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  const sum=c==="green"?"Tout est OK ✅":c==="red"?"⚠️ Il y a un problème : relancer Rungis ou lui poser la question.":c==="orange"?"En cours / en attente.":"";
+  return `<div class="page-h" style="margin:0 0 10px"><div><h2 style="margin:0;font-size:18px;text-transform:capitalize">${esc(lbl)}</h2><div class="sub">${L.length?`${L.length} tournée(s) · ${sum}`:"Aucun enlèvement ce jour-là."}</div></div></div>${L.map(enlTourHTML).join("")}`;
+}
+/* ---------- à traiter (problèmes + questions) */
+function enlTodoHTML(){
+  const P=enlProblems(), Q=enlQuestionsOpen(), refs=refusedOpen();
+  const rows=P.map(x=>`<tr style="background:#fff7f6"><td>${dateShort(x.e.at)}<div class="t2">${esc(frIso(enlDay(x.e)))}</div></td><td>${typeTag(x.it.type)} ${storeChip(x.it.code)}</td><td>${x.it.type==="PICKING"?"Commande "+esc(x.it.ref||"—"):x.it._dolly?"Dolly × "+x.it.dollies:esc((x.it.sups||[]).map(s=>s.name).slice(0,2).join(" · ")||"Dispatch")}</td><td>${enlPill(x.st)}</td>
+    <td style="text-align:right;white-space:nowrap">${x.st.k==="nonrecup"?`<button class="tbtn s w" onclick="relancerRungis(['${esc(x.e.id)}|${esc(enlK(x.it))}'])">🔁 Relancer</button> `:""}<button class="tbtn s" onclick="enlAsk('${esc(x.e.id)}','${esc(enlK(x.it))}')">❓ Demander</button> <button class="tbtn s" onclick="enlOpen('${esc(x.e.id)}')">👁 Détail</button></td></tr>`).join("");
+  const qs=Q.map(e=>{ const f=enlFil(e), last=f[f.length-1], st=enlFilState(e);
+    return `<div class="row"><span class="pill ${st==="rungis"?"pr":"pb"}">${st==="rungis"?"❓ attend Rungis":"💬 réponse Rungis"}</span><div style="flex:1;min-width:0"><div class="t1">Tournée ${esc(frIso(enlDay(e)))} · « ${esc(String(last.text).slice(0,120))} »</div><div class="t2">${esc(last.by||"")} · ${ago(last.at)}</div></div><button class="tbtn s" onclick="enlOpen('${esc(e.id)}')">Ouvrir</button></div>`; }).join("");
+  return `<div class="cx" style="overflow:hidden;margin-bottom:16px"><div class="cx-h"><h3>⚠️ Palettes à problème</h3><span class="sp"></span>${refs.length?`<button class="tbtn s w" onclick="relancerRungis(${esc(JSON.stringify(refs.map(x=>x.e.id+"|"+x.k)))})">🔁 Relancer toutes les non récupérées (${refs.length})</button>`:""}</div>
+    ${rows?`<table class="tb"><tr><th>Demande</th><th>Pour</th><th>Contenu</th><th>Problème</th><th></th></tr>${rows}</table>`:`<div class="empty">Aucun problème 👌</div>`}</div>
+    <div class="cx" style="overflow:hidden"><div class="cx-h"><h3>💬 Questions ↔ Rungis</h3><span class="sp"></span><span class="sub">${Q.length} ouverte(s)</span></div>${qs||`<div class="empty">Aucune question en cours.</div>`}</div>`;
+}
+/* ---------- historique */
+function enlHistHTML(){
+  const q=stripAccentsC(enlHistQ).toLowerCase().trim(), lim=Date.now()-enlHistDays*DAY;
+  const L=enlList().filter(e=>(e.at||0)>=lim).filter(e=>{ if(!q) return true;
+    const t=stripAccentsC([e.by, enlDay(e), frIso(enlDay(e)), ...enlAllItems(e).map(it=>[it.code, STORE_LONG_C[String(it.code||"").toUpperCase()]||"", it.ref, it.type, (it.sups||[]).map(s=>s.name).join(" "), it.note].join(" ")), ...enlFil(e).map(m=>m.text)].join(" ")).toLowerCase(); return t.indexOf(q)>=0; });
+  const rows=L.map(e=>{ const S=enlTourSt(e), C=ENL_COL[S.c]||ENL_COL.grey, codes=[...new Set(enlAllItems(e).map(it=>String(it.code||"").toUpperCase()))];
+    const nOk=S.its.filter(x=>x.st.c==="green").length;
+    return `<tr style="cursor:pointer" onclick="enlOpen('${esc(e.id)}')"><td><span class="pill" style="background:${C[0]};color:${C[1]};font-weight:800">${C[2]}</span></td><td><b>${esc(frIso(enlDay(e)))}</b><div class="t2">demandée ${dateShort(e.at)} ${hm(e.at)}</div></td><td>${codes.map(storeChip).join(" ")}</td><td>${palCount(enlItems(e))} pal.${dolCount(e)?" · "+dolCount(e)+" dolly":""}</td>
+      <td>${e.status==="valide"?`✅ validée ${dateShort(e.validatedAt)}`:e.status==="envoye"?"📨 envoyée":"⏳ en attente"}<div class="t2">${nOk}/${S.its.length} OK${S.pb?` · <b style="color:var(--dan)">${S.pb} problème(s)</b>`:""}${S.fs?" · 💬":""}</div></td><td>${esc(shortName(e.by))}</td><td style="text-align:right"><button class="tbtn s">👁 Détail</button></td></tr>`; }).join("");
+  return `<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>📚 Historique des enlèvements</h3><span class="sp"></span>
+      <input id="enlHistQ" value="${esc(enlHistQ)}" placeholder="🔎 magasin, n° commande, fournisseur, date…" oninput="enlHistQ=this.value;clearTimeout(window.__enlHq);window.__enlHq=setTimeout(()=>{ renderRungis(); const i=document.getElementById('enlHistQ'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } },350)" style="padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:260px">
+      <select onchange="enlHistDays=Number(this.value);renderRungis()" style="padding:6px;border:1px solid var(--line);border-radius:8px">${[30,60,120,365].map(n=>`<option value="${n}" ${n===enlHistDays?"selected":""}>${n} jours</option>`).join("")}</select></div>
+    ${rows?`<table class="tb"><tr><th></th><th>Récupération</th><th>Magasins</th><th>Quantité</th><th>Statut</th><th>Demandé par</th><th></th></tr>${rows}</table>`:`<div class="empty">Rien trouvé.</div>`}</div>`;
+}
+/* ---------- popup détail d'une tournée (historique / à traiter) */
+function enlOpen(id){
+  const e0=(centraleState.enlevements||{})[id]; if(!e0) return;
+  let m=document.getElementById("enlModal"); if(m) m.remove();
+  m=document.createElement("div"); m.id="enlModal"; m.className="modal-back"; m.dataset.id=id; m.onclick=ev=>{ if(ev.target===m) m.remove(); };
+  m.innerHTML=`<div class="modal-box" style="max-width:860px;padding:14px"><div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="tbtn s" onclick="this.closest('.modal-back').remove()">✕ Fermer</button></div><div id="enlModalBody">${enlTourHTML(Object.assign({id},e0))}</div></div>`;
+  document.body.appendChild(m);
+}
+function enlModalRefresh(){ const m=document.getElementById("enlModal"); if(!m) return; const a=document.activeElement; if(a && m.contains(a) && a.tagName==="TEXTAREA") return;
+  const e0=(centraleState.enlevements||{})[m.dataset.id]; const b=document.getElementById("enlModalBody"); if(e0&&b) b.innerHTML=enlTourHTML(Object.assign({id:m.dataset.id},e0)); }
+/* ---------- questions */
+function enlItemLabel(e,k){ const it=enlAllItems(e).find(x=>enlK(x)===k); if(!it) return ""; return (it._dolly?"Dolly":it.type==="PICKING"?"Picking cde "+(it.ref||""):"Dispatch")+" → "+String(it.code||"").toUpperCase(); }
+async function enlPushQ(id, text, key){
+  const e=Object.assign({id},(centraleState.enlevements||{})[id]||{}); text=String(text||"").trim(); if(!text) return false;
+  try{ await dbCentrale.ref("enlevements/"+id+"/fil").push({ from:"console", by:enlWho(), text:text.slice(0,800), at:Date.now(), key:key||null, label:key?enlItemLabel(e,key):null });
+    await dbCentrale.ref("enlevements/"+id+"/filDone").remove(); toastC("💬 Question envoyée à Rungis (Espace Rungis › 📅 Suivi)"); return true; }catch(err){ alert("Erreur : "+err.message); return false; }
+}
+async function enlSendQ(id){ const t=document.getElementById("enlq_"+id); if(!t||!t.value.trim()) { alert("Écris la question."); return; } if(await enlPushQ(id, t.value)){ t.value=""; t.blur(); renderRungis(); enlModalRefresh(); } }
+async function enlAsk(id, k){ const e=Object.assign({id},(centraleState.enlevements||{})[id]||{}), lbl=enlItemLabel(e,k), st=enlItemSt(e, enlAllItems(e).find(x=>enlK(x)===k)||{});
+  const t=prompt("❓ Question à Rungis sur : "+lbl+"\n("+st.t+")", st.k==="nonrecup"||st.k==="missed"?"Pourquoi cette palette n'a pas été prise ? Quand pouvez-vous la récupérer ?":st.k==="np"?"Cette palette a-t-elle bien été récupérée ?":st.k==="nonval"?"Pouvez-vous valider la tournée (lien dans le mail) ?":"");
+  if(t && await enlPushQ(id, t, k)){ renderRungis(); enlModalRefresh(); } }
+async function enlConfirmOk(id,k){ if(!confirm("Confirmer que cette palette a bien été récupérée par Rungis ?\n(ex. confirmé par téléphone)")) return;
+  try{ await dbCentrale.ref("enlevements/"+id+"/picked/"+k).set({ status:"ok", at:Date.now(), by:"Console · "+enlWho(), src:"console" }); toastC("✅ Noté : récupérée"); renderRungis(); enlModalRefresh(); }catch(err){ alert(err.message); } }
+async function enlFilDone(id){ const e=(centraleState.enlevements||{})[id]||{}; const f=enlFil(e); const last=f[f.length-1];
+  try{ await dbCentrale.ref("enlevements/"+id+"/filDone").set({ at:Date.now(), by:enlWho(), upTo:(last&&last.at)||Date.now() }); toastC("✓ Noté"); renderRungis(); enlModalRefresh(); }catch(err){ alert(err.message); } }
+function enlMailQ(id){ const t=document.getElementById("enlq_"+id), e=Object.assign({id},(centraleState.enlevements||{})[id]||{});
+  const body=(t&&t.value.trim()?t.value.trim()+"\n\n":"")+"Tournée "+(e.status==="valide"?"du "+frIso(enlDay(e)):"demandée le "+dateShort(e.at))+".\nRéponse possible dans l'appli Kelbongoo › Espace Rungis › 📅 Suivi enlèvements.\n\n"+enlWho();
+  location.href="mailto:gestion@probon.fr?cc=rr@pribon.org&subject="+encodeURIComponent("Question enlèvement palettes PDP — "+(e.status==="valide"?frIso(enlDay(e)):dateShort(e.at)))+"&body="+encodeURIComponent(body); }
+
 /* ===================================================================== ENLÈVEMENTS RUNGIS */
-let rungisView="soir";
+let rungisView="suivi";
 function stepsHTML(){
   const pend=enlPending(), sent=enlSent(), valToday=enlList().filter(e=>e.status==="valide"&&isToday(e.validatedAt));
   const pItems=[].concat(...pend.map(enlItems));
@@ -4918,7 +5103,16 @@ function renderRungis(){
   const froid=items.filter(x=>x.zone==="froid").length, sec=items.filter(x=>x.zone==="sec").length;
   const nt=noteToday();
   let main;
-  if(rungisView==="soir") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Tournée de ce soir</h3><span class="sub">${palCount(items)} pal. · ${pend.reduce((a,e)=>a+dolCount(e),0)} dolly</span><span class="sp"></span>${froid?`<span class="pill pcold">❄ ${froid} chambre froide</span>`:""}${sec?`<span class="pill pdry">▣ ${sec} entrepôt sec</span>`:""}</div>
+  if(rungisView==="nonrecup") rungisView="todo";
+  const K=enlCounts();
+  const kp=(lbl,v,sub,c,view)=>`<div class="cx kpi" style="cursor:pointer;border-color:${ENL_COL[c][1]}55;background:${ENL_COL[c][0]}" onclick="rungisView='${view}';renderRungis()"><div class="eyebrow" style="color:${ENL_COL[c][1]}">${lbl}</div><div class="v" style="color:${ENL_COL[c][1]}">${v}</div><div class="s">${sub}</div></div>`;
+  const kpis=`<div class="enl-kpis">${kp("⏳ En attente",K.att,"palettes pas encore validées par Rungis","orange","encours")}${kp("📅 À récupérer",K.av,"validées par Rungis, pas encore prises","orange","suivi")}${kp("✅ Récupérées",K.ok7,"ces 7 derniers jours","green","histo")}${kp("❌ Problèmes",K.pb+(K.q?` <small style="font-size:13px">· 💬 ${K.q}</small>`:""),"non récupérées, pas validées, questions","red","todo")}</div>`;
+  const seg=`<span class="seg"><button class="${rungisView==="suivi"?"on":""}" onclick="rungisView='suivi';renderRungis()">📅 Suivi</button><button class="${rungisView==="todo"?"on":""}" onclick="rungisView='todo';renderRungis()">⚠️ À traiter${K.pb+K.q?` (${K.pb+K.q})`:""}</button><button class="${rungisView==="encours"||rungisView==="soir"?"on":""}" onclick="rungisView='encours';renderRungis()">⏳ Ce soir / en cours</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">📚 Historique</button><button class="${rungisView==="epal"?"on":""}" onclick="rungisView='epal';renderRungis()">🟫 Palettes${epalToValidate().length?` (${epalToValidate().length})`:""}</button></span>`;
+  const head=`<div class="page-h"><div><h1>Enlèvements Rungis</h1><div class="sub">Ce qui est en attente, validé par Rungis, récupéré — et ce qui pose problème.</div></div><span class="sp"></span>${seg}</div>`;
+  if(rungisView==="suivi"){ el.innerHTML=head+kpis+`<div class="enl-grid"><div>${enlCalHTML()}</div><div>${enlDayHTML()}</div></div>`; enlModalRefresh(); return; }
+  if(rungisView==="todo"){ el.innerHTML=head+kpis+enlTodoHTML(); enlModalRefresh(); return; }
+  if(rungisView==="histo"){ el.innerHTML=head+enlHistHTML(); enlModalRefresh(); return; }
+  if(rungisView==="encours"||rungisView==="soir") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Tournée de ce soir</h3><span class="sub">${palCount(items)} pal. · ${pend.reduce((a,e)=>a+dolCount(e),0)} dolly</span><span class="sp"></span>${froid?`<span class="pill pcold">❄ ${froid} chambre froide</span>`:""}${sec?`<span class="pill pdry">▣ ${sec} entrepôt sec</span>`:""}</div>
       ${tableFor(pend,{edit:true, empty:"Aucune demande d'enlèvement en attente. La tablette enregistre les demandes au fil de la journée."})}</div>
       ${sent.length?`<div class="cx" style="overflow:hidden;margin-top:16px"><div class="cx-h"><h3>Envoyé à Rungis — en attente de validation</h3><span class="sp"></span><span class="sub">${sent.length} demande(s)</span></div>${tableFor(sent,{})}</div>`:""}`;
   else if(rungisView==="nonrecup") main=`<div class="cx" style="overflow:hidden"><div class="cx-h"><h3>Palettes non récupérées</h3><span class="sp"></span>${refs.length?`<button class="tbtn s w" onclick="relancerRungis(${esc(JSON.stringify(refs.map(x=>x.e.id+"|"+x.k)))})">Tout relancer (${refs.length})</button>`:""}</div>
@@ -4928,8 +5122,8 @@ function renderRungis(){
   const mails=[]; enlList().slice(0,40).forEach(e=>{ if(e.validatedAt) mails.push({ at:e.validatedAt, t:`Rungis a validé la récupération`, s:`${palCount(enlItems(e))} pal.${Object.keys(e.refused||{}).length?` · <b style="color:var(--dan)">${Object.keys(e.refused).length} non récupérée(s)</b> + motif`:""}${e.livraison?` · livraison ${Object.entries(e.livraison).map(([c,d])=>c+" "+d).join(", ")}`:""}` });
     if(e.sentAt) mails.push({ at:e.sentAt, t:`Mail envoyé à Rungis`, s:`${e.sentBy&&e.sentBy!=="23h59"?"envoyé par "+esc(e.sentBy):"envoi automatique 23h59"}`, info:true }); });
   const seen={}; const mailsU=mails.sort((a,b)=>b.at-a.at).filter(m=>{ const k=m.t+Math.round(m.at/60000); if(seen[k]) return false; seen[k]=1; return true; }).slice(0,8);
-  el.innerHTML=`<div class="page-h"><div><h1>Enlèvements Rungis</h1><div class="sub">Demandes de la tablette, mail consolidé de 23h59, validation Rungis et livraison des magasins.</div></div><span class="sp"></span>
-    <span class="seg"><button class="${rungisView==="soir"?"on":""}" onclick="rungisView='soir';renderRungis()">Tournée de ce soir</button><button class="${rungisView==="nonrecup"?"on":""}" onclick="rungisView='nonrecup';renderRungis()">Non récupérées${refs.length?` (${refs.length})`:""}</button><button class="${rungisView==="histo"?"on":""}" onclick="rungisView='histo';renderRungis()">Historique</button><button class="${rungisView==="epal"?"on":""}" onclick="rungisView='epal';renderRungis()">🟫 Palettes${epalToValidate().length?` (${epalToValidate().length} à valider)`:""}</button></span></div>
+  if(rungisView==="epal"){ el.innerHTML=head+main; return; }
+  el.innerHTML=`${head}
   ${stepsHTML()}
   <div class="grid-r"><div>${main}</div>
     <div style="display:flex;flex-direction:column;gap:16px">
