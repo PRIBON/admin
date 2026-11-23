@@ -434,7 +434,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.18.0"; // 2.18.0 = Enlèvements Rungis › 🔳 QR codes du jour : calendrier, détail par type et lieu, tout imprimer ou sélection (même étiquette que Kelbongoo V11.74, scan chauffeur) // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.18.1"; // 2.18.1 = 🔐 Base fermée : session 12 h expirée ou refus de la base → bandeau « Se reconnecter » (plus d'échec silencieux) · 2.18.0 = 2.18.0 = Enlèvements Rungis › 🔳 QR codes du jour : calendrier, détail par type et lieu, tout imprimer ou sélection (même étiquette que Kelbongoo V11.74, scan chauffeur) // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
 const OAUTH_CLIENT_ID = "757658680772-ogalpu5olqd2fiovnbnj55j1g0lbq7rr.apps.googleusercontent.com";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzSMWziEuPvxY6UvM6FimJlFCTE1v9u1mWh3gJXbOtMVlHcb478_gASeIwZ1PMEw7-2Sw/exec";
 // Un objet par magasin. Colle la config Firebase de CHAQUE magasin (comme dans son index.html).
@@ -574,6 +574,28 @@ async function sessTokens(){
   return out;
 }
 let SESS_OK=false;
+// v2.18.1 — BASE FERMÉE : la session responsable dure 12 h. Après (ou si une base refuse), tout échouait en silence.
+//   → bandeau rouge « Session expirée — Se reconnecter » (recharge la page = nouvelle connexion Google).
+let SESS_AT=0;
+function sessExpired(why){
+  if(document.getElementById("sessBar")) return;
+  const b=document.createElement("div"); b.id="sessBar";
+  b.style.cssText="position:fixed;left:0;right:0;top:0;z-index:100000;background:#c62828;color:#fff;font:700 14px -apple-system,Segoe UI,sans-serif;text-align:center;padding:10px 12px;box-shadow:0 2px 8px rgba(0,0,0,.25)";
+  b.innerHTML='🔐 Session expirée'+(why?' ('+why+')':'')+' — les données ne se mettent plus à jour. <button onclick="location.reload()" style="margin-left:10px;background:#fff;color:#c62828;border:0;border-radius:6px;padding:6px 14px;font-weight:800;cursor:pointer">Se reconnecter</button>';
+  (document.body||document.documentElement).appendChild(b);
+}
+(function(){
+  const denied=e=>/permission/i.test(String((e&&(e.code||e.message))||""));
+  setInterval(()=>{ if(SESS_AT && Date.now()-SESS_AT>11.75*3600e3) sessExpired("12 h"); },60000);
+  try{
+    const R=firebase.database.Reference.prototype;
+    ["set","update","remove","transaction"].forEach(fn=>{ const o=R[fn]; if(typeof o!=="function") return;
+      R[fn]=function(...a){ return o.apply(this,a).catch(e=>{ if(SESS_AT&&denied(e)) sessExpired("enregistrement refusé"); throw e; }); }; });
+    const on=R.on;
+    R.on=function(t,cb,c,ctx){ const cc=(e)=>{ if(SESS_AT&&denied(e)) sessExpired("lecture refusée"); if(typeof c==="function") try{ c(e); }catch(_){} };
+      return on.call(this,t,cb,cc,(typeof c==="function")?ctx:c); };
+  }catch(e){ console.error("sess-watch",e); }
+})();
 // Tous les appels aux scripts Google portent les jetons de la console (fb) : le serveur vérifie la session.
 (function(){
   if (!window.fetch || window.__pribonFetch) return;
@@ -598,7 +620,7 @@ async function onCredential(resp){
   fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:JSON.stringify({action:"verify-responsable",idToken:ID_TOKEN,fb})})
     .then(r=>r.json()).then(j=>{
-      if(j&&j.allowed){ document.getElementById("gateErr").textContent=""; SESS_OK=!!(j.sessions&&j.sessions.prep); start(j.email); try{ document.getElementById("sideVer").textContent="Responsable · v"+APP_VERSION+(SESS_OK?" 🔒":" 🔓"); }catch(e){} }
+      if(j&&j.allowed){ document.getElementById("gateErr").textContent=""; SESS_OK=!!(j.sessions&&j.sessions.prep); SESS_AT=Date.now(); start(j.email); try{ document.getElementById("sideVer").textContent="Responsable · v"+APP_VERSION+(SESS_OK?" 🔒":" 🔓"); }catch(e){} }
       else document.getElementById("gateErr").textContent="Accès refusé : "+((j&&j.email)||"")+" n'est pas autorisé.";
     }).catch(e=>document.getElementById("gateErr").textContent="Erreur : "+e.message);
 }
