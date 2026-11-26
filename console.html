@@ -381,6 +381,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
       <button class="tab" data-tab="rungis" data-key="rungisqr" data-rview="qr"><span class="em">🔳</span><span class="lbl">QR codes du jour</span><span class="cnt" id="cnt-rungisqr"></span></button>
       <button class="tab" data-tab="sapins" data-key="sapins"><span class="em">🎄</span><span class="lbl">Sapins</span><span class="cnt" id="cnt-sapins"></span></button>
       <button class="tab" data-tab="inventaire" data-key="inventaire"><span class="em">📋</span><span class="lbl">Inventaires</span><span class="cnt" id="cnt-inventaire"></span></button>
+      <button class="tab" data-tab="chat" data-key="chat"><span class="em">💬</span><span class="lbl">Chat équipe Centrale</span><span class="cnt" id="cnt-chat"></span></button>
     </div>
     <div class="kgrp" style="--g:#e9c46a">
       <div class="kgrp-h"><span class="kgrp-ic">🧀</span><span class="kgrp-t">Fromage</span></div>
@@ -429,6 +430,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
       <div id="tab-menage" class="hidden"></div>
       <div id="tab-fiches" class="hidden"></div>
       <div id="tab-design" class="hidden"></div>
+      <div id="tab-chat" class="hidden"></div>
     </div>
   </div>
 </div>
@@ -436,7 +438,7 @@ details.fr-day[open]>summary{border-bottom:1px solid var(--line)}
 <script>
 /* =========================== CONFIGURATION =========================== */
 // Version de l'app (voir VERSIONS.md). Comparée à get-version pour proposer la MAJ.
-const APP_VERSION = "2.19.0"; // 2.19.0 = 🎨 Réglages › Design & thèmes : thème « Fêtes de fin d'année » (guirlande, neige légère, Père Noël sur l'accueil, cadeau à la validation), dessins faits main, animations coupables · 2.18.1 = 🔐 Base fermée : session 12 h expirée ou refus de la base → bandeau « Se reconnecter » (plus d'échec silencieux) · 2.18.0 = 2.18.0 = Enlèvements Rungis › 🔳 QR codes du jour : calendrier, détail par type et lieu, tout imprimer ou sélection (même étiquette que Kelbongoo V11.74, scan chauffeur) // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
+const APP_VERSION = "2.20.0"; // 2.20.0 = 💬 Entrepôt PDP › Chat équipe Centrale : écrire à un opérateur connecté (Discussion ou À valider avec initiales), mêmes fils que le Master Kelbongoo · 2.19.0 = 🎨 Réglages › Design & thèmes : thème « Fêtes de fin d'année » (guirlande, neige légère, Père Noël sur l'accueil, cadeau à la validation), dessins faits main, animations coupables · 2.18.1 = 🔐 Base fermée : session 12 h expirée ou refus de la base → bandeau « Se reconnecter » (plus d'échec silencieux) · 2.18.0 = 2.18.0 = Enlèvements Rungis › 🔳 QR codes du jour : calendrier, détail par type et lieu, tout imprimer ou sélection (même étiquette que Kelbongoo V11.74, scan chauffeur) // 2.17.0 = Enlèvements Rungis refondus : 📅 calendrier coloré (vert OK / orange en cours / rouge problème) + détail du jour (photo, emplacement, qui, quand, chauffeur, BL) · ⚠️ À traiter · 📚 Historique recherchable · 💬 questions ↔ Rungis (réponse dans l'appli Kelbongoo › Espace Rungis) // 2.16.0 = Réception : ✖ retirer un fichier chargé par erreur (commande / BL, simple + multi) · facture PDF AGIDRA lue · réf. avec zéros en tête rapprochées (074128 = 74128) · fournisseur inconnu : lecture du PDF guidée par la commande (réf. fournisseur / EAN) // 2.15.0 = Picking : diagnostic ligne par ligne au chargement (bonne colonne quantité, doublons, EAN invalides, fournisseurs décalés) · Réception : Relais Vert traité comme Vitafrais (unités → colis G5) + contrôle avant envoi // 2.14.0 = Ménage : jour prévu sans pointage = pas passé (déduit) · « Fermé » = annulé par le magasin (payé) // 2.13.3 = Ménage : enregistrement fiable (délai max 60 s + message clair) · bouton « Mettre à jour le Sheet » // 2.13.2 = sécurité : jeton Google transmis seulement aux écrans de la Vue appli (message ciblé) // 2.13.1 = fiches : brouillon auto + alerte si le serveur n'enregistre pas · prix/passage annualisé · lien Google Sheet · lecture facture Équipage · Vue appli ne recharge plus toutes les 4 s // 2.13.0 = Fiches magasins (Référentiels) + Vue appli 3 vues (Centrale & ménage / Magasin admin multi / Réception multi, vue ordinateur) // 2.12.1 = URL Ménage branchée · 2.12.0 = menu façon Kelbongoo (groupes colorés) + onglet Ménage (passages, calendrier, factures prestataire) // 2.11.3 = Sapins : stock PDV (théorique) affiché dans Suivi + détail magasin // 2.11.2 = Sapins : mails @probon.fr remis (+ @probon.org en secours) // 2.11.0 = connexion sécurisée étape A (session responsable ouverte par le registre)
     // ============================================================
 // THÈMES DE FÊTES (Kelbongoo V11.78 · Console 2.19.0) — même module dans les deux applis
 //  • Thème choisi dans les Réglages (Aucun / Noël…). Rien n'est envoyé ailleurs : simple affichage.
@@ -860,6 +862,9 @@ function start(email){
     dbCentrale.ref("config/kbg_poids").on("value",snap=>{ centraleState.kbgPoids=snap.val()||{}; renderKbgPoids(); });
     dbCentrale.ref("config/kbg_produits").on("value",snap=>{ centraleState.kbgSite=snap.val()||{}; KBG_SITE=(centraleState.kbgSite&&centraleState.kbgSite.items)||{}; kbgRebuildRef(); renderKbgPoids(); });
     dbCentrale.ref("broadcasts").on("value",snap=>{ centraleState.broadcasts=snap.val()||{}; renderMsg(); });
+    // 2.20.0 — 💬 chat équipe Centrale (mêmes fils que le Master Kelbongoo)
+    dbCentrale.ref("chat/presence").on("value",snap=>{ CHAT.pres=snap.val()||{}; chatTick(); });
+    dbCentrale.ref("chat/msgs").orderByChild("at").startAt(Date.now()-7*86400000).on("value",snap=>{ CHAT.msgs=snap.val()||{}; chatTick(); });
     // v2.0 — enlèvements Rungis + note du soir (console : accueil, page Enlèvements Rungis)
     dbCentrale.ref("enlevements").orderByChild("at").startAt(Date.now()-21*86400000).on("value",snap=>{ centraleState.enlevements=snap.val()||{}; dashTick(true); });
     // v2.4.0 — registre des palettes EPAL (envois validés par Rungis, retours chauffeur, ajustements console)
@@ -885,10 +890,10 @@ function start(email){
   setInterval(()=>dashTick(false), 4000);
 }
 let ACTIVE_TAB="home", ACTIVE_KEY="home";
-const TAB_IDS=["home","multi","g5","centrale","rungis","sapins","inventaire","kbgpoids","fromage","blf","avoirs","suivi","msg","fourn","appview","menage","fiches","design"];
+const TAB_IDS=["home","multi","g5","centrale","rungis","sapins","inventaire","kbgpoids","fromage","blf","avoirs","suivi","msg","fourn","appview","menage","fiches","design","chat"];
 const CRUMBS={ home:["Pilotage","Aujourd'hui"], suivi:["Pilotage","Suivi live"], multi:["Magasins","Chargement BL"], g5:["Magasins","Réceptions G5"], avoirs:["Magasins","Avoirs"], msg:["Magasins","Messages"],
   centrale:["Entrepôt PDP","Dispatch & Picking"], decoupe:["Fromage","Découpes par BL"], traca:["Fromage","Traçabilité lots"], fromage:["Fromage","Suivi fromage"], blf:["Fromage","BL fromage"], rungis:["Entrepôt PDP","Enlèvements Rungis"], rungisqr:["Entrepôt PDP","QR codes du jour"], sapins:["Entrepôt PDP","🎄 Sapins"], inventaire:["Entrepôt PDP","Inventaires"], kbgpoids:["Fromage","Poids Kelbongoo"],
-  fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli"], menage:["Magasins","Ménage"], fiches:["Référentiels & outils","Fiches magasins"], design:["Référentiels & outils","Design & thèmes"] };
+  fourn:["Référentiels & outils","Fournisseurs"], appview:["Référentiels & outils","Vue appli"], menage:["Magasins","Ménage"], fiches:["Référentiels & outils","Fiches magasins"], design:["Référentiels & outils","Design & thèmes"], chat:["Entrepôt PDP","Chat équipe Centrale"] };
 function switchTab(t, key){
   if(TAB_IDS.indexOf(t)<0) t="home";
   key = key || (t==="centrale" && centraleView==="decoupe" ? "decoupe" : (t==="centrale" && centraleView==="traca" ? "traca" : t));
@@ -911,6 +916,7 @@ function switchTab(t, key){
   if(t==="menage") renderMenage();
   if(t==="fiches") renderFiches();
   if(t==="design") renderDesign();
+  if(t==="chat") renderChat();
   try{ kbThemeHome(t==="home"); }catch(e){}
   try{ window.scrollTo(0,0); }catch(e){}
 }
@@ -5611,6 +5617,78 @@ async function envoyerMailRungis(relance){
 function toastC(msg){ let t=document.getElementById("toastC"); if(!t){ t=document.createElement("div"); t.id="toastC"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1f1d1a;color:#fff;padding:10px 16px;border-radius:10px;font:600 13px Inter,sans-serif;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity .3s"; document.body.appendChild(t); }
   t.textContent=msg; t.style.opacity="1"; clearTimeout(t._h); t._h=setTimeout(()=>{ t.style.opacity="0"; }, 3200);
   try{ kbThemeGift(msg); }catch(e){} }
+
+/* ==================== 2.20.0 — 💬 CHAT ÉQUIPE CENTRALE ====================
+   Base Centrale (fermée, session responsable) : chat/presence/<appareil> (opérateurs connectés, 60 s) et chat/msgs/<id>.
+   Mêmes fils que le Master Kelbongoo (Master › 💬 › Équipe › Centrale). Tout le texte est échappé (esc) avant affichage. */
+const CHAT={ pres:{}, msgs:{}, to:null, mode:"chat" };
+function chatArr(t){ return Array.isArray(t)?t.filter(Boolean):Object.values(t||{}).filter(Boolean).sort((a,b)=>(a.at||0)-(b.at||0)); }
+function chatMe(){ const l=String(ME_EMAIL||"").split("@")[0].toLowerCase(); return ({hg:"Henry",rr:"Raimbaud"})[l] || (l?l.charAt(0).toUpperCase()+l.slice(1):"Responsable"); }
+function chatHm(ts){ try{ const d=new Date(ts); return (new Date().toDateString()===d.toDateString()?"":d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})+" ")+d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}); }catch(e){ return ""; } }
+function chatOnline(){ const now=Date.now(); return Object.keys(CHAT.pres).map(k=>({ dev:k, ...CHAT.pres[k] })).filter(p=>p&&p.name&&now-(p.at||0)<5*60000).sort((a,b)=>String(a.name).localeCompare(String(b.name),"fr")); }
+function chatList(){ return Object.keys(CHAT.msgs).map(id=>({ id, ...CHAT.msgs[id], thread:chatArr(CHAT.msgs[id].thread) })).sort((a,b)=>(b.at||0)-(a.at||0)); }
+function chatTick(){ try{ setCnt("chat", chatList().filter(m=>m.status==="new").length, "r"); }catch(e){} if(ACTIVE_TAB==="chat") renderChatLists(); }
+function renderChat(){
+  const el=document.getElementById("tab-chat"); if(!el) return;
+  if(!el.dataset.built){
+    el.innerHTML=`<div class="card" style="padding:16px">
+      <h2 style="margin:0 0 4px">💬 Chat équipe Centrale</h2>
+      <p class="muted" style="margin:0 0 12px">Écris à une personne connectée à la Centrale. <b>💬 Discussion</b> : la personne répond. <b>✅ À valider</b> : elle valide avec ses initiales. Les mêmes fils sont visibles dans le Master Kelbongoo.</p>
+      <div style="font-weight:700;margin-bottom:6px">1. À qui ? <span class="muted" style="font-weight:400">(connectés ces 5 dernières minutes)</span></div>
+      <div id="chatWho" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
+      <div style="font-weight:700;margin-bottom:6px">2. Quel type ?</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="btn" id="chatModeChat" onclick="CHAT.mode='chat';renderChatLists()">💬 Discussion</button>
+        <button class="btn" id="chatModeAck" onclick="CHAT.mode='ack';renderChatLists()">✅ À valider</button></div>
+      <div style="display:flex;gap:8px"><textarea id="chatTxt" rows="2" maxlength="1000" placeholder="Ton message…" style="flex:1;font-size:15px;padding:8px 10px;border-radius:10px;border:1px solid #d6ddd8"></textarea>
+        <button class="btn" onclick="chatSend()" style="width:auto">Envoyer ➤</button></div>
+      <div id="chatOut" style="margin-top:6px"></div></div>
+      <div id="chatThreads" style="margin-top:14px"></div>`;
+    el.dataset.built="1";
+  }
+  renderChatLists();
+}
+function renderChatLists(){
+  const who=document.getElementById("chatWho"); if(!who) return;
+  const on=chatOnline();
+  if(CHAT.to && !on.some(p=>p.dev===CHAT.to.dev)) CHAT.to=null;
+  who.innerHTML=on.length?on.map(p=>`<button class="btn" data-dev="${esc(p.dev)}" style="padding:7px 12px;font-size:14px;${CHAT.to&&CHAT.to.dev===p.dev?'background:#fff3e0;color:#e65100;outline:2px solid #ef6c00':'background:#eef2f7;color:#222'}">🏭 ${esc(p.name)} <span style="font-weight:400;font-size:12px">· ${esc(p.module||"")}</span></button>`).join(""):'<span class="muted">Personne de la Centrale en ligne pour l\'instant.</span>';
+  who.querySelectorAll("button[data-dev]").forEach(b=>b.onclick=()=>{ const p=on.find(x=>x.dev===b.dataset.dev); CHAT.to=(CHAT.to&&CHAT.to.dev===p.dev)?null:p; renderChatLists(); });
+  const mc=document.getElementById("chatModeChat"), ma=document.getElementById("chatModeAck");
+  if(mc&&ma){ [[mc,"chat"],[ma,"ack"]].forEach(([b,k])=>{ b.style.background=CHAT.mode===k?"#1a4d2e":"#eef2f7"; b.style.color=CHAT.mode===k?"#fff":"#222"; }); }
+  const ta=document.getElementById("chatTxt"); if(ta) ta.placeholder=CHAT.to?("Message pour "+CHAT.to.name+"…"):"Choisis d'abord la personne";
+  const box=document.getElementById("chatThreads"); if(!box || focusInside("chatThreads")) return;
+  const L=chatList();
+  box.innerHTML=L.length?L.map(m=>{ const ack=m.thread.find(t=>t.ack);
+    const st=ack?('✅ validé par '+esc(ack.ack)+' à '+chatHm(ack.at)):m.status==="done"?'✓ terminé':m.userReadAt?'👀 vu à '+chatHm(m.userReadAt):'⏳ pas encore vu';
+    return `<div class="card" style="padding:12px;margin-bottom:10px;border:2px solid ${m.status==="new"?'#ef6c00':'#e3e8e5'};${m.status==="done"?'opacity:.7':''}">
+      <div style="font-weight:700">${m.mode==="ack"?'✅ À valider':'💬 Discussion'} → ${esc(m.toName||"")} <span class="muted" style="font-weight:400">· ${esc(m.toModule||"")} · ${m.fromApp==="master"?'depuis le Master':'depuis la Console'}</span></div>
+      <div style="font-size:12px;font-weight:600;color:${m.status==="new"?'#e65100':'#666'};margin:2px 0 6px">${m.status==="new"?'🔔 nouvelle réponse · ':''}${st}</div>
+      ${m.thread.map(t=>`<div style="display:flex;justify-content:${t.by==="bureau"?"flex-end":"flex-start"};margin:4px 0"><div style="max-width:80%;background:${t.by==="bureau"?"#eef3fb":"#e8f5e9"};border-radius:12px;padding:6px 10px"><div style="font-size:11px;color:#607d8b;font-weight:700">${esc(t.from||"")} · ${chatHm(t.at)}</div><div style="white-space:pre-wrap;word-break:break-word">${esc(t.text||"")}</div></div></div>`).join("")}
+      ${m.status!=="done"?`<div style="display:flex;gap:6px;margin-top:8px">${m.mode!=="ack"?`<input id="chatR_${esc(m.id)}" maxlength="1000" placeholder="Répondre…" style="flex:1;padding:8px 10px;border-radius:10px;border:1px solid #d6ddd8" onkeydown="if(event.key==='Enter')chatAnswer('${esc(m.id)}',false)"><button class="btn" style="width:auto" onclick="chatAnswer('${esc(m.id)}',false)">➤</button>`:''}<button class="btn" style="width:auto;background:#eef2f7;color:#222" onclick="chatAnswer('${esc(m.id)}',true)">✓ Clore</button></div>`:''}
+    </div>`; }).join(""):'<p class="muted">Aucun message envoyé à la Centrale ces 7 derniers jours.</p>';
+}
+async function chatSend(){
+  const out=document.getElementById("chatOut"), ta=document.getElementById("chatTxt"), t=String(ta&&ta.value||"").trim();
+  if(!dbCentrale){ out.innerHTML='<div class="err">Connexion centrale indisponible.</div>'; return; }
+  if(!CHAT.to){ out.innerHTML='<div class="err">Choisis la personne.</div>'; return; }
+  if(!t){ out.innerHTML='<div class="err">Écris le message.</div>'; return; }
+  const now=Date.now();
+  try{
+    await dbCentrale.ref("chat/msgs").push({ to:CHAT.to.dev, toName:String(CHAT.to.name||"").slice(0,60), toModule:String(CHAT.to.module||"").slice(0,40), mode:CHAT.mode==="ack"?"ack":"chat", status:"open", at:now, fromApp:"console", userReadAt:0,
+      thread:[{ by:"bureau", from:chatMe(), text:t.slice(0,1000), at:now }] });
+    ta.value=""; out.innerHTML='<div class="ok">✓ '+(CHAT.mode==="ack"?'Envoyé à valider à ':'Envoyé à ')+esc(CHAT.to.name)+'</div>';
+  }catch(e){ out.innerHTML='<div class="err">Pas envoyé : '+esc(e.message||e)+'</div>'; }
+}
+async function chatAnswer(id, done){
+  const m=chatList().find(x=>x.id===id); if(!m) return;
+  const inp=document.getElementById("chatR_"+id), t=String(inp&&inp.value||"").trim();
+  if(!t && !done) return;
+  const th=t?m.thread.concat([{ by:"bureau", from:chatMe(), text:t.slice(0,1000), at:Date.now() }]).slice(-60):m.thread;
+  try{ await dbCentrale.ref("chat/msgs/"+id).update({ thread:th, status:done?"done":"answered" }); if(inp) inp.value=""; renderChatLists(); }
+  catch(e){ alert("Pas envoyé : "+(e.message||e)); }
+}
+
 /* 2.19.0 — Réglages › 🎨 Design & thèmes (choix enregistré sur cet appareil) */
 function renderDesign(){
   const el=document.getElementById("tab-design"); if(!el) return;
